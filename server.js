@@ -403,10 +403,8 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/sw.js') {
         headers['Service-Worker-Allowed'] = '/';
-        headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-    } else if (ext === '.html') {
-        headers['Cache-Control'] = 'no-cache, must-revalidate';
     }
+    headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
 
     fs.readFile(filePath, (err, content) => {
         if (err) {
