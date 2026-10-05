@@ -791,6 +791,7 @@ function renderTree() {
             if (pinBadge) item.appendChild(pinBadge);
             item.appendChild(actions);
 
+            item.dataset.id = node.id;
             item.onclick = () => selectNode(node.id);
             item.oncontextmenu = (e) => {
                 e.preventDefault();
@@ -821,12 +822,19 @@ function renderTree() {
     }
 
     buildBranch(null, treeContainer);
-    treeContainer.oncontextmenu = (e) => {
-        if (e.target === treeContainer) {
+    const sidebarEl = document.getElementById('sidebar');
+    if (sidebarEl) {
+        sidebarEl.oncontextmenu = (e) => {
+            if (e.target.closest('button.icon-btn-small')) return;
             e.preventDefault();
-            openTreeContextMenu(e, null);
-        }
-    };
+            const nodeEl = e.target.closest('.tree-node');
+            if (nodeEl && nodeEl.dataset.id) {
+                openTreeContextMenu(e, nodeEl.dataset.id);
+            } else {
+                openTreeContextMenu(e, null);
+            }
+        };
+    }
 }
 
 function toggleNodeExpand(id) {
@@ -898,53 +906,90 @@ let activeContextMenuNodeId = null;
 
 function openTreeContextMenu(e, nodeId) {
     closeTreeContextMenu();
-    activeContextMenuNodeId = nodeId;
     const menu = document.getElementById('tree-context-menu');
     if (!menu) return;
 
     if (nodeId && state.nodes.has(nodeId)) {
         selectNode(nodeId);
-        const node = state.nodes.get(nodeId);
+    }
+
+    const targetId = nodeId || state.activeNodeId;
+    activeContextMenuNodeId = targetId;
+
+    const ctxNewRoot = document.getElementById('ctx-new-root');
+    const ctxSubnode = document.getElementById('ctx-subnode');
+    const ctxDivider1 = document.getElementById('ctx-divider-1');
+    const ctxPin = document.getElementById('ctx-pin');
+    const ctxRename = document.getElementById('ctx-rename');
+    const ctxColor = document.getElementById('ctx-color');
+    const ctxIcon = document.getElementById('ctx-icon');
+    const ctxDuplicate = document.getElementById('ctx-duplicate');
+    const ctxReadonly = document.getElementById('ctx-readonly');
+    const ctxExpandAll = document.getElementById('ctx-expand-all');
+    const ctxCollapseAll = document.getElementById('ctx-collapse-all');
+    const ctxDivider2 = document.getElementById('ctx-divider-2');
+    const ctxDelete = document.getElementById('ctx-delete');
+
+    if (targetId && state.nodes.has(targetId)) {
+        const node = state.nodes.get(targetId);
         const isPinned = !!node.is_pinned;
-        const pinText = document.getElementById('ctx-pin-text');
-        if (pinText) pinText.textContent = isPinned ? 'Unpin Note' : 'Pin to Top';
+        const isReadOnly = !!node.is_readonly;
 
-        const readonlyText = document.getElementById('ctx-readonly-text');
-        if (readonlyText) readonlyText.textContent = node.is_readonly ? 'Make Editable' : 'Make Read-Only';
+        if (ctxPin) {
+            const pinText = document.getElementById('ctx-pin-text');
+            if (pinText) pinText.textContent = isPinned ? 'Unpin Note' : 'Pin to Top';
+            ctxPin.style.display = 'flex';
+        }
 
-        document.getElementById('ctx-pin').style.display = 'flex';
-        document.getElementById('ctx-rename').style.display = 'flex';
-        document.getElementById('ctx-color').style.display = 'flex';
-        document.getElementById('ctx-icon').style.display = 'flex';
-        document.getElementById('ctx-subnode').style.display = 'flex';
-        const subnodeText = document.querySelector('#ctx-subnode span');
-        if (subnodeText) subnodeText.textContent = 'Add Sub-Note';
-        document.getElementById('ctx-duplicate').style.display = 'flex';
-        document.getElementById('ctx-readonly').style.display = 'flex';
-        document.getElementById('ctx-delete').style.display = 'flex';
+        if (ctxReadonly) {
+            const readonlyText = document.getElementById('ctx-readonly-text');
+            if (readonlyText) readonlyText.textContent = isReadOnly ? 'Make Editable' : 'Make Read-Only';
+            const readonlySvg = document.getElementById('ctx-readonly-svg');
+            if (readonlySvg) {
+                readonlySvg.innerHTML = isReadOnly 
+                    ? `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>`
+                    : `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`;
+            }
+            ctxReadonly.style.display = 'flex';
+        }
+
+        if (ctxNewRoot) ctxNewRoot.style.display = 'flex';
+        if (ctxSubnode) ctxSubnode.style.display = 'flex';
+        if (ctxDivider1) ctxDivider1.style.display = 'block';
+        if (ctxRename) ctxRename.style.display = 'flex';
+        if (ctxColor) ctxColor.style.display = 'flex';
+        if (ctxIcon) ctxIcon.style.display = 'flex';
+        if (ctxDuplicate) ctxDuplicate.style.display = 'flex';
+        if (ctxExpandAll) ctxExpandAll.style.display = 'none';
+        if (ctxCollapseAll) ctxCollapseAll.style.display = 'none';
+        if (ctxDivider2) ctxDivider2.style.display = 'block';
+        if (ctxDelete) ctxDelete.style.display = 'flex';
     } else {
-        // Clicked on empty tree container background
-        document.getElementById('ctx-pin').style.display = 'none';
-        document.getElementById('ctx-rename').style.display = 'none';
-        document.getElementById('ctx-color').style.display = 'none';
-        document.getElementById('ctx-icon').style.display = 'none';
-        document.getElementById('ctx-duplicate').style.display = 'none';
-        document.getElementById('ctx-readonly').style.display = 'none';
-        document.getElementById('ctx-delete').style.display = 'none';
-        document.getElementById('ctx-subnode').style.display = 'flex';
-        const subnodeText = document.querySelector('#ctx-subnode span');
-        if (subnodeText) subnodeText.textContent = '+ New Root Note';
+        // No node targeted (empty tree or no active note)
+        if (ctxNewRoot) ctxNewRoot.style.display = 'flex';
+        if (ctxSubnode) ctxSubnode.style.display = 'none';
+        if (ctxDivider1) ctxDivider1.style.display = 'block';
+        if (ctxPin) ctxPin.style.display = 'none';
+        if (ctxRename) ctxRename.style.display = 'none';
+        if (ctxColor) ctxColor.style.display = 'none';
+        if (ctxIcon) ctxIcon.style.display = 'none';
+        if (ctxDuplicate) ctxDuplicate.style.display = 'none';
+        if (ctxReadonly) ctxReadonly.style.display = 'none';
+        if (ctxExpandAll) ctxExpandAll.style.display = 'flex';
+        if (ctxCollapseAll) ctxCollapseAll.style.display = 'flex';
+        if (ctxDivider2) ctxDivider2.style.display = 'none';
+        if (ctxDelete) ctxDelete.style.display = 'none';
     }
 
     // Position menu with window boundary checks
     menu.style.display = 'flex';
-    const menuWidth = 190;
-    const menuHeight = 280;
+    const menuWidth = 200;
+    const menuHeight = 340;
     let x = e.clientX;
     let y = e.clientY;
 
-    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
-    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 12;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 12;
 
     menu.style.left = `${Math.max(10, x)}px`;
     menu.style.top = `${Math.max(10, y)}px`;
@@ -1312,9 +1357,13 @@ function applyReadOnlyState(isReadOnly) {
         btn.innerHTML = `${isReadOnly ? lockSvg : unlockSvg}<span>${isReadOnly ? 'Read Only' : 'Read/Write'}</span>`;
         btn.className = `btn btn-sm ${isReadOnly ? 'btn-danger' : 'btn-secondary'}`;
     }
+    const badge = document.getElementById('readonly-badge');
+    if (badge) {
+        badge.style.display = isReadOnly ? 'inline-flex' : 'none';
+    }
     noteEditor.contentEditable = !isReadOnly;
     noteTitleInput.readOnly = isReadOnly;
-    noteTagsInput.readOnly = isReadOnly;
+    if (noteTagsInput) noteTagsInput.readOnly = isReadOnly;
 }
 
 // --- WYSIWYG Formatting Actions ---
@@ -2778,69 +2827,103 @@ function setupEventListeners() {
     document.getElementById('btn-tbl-del-table').onclick = deleteEntireTable;
 
     // Node Actions
-    document.getElementById('btn-new-root').onclick = createNewRootNode;
+    const btnNewRoot = document.getElementById('btn-new-root');
+    if (btnNewRoot) btnNewRoot.onclick = createNewRootNode;
     const btnNewMeta = document.getElementById('btn-new-note-meta');
     if (btnNewMeta) btnNewMeta.onclick = createNewRootNode;
     const btnPin = document.getElementById('btn-pin-node');
     if (btnPin) btnPin.onclick = togglePinActiveNode;
     const btnRename = document.getElementById('btn-rename-node');
     if (btnRename) btnRename.onclick = renameActiveNode;
-    document.getElementById('btn-add-subnode').onclick = () => {
+    const btnAddSub = document.getElementById('btn-add-subnode');
+    if (btnAddSub) btnAddSub.onclick = () => {
         if (state.activeNodeId) createSubNode(state.activeNodeId);
     };
-    document.getElementById('btn-duplicate-node').onclick = duplicateCurrentNode;
-    document.getElementById('btn-toggle-readonly').onclick = toggleReadOnlyMode;
-    document.getElementById('btn-delete-node').onclick = () => {
+    const btnDup = document.getElementById('btn-duplicate-node');
+    if (btnDup) btnDup.onclick = duplicateCurrentNode;
+    const btnToggleRo = document.getElementById('btn-toggle-readonly');
+    if (btnToggleRo) btnToggleRo.onclick = toggleReadOnlyMode;
+    const btnDel = document.getElementById('btn-delete-node');
+    if (btnDel) btnDel.onclick = () => {
         if (state.activeNodeId) deleteNode(state.activeNodeId);
     };
+    const readonlyBadge = document.getElementById('readonly-badge');
+    if (readonlyBadge) readonlyBadge.onclick = toggleReadOnlyMode;
 
     // Tree Right-Click Context Menu Actions
-    const ctxPin = document.getElementById('ctx-pin');
-    if (ctxPin) ctxPin.onclick = () => {
-        if (activeContextMenuNodeId) togglePinNode(activeContextMenuNodeId);
+    const ctxNewRoot = document.getElementById('ctx-new-root');
+    if (ctxNewRoot) ctxNewRoot.onclick = () => {
         closeTreeContextMenu();
-    };
-    const ctxRename = document.getElementById('ctx-rename');
-    if (ctxRename) ctxRename.onclick = () => {
-        closeTreeContextMenu();
-        renameActiveNode();
-    };
-    const ctxColor = document.getElementById('ctx-color');
-    if (ctxColor) ctxColor.onclick = () => {
-        closeTreeContextMenu();
-        openNodeColorModal();
-    };
-    const ctxIcon = document.getElementById('ctx-icon');
-    if (ctxIcon) ctxIcon.onclick = () => {
-        closeTreeContextMenu();
-        openIconModal();
+        createNewRootNode();
     };
     const ctxSubnode = document.getElementById('ctx-subnode');
     if (ctxSubnode) ctxSubnode.onclick = () => {
-        const tid = activeContextMenuNodeId;
+        const tid = activeContextMenuNodeId || state.activeNodeId;
         closeTreeContextMenu();
         if (tid) createSubNode(tid);
         else createNewRootNode();
     };
+    const ctxPin = document.getElementById('ctx-pin');
+    if (ctxPin) ctxPin.onclick = () => {
+        const tid = activeContextMenuNodeId || state.activeNodeId;
+        if (tid) togglePinNode(tid);
+        closeTreeContextMenu();
+    };
+    const ctxRename = document.getElementById('ctx-rename');
+    if (ctxRename) ctxRename.onclick = () => {
+        const tid = activeContextMenuNodeId || state.activeNodeId;
+        closeTreeContextMenu();
+        if (tid && tid !== state.activeNodeId) selectNode(tid);
+        renameActiveNode();
+    };
+    const ctxColor = document.getElementById('ctx-color');
+    if (ctxColor) ctxColor.onclick = () => {
+        const tid = activeContextMenuNodeId || state.activeNodeId;
+        closeTreeContextMenu();
+        if (tid && tid !== state.activeNodeId) selectNode(tid);
+        openNodeColorModal();
+    };
+    const ctxIcon = document.getElementById('ctx-icon');
+    if (ctxIcon) ctxIcon.onclick = () => {
+        const tid = activeContextMenuNodeId || state.activeNodeId;
+        closeTreeContextMenu();
+        if (tid && tid !== state.activeNodeId) selectNode(tid);
+        openIconModal();
+    };
     const ctxDuplicate = document.getElementById('ctx-duplicate');
     if (ctxDuplicate) ctxDuplicate.onclick = () => {
+        const tid = activeContextMenuNodeId || state.activeNodeId;
         closeTreeContextMenu();
+        if (tid && tid !== state.activeNodeId) selectNode(tid);
         duplicateCurrentNode();
     };
     const ctxReadonly = document.getElementById('ctx-readonly');
     if (ctxReadonly) ctxReadonly.onclick = () => {
+        const tid = activeContextMenuNodeId || state.activeNodeId;
         closeTreeContextMenu();
+        if (tid && tid !== state.activeNodeId) selectNode(tid);
         toggleReadOnlyMode();
+    };
+    const ctxExpandAll = document.getElementById('ctx-expand-all');
+    if (ctxExpandAll) ctxExpandAll.onclick = () => {
+        closeTreeContextMenu();
+        expandAll();
+    };
+    const ctxCollapseAll = document.getElementById('ctx-collapse-all');
+    if (ctxCollapseAll) ctxCollapseAll.onclick = () => {
+        closeTreeContextMenu();
+        collapseAll();
     };
     const ctxDelete = document.getElementById('ctx-delete');
     if (ctxDelete) ctxDelete.onclick = () => {
-        const tid = activeContextMenuNodeId;
+        const tid = activeContextMenuNodeId || state.activeNodeId;
         closeTreeContextMenu();
         if (tid) deleteNode(tid);
     };
 
     // Node Color
-    document.getElementById('btn-node-color').onclick = openNodeColorModal;
+    const btnNodeColor = document.getElementById('btn-node-color');
+    if (btnNodeColor) btnNodeColor.onclick = openNodeColorModal;
     document.querySelectorAll('.node-color-choice').forEach(btn => {
         btn.onclick = () => applyNodeColor(btn.dataset.color);
     });
