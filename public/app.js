@@ -466,6 +466,84 @@ function scheduleDriveAutoBackup() {
     }, 1800);
 }
 
+// --- Toast Notifications ---
+function showToast(message, isError = false) {
+    let toast = document.getElementById('cybernote-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'cybernote-toast';
+        toast.className = 'cybernote-toast';
+        document.body.appendChild(toast);
+    }
+    toast.className = 'cybernote-toast' + (isError ? ' toast-error' : '');
+    toast.innerHTML = (isError ? 
+        `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>` : 
+        `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="color:var(--success);"><polyline points="20 6 9 17 4 12"/></svg>`) + 
+        `<span>${message}</span>`;
+    toast.classList.add('show');
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3200);
+}
+
+// --- Instant Manual Sync ("Now Sync" Button) ---
+async function triggerManualSyncNow() {
+    const btnSyncNow = document.getElementById('btn-sync-now');
+    const svgIcon = document.getElementById('sync-now-svg');
+    const textLabel = document.getElementById('sync-now-text');
+
+    if (btnSyncNow) btnSyncNow.classList.add('syncing');
+    if (svgIcon) svgIcon.classList.add('spinning');
+    if (textLabel) textLabel.textContent = 'Syncing...';
+
+    // Flush any pending active editor saves immediately
+    if (state.activeNodeId) {
+        const titleVal = noteTitleInput.value;
+        const contentVal = noteEditor.innerHTML;
+        const tagsVal = noteTagsInput ? noteTagsInput.value : '';
+        const node = state.nodes.get(state.activeNodeId);
+        if (node) {
+            node.title = titleVal;
+            node.content = contentVal;
+            node.tags = tagsVal;
+            node.updated_at = Date.now();
+        }
+        if (state.isServerMode) {
+            fetch(`/api/nodes/${state.activeNodeId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: titleVal, content: contentVal, tags: tagsVal })
+            }).catch(() => {});
+        }
+    }
+    saveLocalNodesBackup();
+
+    try {
+        if (state.googleAccessToken) {
+            setSyncStatus('syncing', 'Syncing to Drive...');
+            await backupToGoogleDrive(false);
+            const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setSyncStatus('live', `Drive Synced (${nowStr})`);
+            showToast(`✓ Cloud Synced: All ${state.nodes.size} notes secured to Google Drive!`);
+        } else {
+            // Offline / Local storage sync
+            const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setSyncStatus('live', `Local Synced (${nowStr})`);
+            showToast(`✓ Local Storage Synced: ${state.nodes.size} notes secured offline!`);
+        }
+    } catch (err) {
+        console.error('Manual sync error:', err);
+        showToast(`Sync error: ${err.message}`, true);
+    } finally {
+        setTimeout(() => {
+            if (btnSyncNow) btnSyncNow.classList.remove('syncing');
+            if (svgIcon) svgIcon.classList.remove('spinning');
+            if (textLabel) textLabel.textContent = 'Now Sync';
+        }, 600);
+    }
+}
+
 // --- End-to-End Cryptography (AES-256-GCM + PBKDF2) ---
 async function deriveKey(password, salt) {
     const enc = new TextEncoder();
@@ -2788,9 +2866,13 @@ function setupEventListeners() {
         }
     });
 
-    // Undo / Redo
-    document.getElementById('btn-undo').onclick = () => execFormat('undo');
-    document.getElementById('btn-redo').onclick = () => execFormat('redo');
+    // Undo / Redo & Instant Manual Sync
+    const btnUndo = document.getElementById('btn-undo');
+    if (btnUndo) btnUndo.onclick = () => execFormat('undo');
+    const btnRedo = document.getElementById('btn-redo');
+    if (btnRedo) btnRedo.onclick = () => execFormat('redo');
+    const btnSyncNow = document.getElementById('btn-sync-now');
+    if (btnSyncNow) btnSyncNow.onclick = triggerManualSyncNow;
 
     // Font Family & Size
     document.getElementById('select-font-family').onchange = (e) => handleFontFamilyChange(e.target.value);
@@ -2994,7 +3076,8 @@ function setupEventListeners() {
     });
 
     // Find & Replace
-    document.getElementById('btn-toggle-find').onclick = toggleFindBar;
+    const btnToggleFind = document.getElementById('btn-toggle-find');
+    if (btnToggleFind) btnToggleFind.onclick = toggleFindBar;
     document.getElementById('btn-find-close').onclick = closeFindBar;
     document.getElementById('btn-find-next').onclick = performFind;
     document.getElementById('btn-find-replace').onclick = performReplace;
