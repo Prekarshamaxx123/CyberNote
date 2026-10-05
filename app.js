@@ -1890,6 +1890,7 @@ function selectNode(id) {
 function setEditorContent(content) {
     if (!content) {
         noteEditor.innerHTML = '';
+        initEditorHistory(state.activeNodeId, '');
         return;
     }
 
@@ -1906,6 +1907,7 @@ function setEditorContent(content) {
     } else {
         noteEditor.innerHTML = processed;
     }
+    initEditorHistory(state.activeNodeId, noteEditor.innerHTML);
 }
 
 function updateNodeColorDot(color) {
@@ -2582,7 +2584,19 @@ function applyAnimatedText(type) {
         }
     }
 
-    const animClasses = ['anim-rainbow-text', 'anim-pulse-text', 'anim-float-text'];
+    const animClasses = [
+        'anim-rainbow-text',
+        'anim-pulse-text',
+        'anim-float-text',
+        'anim-glitch-text',
+        'anim-shimmer-text',
+        'anim-bounce-text',
+        'anim-flicker-text',
+        'anim-hue-text',
+        'anim-flame-text',
+        'anim-blink-text',
+        'anim-pop-text'
+    ];
 
     if (targetSpan) {
         targetSpan.classList.remove(...animClasses);
@@ -2603,14 +2617,29 @@ function applyAnimatedText(type) {
         sel.addRange(newRange);
         saveSelection();
         handleEditorInput();
+        pushHistorySnapshot(true);
         return;
     }
 
     if (type === 'none') return;
 
     if (range.collapsed) {
-        const defaultText = type === 'rainbow' ? 'Rainbow Shimmering Title' : (type === 'pulse' ? 'Pulsing Ambient Text' : 'Floating Waves Text');
+        const sampleMap = {
+            rainbow: 'Rainbow Flowing Title',
+            pulse: 'Pulsing Ambient Text',
+            float: 'Floating Waves Text',
+            glitch: 'Cyber Glitch Effect',
+            shimmer: 'Metallic Shimmering Text',
+            bounce: 'Bouncing Energetic Text',
+            flicker: 'Flickering Neon Lamp',
+            hue: 'Hue Cycling Spectrum',
+            flame: 'Blazing Flame Text',
+            blink: 'Terminal Blinking Text',
+            pop: 'Heartbeat Zoom Pop'
+        };
+        const defaultText = sampleMap[type] || 'Animated Styled Text';
         insertHtmlAtCursor(`<span class="anim-${type}-text">${defaultText}</span>&nbsp;`);
+        pushHistorySnapshot(true);
         return;
     }
 
@@ -2628,6 +2657,7 @@ function applyAnimatedText(type) {
 
     saveSelection();
     handleEditorInput();
+    pushHistorySnapshot(true);
 }
 
 function insertSymbol(sym) {
@@ -3014,6 +3044,8 @@ window.insertTimeline = insertTimeline;
 window.insertQuoteCard = insertQuoteCard;
 window.insertFancyDivider = insertFancyDivider;
 window.toggleZenMode = toggleZenMode;
+window.performUndo = performUndo;
+window.performRedo = performRedo;
 
 // --- WYSIWYG Formatting Actions ---
 function execFormat(command, value = null) {
@@ -3021,6 +3053,7 @@ function execFormat(command, value = null) {
     noteEditor.focus();
     document.execCommand(command, false, value);
     handleEditorInput();
+    pushHistorySnapshot(true);
 }
 
 function handleFontFamilyChange(font) {
@@ -4665,11 +4698,186 @@ function selectIcon(iconName) {
     renderTree();
 }
 
+// ==========================================================================
+// UNDO & REDO HISTORY ENGINE (Snapshot-based Multi-Level State Manager)
+// ==========================================================================
+const editorHistory = {
+    stack: [],
+    index: -1,
+    maxSize: 60,
+    isUndoingRedoing: false,
+    debounceTimer: null,
+    currentNoteId: null
+};
+
+function initEditorHistory(noteId, initialContent) {
+    if (editorHistory.debounceTimer) {
+        clearTimeout(editorHistory.debounceTimer);
+        editorHistory.debounceTimer = null;
+    }
+    editorHistory.currentNoteId = noteId;
+    editorHistory.stack = [initialContent || ''];
+    editorHistory.index = 0;
+    editorHistory.isUndoingRedoing = false;
+    updateUndoRedoUI();
+}
+
+function pushHistorySnapshot(force = false) {
+    if (editorHistory.isUndoingRedoing) return;
+    if (state.isReadOnly || !state.activeNodeId) return;
+
+    const currentHtml = noteEditor.innerHTML;
+
+    // Avoid duplicate snapshots if content hasn't changed
+    if (editorHistory.index >= 0 && editorHistory.stack[editorHistory.index] === currentHtml) {
+        return;
+    }
+
+    const doPush = () => {
+        if (editorHistory.isUndoingRedoing) return;
+        // Truncate redo history if we are branched
+        if (editorHistory.index < editorHistory.stack.length - 1) {
+            editorHistory.stack = editorHistory.stack.slice(0, editorHistory.index + 1);
+        }
+
+        editorHistory.stack.push(currentHtml);
+        if (editorHistory.stack.length > editorHistory.maxSize) {
+            editorHistory.stack.shift();
+        } else {
+            editorHistory.index++;
+        }
+        updateUndoRedoUI();
+    };
+
+    if (force) {
+        if (editorHistory.debounceTimer) {
+            clearTimeout(editorHistory.debounceTimer);
+            editorHistory.debounceTimer = null;
+        }
+        doPush();
+    } else {
+        if (editorHistory.debounceTimer) clearTimeout(editorHistory.debounceTimer);
+        editorHistory.debounceTimer = setTimeout(() => {
+            doPush();
+            editorHistory.debounceTimer = null;
+        }, 350);
+    }
+}
+
+function performUndo() {
+    if (state.isReadOnly || !state.activeNodeId) return;
+
+    // Check if there is an unsaved debounced typing snapshot
+    if (editorHistory.debounceTimer) {
+        clearTimeout(editorHistory.debounceTimer);
+        editorHistory.debounceTimer = null;
+        const currentHtml = noteEditor.innerHTML;
+        if (editorHistory.index >= 0 && editorHistory.stack[editorHistory.index] !== currentHtml) {
+            if (editorHistory.index < editorHistory.stack.length - 1) {
+                editorHistory.stack = editorHistory.stack.slice(0, editorHistory.index + 1);
+            }
+            editorHistory.stack.push(currentHtml);
+            editorHistory.index++;
+        }
+    }
+
+    if (editorHistory.index > 0) {
+        editorHistory.isUndoingRedoing = true;
+        editorHistory.index--;
+        const previousHtml = editorHistory.stack[editorHistory.index];
+        noteEditor.innerHTML = previousHtml;
+
+        const node = state.nodes.get(state.activeNodeId);
+        if (node) {
+            node.content = previousHtml;
+            node.updated_at = Date.now();
+        }
+        scheduleSave('content', previousHtml);
+        updateWordStats();
+        updateDocumentStats();
+        updateUndoRedoUI();
+
+        editorHistory.isUndoingRedoing = false;
+        noteEditor.focus();
+        showToast('↺ Undo');
+        return;
+    }
+
+    // Fallback to browser execCommand if available
+    try {
+        noteEditor.focus();
+        const success = document.execCommand('undo');
+        if (success) {
+            updateWordStats();
+            updateDocumentStats();
+            showToast('↺ Undo');
+        }
+    } catch (e) {
+        console.warn('execCommand undo fallback error:', e);
+    }
+}
+
+function performRedo() {
+    if (state.isReadOnly || !state.activeNodeId) return;
+
+    if (editorHistory.index < editorHistory.stack.length - 1) {
+        editorHistory.isUndoingRedoing = true;
+        editorHistory.index++;
+        const nextHtml = editorHistory.stack[editorHistory.index];
+        noteEditor.innerHTML = nextHtml;
+
+        const node = state.nodes.get(state.activeNodeId);
+        if (node) {
+            node.content = nextHtml;
+            node.updated_at = Date.now();
+        }
+        scheduleSave('content', nextHtml);
+        updateWordStats();
+        updateDocumentStats();
+        updateUndoRedoUI();
+
+        editorHistory.isUndoingRedoing = false;
+        noteEditor.focus();
+        showToast('↻ Redo');
+        return;
+    }
+
+    // Fallback to browser execCommand if available
+    try {
+        noteEditor.focus();
+        const success = document.execCommand('redo');
+        if (success) {
+            updateWordStats();
+            updateDocumentStats();
+            showToast('↻ Redo');
+        }
+    } catch (e) {
+        console.warn('execCommand redo fallback error:', e);
+    }
+}
+
+function updateUndoRedoUI() {
+    const canUndo = editorHistory.index > 0;
+    const canRedo = editorHistory.index < editorHistory.stack.length - 1;
+
+    document.querySelectorAll('.btn-undo-target').forEach(btn => {
+        btn.style.opacity = canUndo ? '1' : '0.4';
+        btn.title = canUndo ? 'Undo (Ctrl+Z)' : 'Undo (Ctrl+Z) - No earlier changes';
+    });
+
+    document.querySelectorAll('.btn-redo-target').forEach(btn => {
+        btn.style.opacity = canRedo ? '1' : '0.4';
+        btn.title = canRedo ? 'Redo (Ctrl+Y)' : 'Redo (Ctrl+Y) - No forward changes';
+    });
+}
+
 // --- Word Stats & Editor Input ---
 function handleEditorInput() {
     if (state.isReadOnly) return;
     updateWordStats();
+    updateDocumentStats();
     scheduleSave('content', noteEditor.innerHTML);
+    pushHistorySnapshot(false);
 }
 
 function updateWordStats() {
@@ -5185,11 +5393,23 @@ function setupEventListeners() {
         }
     });
 
-    // Undo / Redo & Instant Manual Sync
-    const btnUndo = document.getElementById('btn-undo');
-    if (btnUndo) btnUndo.onclick = () => execFormat('undo');
-    const btnRedo = document.getElementById('btn-redo');
-    if (btnRedo) btnRedo.onclick = () => execFormat('redo');
+    // Undo / Redo (Targets all undo/redo buttons in header and ribbon)
+    document.querySelectorAll('.btn-undo-target, #btn-undo, #btn-header-undo, #btn-ribbon-undo').forEach(btn => {
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
+        btn.onclick = (e) => {
+            e.preventDefault();
+            performUndo();
+        };
+    });
+
+    document.querySelectorAll('.btn-redo-target, #btn-redo, #btn-header-redo, #btn-ribbon-redo').forEach(btn => {
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
+        btn.onclick = (e) => {
+            e.preventDefault();
+            performRedo();
+        };
+    });
+
     const btnSyncNow = document.getElementById('btn-sync-now');
     if (btnSyncNow) btnSyncNow.onclick = triggerManualSyncNow;
 
@@ -5698,6 +5918,18 @@ function setupEventListeners() {
                     performGlobalSearch(searchInput.value);
                 }
             }
+        }
+        if (isCtrl && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                performRedo();
+            } else {
+                performUndo();
+            }
+        }
+        if (isCtrl && e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            performRedo();
         }
         if (e.altKey && e.key === 'ArrowUp') {
             e.preventDefault();
