@@ -3151,16 +3151,216 @@ let resizeStartX = 0;
 let resizeStartWidth = 0;
 let resizeHoverCell = null;
 
+function updateTableResizeOverlay() {
+    const overlay = document.getElementById('table-resize-overlay');
+    const scrollArea = document.getElementById('editor-scroll-area');
+    if (!overlay || !scrollArea) return;
+
+    if (!state.activeTableElement || !state.activeTableElement.isConnected) {
+        overlay.style.display = 'none';
+        return;
+    }
+
+    const table = state.activeTableElement;
+    const tblRect = table.getBoundingClientRect();
+    const scrollRect = scrollArea.getBoundingClientRect();
+
+    if (tblRect.width === 0 || tblRect.height === 0) {
+        overlay.style.display = 'none';
+        return;
+    }
+
+    overlay.style.display = 'block';
+    const left = tblRect.left - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
+    const top = tblRect.top - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
+
+    overlay.style.left = `${Math.round(left)}px`;
+    overlay.style.top = `${Math.round(top)}px`;
+    overlay.style.width = `${Math.round(tblRect.width)}px`;
+    overlay.style.height = `${Math.round(tblRect.height)}px`;
+
+    const badge = document.getElementById('tbl-dimension-badge');
+    if (badge) {
+        badge.textContent = `${Math.round(tblRect.width)} × ${Math.round(tblRect.height)}px`;
+    }
+}
+
+function hideTableResizeOverlay() {
+    const overlay = document.getElementById('table-resize-overlay');
+    if (overlay) overlay.style.display = 'none';
+    if (tableToolbar) tableToolbar.style.display = 'none';
+    state.activeTableElement = null;
+    state.activeTableCell = null;
+}
+
+function setupTableResizeHandles() {
+    const overlay = document.getElementById('table-resize-overlay');
+    if (!overlay) return;
+
+    let isResizing = false;
+    let currentHandle = null;
+    let startX = 0;
+    let startY = 0;
+    let startWidth = 0;
+    let startHeight = 0;
+    let startTable = null;
+    let startColWidths = [];
+    let startRowHeights = [];
+
+    const onStart = (clientX, clientY, handle) => {
+        if (!state.activeTableElement || state.isReadOnly) return;
+
+        isResizing = true;
+        currentHandle = handle.dataset.handle;
+        startX = clientX;
+        startY = clientY;
+        startTable = state.activeTableElement;
+        startWidth = startTable.offsetWidth;
+        startHeight = startTable.offsetHeight;
+
+        startTable.style.tableLayout = 'fixed';
+
+        const firstRow = startTable.rows[0];
+        if (firstRow) {
+            startColWidths = Array.from(firstRow.children).map(c => c.offsetWidth);
+        } else {
+            startColWidths = [];
+        }
+        startRowHeights = Array.from(startTable.rows).map(r => r.offsetHeight);
+
+        document.body.style.userSelect = 'none';
+        if (currentHandle === 'se') document.body.style.cursor = 'nwse-resize';
+        else if (currentHandle === 'sw') document.body.style.cursor = 'nesw-resize';
+        else if (currentHandle === 'e') document.body.style.cursor = 'ew-resize';
+        else if (currentHandle === 's') document.body.style.cursor = 'ns-resize';
+    };
+
+    const onMove = (clientX, clientY) => {
+        if (!isResizing || !startTable) return;
+
+        const deltaX = clientX - startX;
+        const deltaY = clientY - startY;
+
+        // Width adjustment
+        let newWidth = startWidth;
+        if (currentHandle === 'se' || currentHandle === 'e') {
+            newWidth = Math.max(120, startWidth + deltaX);
+        } else if (currentHandle === 'sw') {
+            newWidth = Math.max(120, startWidth - deltaX);
+        }
+
+        if (newWidth !== startWidth && startWidth > 0) {
+            const scaleX = newWidth / startWidth;
+            const firstRow = startTable.rows[0];
+            if (firstRow && startColWidths.length > 0) {
+                let colSum = 0;
+                for (let i = 0; i < firstRow.children.length; i++) {
+                    const cw = Math.max(30, Math.round(startColWidths[i] * scaleX));
+                    colSum += cw;
+                    for (const row of startTable.rows) {
+                        if (row.children[i]) {
+                            row.children[i].style.width = `${cw}px`;
+                        }
+                    }
+                }
+                startTable.style.width = `${colSum}px`;
+            }
+        }
+
+        // Height adjustment
+        let newHeight = startHeight;
+        if (currentHandle === 'se' || currentHandle === 's' || currentHandle === 'sw') {
+            newHeight = Math.max(48, startHeight + deltaY);
+        }
+
+        if (newHeight !== startHeight && startHeight > 0 && startRowHeights.length > 0) {
+            const scaleY = newHeight / startHeight;
+            for (let r = 0; r < startTable.rows.length; r++) {
+                const rh = Math.max(24, Math.round(startRowHeights[r] * scaleY));
+                startTable.rows[r].style.height = `${rh}px`;
+                for (const cell of startTable.rows[r].children) {
+                    cell.style.height = `${rh}px`;
+                }
+            }
+        }
+
+        updateTableResizeOverlay();
+    };
+
+    overlay.addEventListener('mousedown', (e) => {
+        const handle = e.target.closest('.tbl-resize-handle');
+        if (!handle) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onStart(e.clientX, e.clientY, handle);
+    });
+
+    overlay.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        const handle = e.target.closest('.tbl-resize-handle');
+        if (!handle) return;
+        e.preventDefault();
+        onStart(e.touches[0].clientX, e.touches[0].clientY, handle);
+    }, { passive: false });
+
+    window.addEventListener('mousemove', (e) => {
+        onMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!isResizing || e.touches.length !== 1) return;
+        if (e.cancelable) e.preventDefault();
+        onMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
+    const finishResize = () => {
+        if (isResizing) {
+            isResizing = false;
+            currentHandle = null;
+            startTable = null;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            updateTableResizeOverlay();
+            handleEditorInput();
+        }
+    };
+
+    window.addEventListener('mouseup', finishResize);
+    window.addEventListener('touchend', finishResize);
+
+    const scrollArea = document.getElementById('editor-scroll-area');
+    if (scrollArea) {
+        scrollArea.addEventListener('scroll', updateTableResizeOverlay);
+    }
+    window.addEventListener('resize', updateTableResizeOverlay);
+}
+
 function setupTableInteractions() {
-    // Focus listener to show table toolbar
+    setupTableResizeHandles();
+
+    // Table click & selection
+    noteEditor.addEventListener('click', (e) => {
+        const table = e.target.closest('table');
+        const cell = e.target.closest('td, th');
+        if (table) {
+            state.activeTableElement = table;
+            state.activeTableCell = cell || table.querySelector('td, th');
+            tableToolbar.style.display = 'flex';
+            updateTableResizeOverlay();
+        } else if (!e.target.closest('#table-toolbar') && !e.target.closest('#table-resize-overlay')) {
+            hideTableResizeOverlay();
+        }
+    });
+
+    // Focus listener to show table toolbar and overlay
     noteEditor.addEventListener('focusin', (e) => {
         const cell = e.target.closest('td, th');
-        if (cell) {
+        const table = e.target.closest('table');
+        if (cell && table) {
             state.activeTableCell = cell;
-            state.activeTableElement = cell.closest('table');
+            state.activeTableElement = table;
             tableToolbar.style.display = 'flex';
-        } else if (!e.target.closest('#table-toolbar')) {
-            tableToolbar.style.display = 'none';
+            updateTableResizeOverlay();
         }
     });
 
@@ -3245,6 +3445,8 @@ function setupTableInteractions() {
             }
             resizeTableElem.style.width = `${totalW}px`;
         }
+
+        updateTableResizeOverlay();
     });
 
     // Finish column resize dragging on window
@@ -3259,6 +3461,7 @@ function setupTableInteractions() {
                 resizeHoverCell.style.cursor = '';
                 resizeHoverCell = null;
             }
+            updateTableResizeOverlay();
             handleEditorInput();
         }
     };
@@ -3277,6 +3480,7 @@ function setTableWidthFull() {
             c.style.width = '';
         }
     }
+    updateTableResizeOverlay();
     handleEditorInput();
 }
 
@@ -3290,6 +3494,7 @@ function setTableWidthAuto() {
             c.style.width = '';
         }
     }
+    updateTableResizeOverlay();
     handleEditorInput();
 }
 
@@ -3305,6 +3510,7 @@ function distributeTableColsEvenly() {
             c.style.width = `${pct}%`;
         }
     }
+    updateTableResizeOverlay();
     handleEditorInput();
 }
 
@@ -3332,6 +3538,7 @@ function adjustActiveColWidth(delta) {
         table.style.width = `${totalW}px`;
     }
 
+    updateTableResizeOverlay();
     handleEditorInput();
 }
 
@@ -3377,7 +3584,7 @@ function deleteTableRow() {
     if (!state.activeTableCell || !state.activeTableElement) return;
     const tr = state.activeTableCell.closest('tr');
     tr.remove();
-    tableToolbar.style.display = 'none';
+    updateTableResizeOverlay();
     handleEditorInput();
 }
 
@@ -3388,20 +3595,22 @@ function deleteTableColumn() {
     for (const row of table.rows) {
         if (row.children[cellIdx]) row.children[cellIdx].remove();
     }
-    tableToolbar.style.display = 'none';
+    updateTableResizeOverlay();
     handleEditorInput();
 }
 
 function deleteEntireTable() {
     if (!state.activeTableElement) return;
     state.activeTableElement.remove();
-    tableToolbar.style.display = 'none';
+    hideTableResizeOverlay();
     handleEditorInput();
 }
 
 function hideFloatingToolbars() {
     if (tableToolbar) tableToolbar.style.display = 'none';
     if (imageToolbar) imageToolbar.style.display = 'none';
+    hideTableResizeOverlay();
+    hideImageToolbar();
 }
 
 // Helper for drawing arrows on HTML5 canvas

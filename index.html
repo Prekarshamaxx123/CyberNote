@@ -652,6 +652,16 @@
                         <div class="img-resize-handle handle-sw" data-handle="sw"></div>
                         <div class="img-dimension-badge" id="img-dimension-badge">300 × 200</div>
                     </div>
+
+                    <!-- Interactive Corner Resize Overlay for Tables (inside scroll container) -->
+                    <div id="table-resize-overlay" class="table-resize-overlay" style="display: none;">
+                        <div class="tbl-resize-handle handle-se" data-handle="se" title="Drag corner to resize table freely"></div>
+                        <div class="tbl-resize-handle handle-e" data-handle="e" title="Drag to adjust table width"></div>
+                        <div class="tbl-resize-handle handle-s" data-handle="s" title="Drag to adjust table height"></div>
+                        <div class="tbl-resize-handle handle-sw" data-handle="sw" title="Drag corner to resize table"></div>
+                        <div class="tbl-dimension-badge" id="tbl-dimension-badge">Table Size</div>
+                    </div>
+
                     <div id="note-editor" class="wysiwyg-canvas" contenteditable="true" spellcheck="true" data-placeholder="Start typing notes, or type '/' for quick actions (paint, tables, codebox, checklist, callouts)..."></div>
                 </div>
             </div>
