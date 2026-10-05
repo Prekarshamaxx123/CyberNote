@@ -2260,6 +2260,80 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
+/* Center Move Handle for Images, Shapes & Signatures */
+.img-move-handle {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #89b4fa;
+    color: #11111b;
+    padding: 3px 12px;
+    border-radius: 14px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: grab;
+    pointer-events: auto;
+    z-index: 96;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 10px rgba(137, 180, 250, 0.5);
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.img-move-handle:hover {
+    background: #b4befe;
+    transform: translateX(-50%) scale(1.06);
+    box-shadow: 0 4px 16px rgba(137, 180, 250, 0.7);
+}
+
+.img-move-handle:active,
+.img-move-handle.dragging {
+    cursor: grabbing;
+    background: #00ffff;
+    transform: translateX(-50%) scale(0.98);
+}
+
+/* Document Drop Indicator Line during Drag-to-Move */
+.editor-drop-line {
+    position: absolute;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #00ffff, var(--accent), transparent);
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.9), 0 0 3px #fff;
+    border-radius: 2px;
+    z-index: 1000;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: top 0.06s ease, left 0.06s ease;
+}
+
+.editor-drop-badge {
+    background: #00ffff;
+    color: #11111b;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 255, 255, 0.6);
+    pointer-events: none;
+    transform: translateY(-50%);
+    white-space: nowrap;
+}
+
+/* Image / Shape Wrapper Hover & Selected state */
+.editor-img-wrap {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    cursor: pointer;
+}
+
+.editor-img-wrap.moving-active {
+    opacity: 0.35 !important;
+}
+
 /* Table Interactive Resize Overlay & Corner Handles */
 .table-resize-overlay {
     position: absolute;
