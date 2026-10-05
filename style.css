@@ -161,6 +161,30 @@ body {
     opacity: 0.85;
 }
 
+/* Save to Drive button — green accent */
+.btn-drive-save {
+    background: linear-gradient(135deg, rgba(166, 227, 161, 0.15), rgba(137, 220, 235, 0.10)) !important;
+    color: #a6e3a1 !important;
+    border-color: rgba(166, 227, 161, 0.35) !important;
+}
+.btn-drive-save:hover {
+    background: linear-gradient(135deg, rgba(166, 227, 161, 0.28), rgba(137, 220, 235, 0.20)) !important;
+    border-color: #a6e3a1 !important;
+    box-shadow: 0 2px 8px rgba(166, 227, 161, 0.25) !important;
+}
+
+/* Download from Drive button — teal accent */
+.btn-drive-download {
+    background: linear-gradient(135deg, rgba(137, 220, 235, 0.15), rgba(116, 199, 236, 0.10)) !important;
+    color: #89dceb !important;
+    border-color: rgba(137, 220, 235, 0.35) !important;
+}
+.btn-drive-download:hover {
+    background: linear-gradient(135deg, rgba(137, 220, 235, 0.28), rgba(116, 199, 236, 0.20)) !important;
+    border-color: #89dceb !important;
+    box-shadow: 0 2px 8px rgba(137, 220, 235, 0.25) !important;
+}
+
 .spinning {
     animation: spin 0.85s linear infinite;
 }

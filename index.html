@@ -29,11 +29,21 @@
                 <button id="btn-header-redo" class="icon-btn-header btn-redo-target" title="Redo (Ctrl+Y)">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
                 </button>
-                <button id="btn-sync-now" class="btn-sync-now" title="Now Sync - Instantly sync notes with Google Drive & local storage">
-                    <svg id="sync-now-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                <button id="btn-drive-save" class="btn-sync-now btn-drive-save" title="Save to Google Drive - Upload all notes to cloud">
+                    <svg id="drive-save-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                        <polyline points="16 16 12 12 8 16"/>
+                        <line x1="12" y1="12" x2="12" y2="21"/>
                     </svg>
-                    <span id="sync-now-text">Now Sync</span>
+                    <span id="drive-save-text">Save</span>
+                </button>
+                <button id="btn-drive-download" class="btn-sync-now btn-drive-download" title="Download from Google Drive - Pull latest notes from cloud">
+                    <svg id="drive-download-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                        <polyline points="8 12 12 16 16 12"/>
+                        <line x1="12" y1="16" x2="12" y2="7"/>
+                    </svg>
+                    <span id="drive-download-text">Download</span>
                 </button>
             </div>
         </div>
@@ -1469,12 +1479,12 @@
 
             <div class="drive-actions-group">
                 <button id="btn-drive-backup-now" class="btn btn-primary" style="flex:1;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-                    <span>Backup to Drive Now</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/></svg>
+                    <span>Save to Drive</span>
                 </button>
                 <button id="btn-drive-restore-now" class="btn btn-secondary" style="flex:1;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    <span>Restore from Drive</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="16" x2="12" y2="7"/></svg>
+                    <span>Download from Drive</span>
                 </button>
             </div>
             
@@ -2006,6 +2016,6 @@
     <!-- Toast Notification Container -->
     <div id="cybernote-toast" class="cybernote-toast"></div>
 
-    <script src="app.js?v=20261006_twowaysync_v4"></script>
+    <script src="app.js?v=20261006_perfile_sync_v1"></script>
 </body>
 </html>
