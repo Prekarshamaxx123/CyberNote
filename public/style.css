@@ -1195,7 +1195,10 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: thin;
 }
 
 .ribbon-row-studio {
@@ -2010,6 +2013,27 @@ body {
     box-shadow: 0 0 0 3px var(--accent);
 }
 
+/* Vector Shapes & Signatures - Zero Surrounding Box */
+.wysiwyg-canvas img.note-vector-shape,
+.wysiwyg-canvas img.note-signature-img {
+    border: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.wysiwyg-canvas img.note-vector-shape:hover,
+.wysiwyg-canvas img.note-signature-img:hover {
+    outline: 1.5px dashed var(--accent, #00ffff) !important;
+    box-shadow: none !important;
+}
+
+.wysiwyg-canvas img.note-vector-shape.selected-img,
+.wysiwyg-canvas img.note-signature-img.selected-img {
+    outline: 2px solid var(--accent, #00ffff) !important;
+    box-shadow: none !important;
+}
+
 /* Links in Editor (Item 5: Vibrant Electric Blue) */
 .wysiwyg-canvas a,
 .note-editor a,
@@ -2365,6 +2389,212 @@ body {
 
 .paint-actions {
     margin-top: 10px;
+}
+
+/* ==========================================================================
+   GEOMETRIC SHAPE STUDIO MODAL
+   ========================================================================== */
+.shape-modal-content {
+    width: 780px;
+    max-width: 95%;
+}
+
+.shape-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent);
+}
+
+.shape-modal-title h3 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.shape-studio-body {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 20px;
+    margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+    .shape-studio-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+.shape-controls-col {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.shape-ctrl-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.shape-ctrl-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.shape-grid-picker {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+}
+
+.shape-opt-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.shape-opt-btn span {
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.shape-opt-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.shape-opt-btn.active {
+    background: rgba(137, 180, 250, 0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(137, 180, 250, 0.25);
+}
+
+.shape-mode-pills, .shape-stroke-pills, .shape-size-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.shape-mode-btn, .shape-stroke-btn, .shape-size-btn {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.14s ease;
+    text-align: center;
+}
+
+.shape-mode-btn:hover, .shape-stroke-btn:hover, .shape-size-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.shape-mode-btn.active, .shape-stroke-btn.active, .shape-size-btn.active {
+    background: var(--accent);
+    color: #111;
+    font-weight: 700;
+    border-color: var(--accent);
+}
+
+.shape-color-swatches {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.shape-color-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.14s ease;
+}
+
+.shape-color-dot:hover {
+    transform: scale(1.15);
+}
+
+.shape-color-dot.active {
+    border-color: #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    transform: scale(1.1);
+}
+
+.shape-color-swatches input[type="color"] {
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.shape-flex-row {
+    display: flex;
+    gap: 16px;
+}
+
+.shape-flex-row > div {
+    flex: 1;
+}
+
+.shape-preview-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.shape-preview-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.shape-preview-box {
+    flex: 1;
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--border-color);
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+}
+
+.checkered-bg {
+    background-color: #181825;
+    background-image: linear-gradient(45deg, #11111b 25%, transparent 25%), linear-gradient(-45deg, #11111b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #11111b 75%), linear-gradient(-45deg, transparent 75%, #11111b 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+
+.shape-preview-info {
+    font-size: 0.76rem;
+    color: #a6e3a1;
+    line-height: 1.4;
 }
 
 /* App Footer */
