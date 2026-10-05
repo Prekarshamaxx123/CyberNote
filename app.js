@@ -335,6 +335,7 @@ async function backupToGoogleDrive(silent = false) {
         return;
     }
 
+    setSyncStatus('syncing', 'Syncing to Google Drive...');
     const logDiv = document.getElementById('drive-sync-log');
     if (!silent && logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">Encrypting & uploading to Google Drive...</span>';
 
@@ -381,24 +382,26 @@ async function backupToGoogleDrive(silent = false) {
             }
         }
 
-        const nowStr = new Date().toLocaleTimeString();
-        setSyncStatus('live', `✓ Drive Synced (${nowStr})`);
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setSyncStatus('live', `Drive Synced (${nowStr})`);
         if (!silent && logDiv) {
             logDiv.innerHTML = `<span style="color:var(--success); font-weight:600;">✓ Successfully backed up ${state.nodes.size} notes to Google Drive at ${nowStr}!</span>`;
         }
     } catch (err) {
         console.error('Backup to Google Drive error:', err);
+        setSyncStatus('error', 'Drive Sync Error');
         if (!silent && logDiv) logDiv.innerHTML = `<span style="color:var(--danger);">Backup failed: ${err.message}</span>`;
     }
 }
 
 function scheduleDriveAutoBackup() {
     if (!state.googleAccessToken) return;
+    setSyncStatus('pending', 'Changes pending...');
     clearTimeout(state.driveSaveTimer);
-    // Debounce auto-backup to Google Drive 2.5 seconds after editing pauses
+    // Debounce auto-backup to Google Drive 1.8 seconds after editing pauses
     state.driveSaveTimer = setTimeout(() => {
         backupToGoogleDrive(true);
-    }, 2500);
+    }, 1800);
 }
 
 // --- End-to-End Cryptography (AES-256-GCM + PBKDF2) ---
@@ -513,9 +516,31 @@ function setupSSE() {
 
 function setSyncStatus(status, text) {
     if (!syncStatusBadge) return;
-    const dot = syncStatusBadge.querySelector('.sync-dot');
-    const label = syncStatusBadge.querySelector('.sync-text');
-    if (dot) dot.className = `sync-dot ${status}`;
+    const iconContainer = document.getElementById('sync-status-icon');
+    const label = document.getElementById('sync-status-text') || syncStatusBadge.querySelector('.sync-text');
+
+    if (status === 'syncing') {
+        if (iconContainer) {
+            iconContainer.innerHTML = `<svg class="sync-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
+        }
+    } else if (status === 'live' || status === 'synced') {
+        if (iconContainer) {
+            if (state.googleAccessToken) {
+                iconContainer.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="color:var(--success);"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="9 11 12 14 17 9"/></svg>`;
+            } else {
+                iconContainer.innerHTML = `<span class="sync-dot live"></span>`;
+            }
+        }
+    } else if (status === 'pending') {
+        if (iconContainer) {
+            iconContainer.innerHTML = `<span class="sync-dot syncing"></span>`;
+        }
+    } else {
+        if (iconContainer) {
+            iconContainer.innerHTML = `<span class="sync-dot ${status}"></span>`;
+        }
+    }
+
     if (label) label.textContent = text;
 }
 
@@ -623,7 +648,12 @@ function renderTree() {
     }
 
     for (const list of childrenMap.values()) {
-        list.sort((a, b) => a.position - b.position);
+        list.sort((a, b) => {
+            const aPinned = a.is_pinned ? 1 : 0;
+            const bPinned = b.is_pinned ? 1 : 0;
+            if (aPinned !== bPinned) return bPinned - aPinned;
+            return a.position - b.position;
+        });
     }
 
     function buildBranch(parentId, container) {
@@ -643,7 +673,7 @@ function renderTree() {
             wrapper.className = 'tree-node-wrapper';
 
             const item = document.createElement('div');
-            item.className = `tree-node ${state.activeNodeId === node.id ? 'active' : ''}`;
+            item.className = `tree-node ${state.activeNodeId === node.id ? 'active' : ''} ${node.is_pinned ? 'pinned' : ''}`;
             item.dataset.id = node.id;
 
             // Expand arrow
@@ -675,6 +705,15 @@ function renderTree() {
             label.textContent = node.title || 'Untitled Note';
             if (node.color) label.style.color = node.color;
 
+            // Pin badge if pinned
+            let pinBadge = null;
+            if (node.is_pinned) {
+                pinBadge = document.createElement('span');
+                pinBadge.className = 'tree-pin-badge';
+                pinBadge.title = 'Pinned Note';
+                pinBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24Z"/></svg>`;
+            }
+
             // Quick Actions
             const actions = document.createElement('div');
             actions.className = 'tree-actions';
@@ -687,9 +726,16 @@ function renderTree() {
             item.appendChild(colorDot);
             item.appendChild(icon);
             item.appendChild(label);
+            if (pinBadge) item.appendChild(pinBadge);
             item.appendChild(actions);
 
             item.onclick = () => selectNode(node.id);
+            item.oncontextmenu = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openTreeContextMenu(e, node.id);
+            };
+
             wrapper.appendChild(item);
 
             if (hasKids) {
@@ -713,6 +759,12 @@ function renderTree() {
     }
 
     buildBranch(null, treeContainer);
+    treeContainer.oncontextmenu = (e) => {
+        if (e.target === treeContainer) {
+            e.preventDefault();
+            openTreeContextMenu(e, null);
+        }
+    };
 }
 
 function toggleNodeExpand(id) {
@@ -735,6 +787,111 @@ function collapseAll() {
     state.expandedNodes.clear();
     localStorage.setItem('cybernote_expanded', JSON.stringify([]));
     renderTree();
+}
+
+// --- Node Pinning & Renaming ---
+function togglePinActiveNode() {
+    if (!state.activeNodeId || !state.nodes.has(state.activeNodeId)) return;
+    togglePinNode(state.activeNodeId);
+}
+
+function togglePinNode(nodeId) {
+    if (!nodeId || !state.nodes.has(nodeId)) return;
+    const node = state.nodes.get(nodeId);
+    const newPinned = node.is_pinned ? 0 : 1;
+    node.is_pinned = newPinned;
+    if (state.activeNodeId === nodeId) {
+        updatePinButtonUI(newPinned);
+    }
+    sendDeltaPatch(nodeId, { is_pinned: newPinned });
+    renderTree();
+}
+
+function updatePinButtonUI(isPinned) {
+    const btn = document.getElementById('btn-pin-node');
+    const text = document.getElementById('pin-btn-text');
+    if (!btn) return;
+    if (isPinned) {
+        btn.classList.add('btn-pin-active');
+        if (text) text.textContent = 'Pinned';
+        btn.title = 'Unpin this note';
+    } else {
+        btn.classList.remove('btn-pin-active');
+        if (text) text.textContent = 'Pin';
+        btn.title = 'Pin note to top';
+    }
+}
+
+function renameActiveNode() {
+    if (state.isReadOnly) return;
+    if (noteTitleInput) {
+        noteTitleInput.focus();
+        noteTitleInput.select();
+        noteTitleInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+// --- Tree Right-Click Context Menu ---
+let activeContextMenuNodeId = null;
+
+function openTreeContextMenu(e, nodeId) {
+    closeTreeContextMenu();
+    activeContextMenuNodeId = nodeId;
+    const menu = document.getElementById('tree-context-menu');
+    if (!menu) return;
+
+    if (nodeId && state.nodes.has(nodeId)) {
+        selectNode(nodeId);
+        const node = state.nodes.get(nodeId);
+        const isPinned = !!node.is_pinned;
+        const pinText = document.getElementById('ctx-pin-text');
+        if (pinText) pinText.textContent = isPinned ? 'Unpin Note' : 'Pin to Top';
+
+        const readonlyText = document.getElementById('ctx-readonly-text');
+        if (readonlyText) readonlyText.textContent = node.is_readonly ? 'Make Editable' : 'Make Read-Only';
+
+        document.getElementById('ctx-pin').style.display = 'flex';
+        document.getElementById('ctx-rename').style.display = 'flex';
+        document.getElementById('ctx-color').style.display = 'flex';
+        document.getElementById('ctx-icon').style.display = 'flex';
+        document.getElementById('ctx-subnode').style.display = 'flex';
+        const subnodeText = document.querySelector('#ctx-subnode span');
+        if (subnodeText) subnodeText.textContent = 'Add Sub-Note';
+        document.getElementById('ctx-duplicate').style.display = 'flex';
+        document.getElementById('ctx-readonly').style.display = 'flex';
+        document.getElementById('ctx-delete').style.display = 'flex';
+    } else {
+        // Clicked on empty tree container background
+        document.getElementById('ctx-pin').style.display = 'none';
+        document.getElementById('ctx-rename').style.display = 'none';
+        document.getElementById('ctx-color').style.display = 'none';
+        document.getElementById('ctx-icon').style.display = 'none';
+        document.getElementById('ctx-duplicate').style.display = 'none';
+        document.getElementById('ctx-readonly').style.display = 'none';
+        document.getElementById('ctx-delete').style.display = 'none';
+        document.getElementById('ctx-subnode').style.display = 'flex';
+        const subnodeText = document.querySelector('#ctx-subnode span');
+        if (subnodeText) subnodeText.textContent = '+ New Root Note';
+    }
+
+    // Position menu with window boundary checks
+    menu.style.display = 'flex';
+    const menuWidth = 190;
+    const menuHeight = 280;
+    let x = e.clientX;
+    let y = e.clientY;
+
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+
+    menu.style.left = `${Math.max(10, x)}px`;
+    menu.style.top = `${Math.max(10, y)}px`;
+}
+
+function closeTreeContextMenu() {
+    const menu = document.getElementById('tree-context-menu');
+    if (menu) menu.style.display = 'none';
+    activeContextMenuNodeId = null;
 }
 
 // --- Node Selection & In-Place Loading ---
@@ -762,6 +919,7 @@ function selectNode(id) {
 
     setEditorContent(node.content || '');
     applyReadOnlyState(!!node.is_readonly);
+    updatePinButtonUI(!!node.is_pinned);
 
     updateBreadcrumbs(id);
     updateWordStats();
@@ -2054,6 +2212,8 @@ function setupEventListeners() {
     if (btnGoogleLogin) btnGoogleLogin.onclick = requestGoogleLogin;
     if (userProfileBadge) userProfileBadge.onclick = openDriveModal;
     document.getElementById('btn-open-drive-modal').onclick = openDriveModal;
+    const syncStatusBadge = document.getElementById('sync-status');
+    if (syncStatusBadge) syncStatusBadge.onclick = openDriveModal;
     document.getElementById('btn-drive-backup-now').onclick = () => backupToGoogleDrive(false);
     document.getElementById('btn-drive-restore-now').onclick = () => autoRestoreFromDriveOnSignIn();
     document.getElementById('btn-drive-signout').onclick = signoutGoogle;
@@ -2202,6 +2362,12 @@ function setupEventListeners() {
 
     // Node Actions
     document.getElementById('btn-new-root').onclick = createNewRootNode;
+    const btnNewMeta = document.getElementById('btn-new-note-meta');
+    if (btnNewMeta) btnNewMeta.onclick = createNewRootNode;
+    const btnPin = document.getElementById('btn-pin-node');
+    if (btnPin) btnPin.onclick = togglePinActiveNode;
+    const btnRename = document.getElementById('btn-rename-node');
+    if (btnRename) btnRename.onclick = renameActiveNode;
     document.getElementById('btn-add-subnode').onclick = () => {
         if (state.activeNodeId) createSubNode(state.activeNodeId);
     };
@@ -2209,6 +2375,51 @@ function setupEventListeners() {
     document.getElementById('btn-toggle-readonly').onclick = toggleReadOnlyMode;
     document.getElementById('btn-delete-node').onclick = () => {
         if (state.activeNodeId) deleteNode(state.activeNodeId);
+    };
+
+    // Tree Right-Click Context Menu Actions
+    const ctxPin = document.getElementById('ctx-pin');
+    if (ctxPin) ctxPin.onclick = () => {
+        if (activeContextMenuNodeId) togglePinNode(activeContextMenuNodeId);
+        closeTreeContextMenu();
+    };
+    const ctxRename = document.getElementById('ctx-rename');
+    if (ctxRename) ctxRename.onclick = () => {
+        closeTreeContextMenu();
+        renameActiveNode();
+    };
+    const ctxColor = document.getElementById('ctx-color');
+    if (ctxColor) ctxColor.onclick = () => {
+        closeTreeContextMenu();
+        openNodeColorModal();
+    };
+    const ctxIcon = document.getElementById('ctx-icon');
+    if (ctxIcon) ctxIcon.onclick = () => {
+        closeTreeContextMenu();
+        openIconModal();
+    };
+    const ctxSubnode = document.getElementById('ctx-subnode');
+    if (ctxSubnode) ctxSubnode.onclick = () => {
+        const tid = activeContextMenuNodeId;
+        closeTreeContextMenu();
+        if (tid) createSubNode(tid);
+        else createNewRootNode();
+    };
+    const ctxDuplicate = document.getElementById('ctx-duplicate');
+    if (ctxDuplicate) ctxDuplicate.onclick = () => {
+        closeTreeContextMenu();
+        duplicateCurrentNode();
+    };
+    const ctxReadonly = document.getElementById('ctx-readonly');
+    if (ctxReadonly) ctxReadonly.onclick = () => {
+        closeTreeContextMenu();
+        toggleReadOnlyMode();
+    };
+    const ctxDelete = document.getElementById('ctx-delete');
+    if (ctxDelete) ctxDelete.onclick = () => {
+        const tid = activeContextMenuNodeId;
+        closeTreeContextMenu();
+        if (tid) deleteNode(tid);
     };
 
     // Node Color
@@ -2252,10 +2463,14 @@ function setupEventListeners() {
     document.getElementById('btn-do-import').onclick = doImportCherryTree;
     document.getElementById('btn-export').onclick = exportNotes;
 
-    // Close modals on clicking backdrop
+    // Close modals and context menu on clicking backdrop
     window.addEventListener('click', (e) => {
         if (e.target && e.target.classList && e.target.classList.contains('modal')) {
             e.target.style.display = 'none';
+        }
+        const ctxMenu = document.getElementById('tree-context-menu');
+        if (ctxMenu && ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) {
+            closeTreeContextMenu();
         }
     });
 
@@ -2270,6 +2485,9 @@ function setupEventListeners() {
     window.addEventListener('keydown', (e) => {
         const isCtrl = e.ctrlKey || e.metaKey;
 
+        if (e.key === 'Escape') {
+            closeTreeContextMenu();
+        }
         if (isCtrl && e.key.toLowerCase() === 'f') {
             e.preventDefault();
             toggleFindBar();
