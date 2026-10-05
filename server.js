@@ -59,9 +59,9 @@ if (countRow.cnt === 0) {
     insertStmt.run(
         'root-welcome',
         null,
-        'Welcome to TreeKeep 🌲',
-        `# Welcome to TreeKeep 🌲\n\n**TreeKeep** is a lightning-fast, hierarchical tree notes app designed for developers, researchers, and cybersecurity enthusiasts.\n\n### 🚀 Why TreeKeep?\n- **Hierarchical Organization:** Infinite sub-nodes, tree nesting, and structured knowledge.\n- **Google Keep-Speed Delta Sync:** Only newly typed changes are transmitted over the wire (less than 1 KB per save!).\n- **Syntax Highlighted Code Boxes:** Seamless code blocks with copy buttons.\n- **Interactive Checklists:** Check and uncheck to-do items live.\n- **CherryTree Compatible:** One-click import from CherryTree \`.ctb\` and \`.ctd\` files.\n\n\`\`\`bash\n# Example bash command\necho "Hello from TreeKeep!"\ncurl -s http://localhost:3000/api/nodes\n\`\`\`\n\nEnjoy organizing your knowledge!`,
-        'book',
+        'Welcome to CyberNote 🛡️',
+        `<h1>Welcome to CyberNote 🛡️</h1>\n<p><b>CyberNote</b> is an ultra-secure, hierarchical cloud notebook with Google Drive auto-sync, direct WYSIWYG editing, and Paint studio.</p>\n<div class="callout-box callout-tip"><span class="callout-icon">💡</span><div class="callout-content">Sign in with your Google account to automatically restore and sync your notes with Google Drive!</div></div>`,
+        'shield',
         'guide,intro',
         0,
         1,
@@ -319,7 +319,7 @@ const server = http.createServer(async (req, res) => {
     // System info API
     if (pathname === '/api/info') {
         return sendJson(res, 200, {
-            name: 'TreeKeep',
+            name: 'CyberNote',
             version: '1.0.0',
             sqlite: true,
             storage_path: DB_PATH,
@@ -348,6 +348,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-    console.log(`🌲 TreeKeep Server running at http://${HOST}:${PORT}`);
+    console.log(`🛡️ CyberNote Server running at http://${HOST}:${PORT}`);
     console.log(`📁 Database: ${DB_PATH}`);
 });

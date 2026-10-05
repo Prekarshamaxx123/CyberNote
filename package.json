@@ -1,20 +1,22 @@
 {
-  "name": "treekeep",
+  "name": "cybernote",
   "version": "1.0.0",
-  "description": "Lightning-fast hierarchical tree notes app with Google Keep-speed micro delta sync",
+  "description": "Secure hierarchical tree notes app with Google Drive auto-sync, WYSIWYG editor and Paint studio",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "keywords": [
     "notes",
+    "cybernote",
     "hierarchy",
     "tree",
+    "google-drive",
+    "security",
+    "encryption",
     "cherrytree",
-    "google-keep",
-    "delta-sync",
-    "markdown"
+    "wysiwyg"
   ],
-  "author": "TreeKeep Team",
+  "author": "CyberNote Team",
   "license": "MIT"
 }

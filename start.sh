@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# TreeKeep 🌲 - 1-Click Startup Script
+# CyberNote 🛡️ - 1-Click Startup Script
 # ==============================================================================
 
 set -e
@@ -15,7 +15,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo -e "${BLUE}======================================================${NC}"
-echo -e "${GREEN}   🌲 TreeKeep - Hierarchical Cloud Notes System       ${NC}"
+echo -e "${GREEN}   🛡️ CyberNote - Secure Hierarchical Cloud Notes       ${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
 # Find local IP address for phone / network access
@@ -29,11 +29,12 @@ echo -e "  💻 This Computer:  ${GREEN}http://localhost:${PORT}${NC}"
 echo -e "  📱 Phone / Wi-Fi:  ${GREEN}http://${LOCAL_IP}:${PORT}${NC}\n"
 
 echo -e "${YELLOW}Key Features:${NC}"
-echo -e "  • Infinite Hierarchical Tree Structure (like CherryTree)"
-echo -e "  • Google Keep-Speed Delta Micro-Sync (~200 bytes per edit)"
-echo -e "  • Syntax-highlighted Code Boxes with Copy button"
-echo -e "  • Interactive Checklists (To-Do lists)"
-echo -e "  • 1-Click CherryTree .ctb / .ctd Import\n"
+echo -e "  • Direct In-Place WYSIWYG Editor (No split preview tab!)"
+echo -e "  • Google Account Sign-In & Google Drive Auto-Backup"
+echo -e "  • Windows Paint Studio & Smooth Handwritten Signatures"
+echo -e "  • Draw & Edit Tables with interactive cell tools"
+echo -e "  • Infinite Hierarchical Tree Structure with Node Colors"
+echo -e "  • Syntax-highlighted Code Boxes with Copy button\n"
 
 # Open browser asynchronously
 (sleep 1 && (xdg-open "http://localhost:${PORT}" || x-www-browser "http://localhost:${PORT}") 2>/dev/null) &
