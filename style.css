@@ -2295,19 +2295,29 @@ body {
 }
 
 .paint-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     background: transparent;
     border: 1px solid var(--border-color);
     color: var(--text-primary);
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: 4px;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     cursor: pointer;
+    transition: all 0.14s ease;
+    user-select: none;
+}
+
+.paint-btn:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--accent);
 }
 
 .paint-btn.active {
     background-color: var(--accent);
     color: #111;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .paint-palette {
@@ -4363,4 +4373,89 @@ kbd.editor-kbd, .editor-kbd {
         width: 100%;
         justify-content: flex-end;
     }
+}
+
+/* Note Structure Cards: Timeline, Quote, Fancy Divider */
+.note-timeline-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    border-left: 4px solid var(--accent);
+}
+
+.timeline-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.timeline-step .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: var(--accent);
+    color: #11111b;
+    font-weight: 700;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.timeline-step .step-content {
+    flex: 1;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.note-quote-card {
+    margin: 16px 0;
+    padding: 12px 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+}
+
+.note-quote-card .quote-text {
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.note-quote-card .quote-author {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.fancy-divider-gradient {
+    height: 2px;
+    margin: 22px 0;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    border-radius: 1px;
+}
+
+/* Zen Focus Mode */
+body.zen-mode-active #sidebar,
+body.zen-mode-active #sidebar-resizer {
+    display: none !important;
+}
+
+body.zen-mode-active .editor-scroll-area {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+#btn-zen-mode.active {
+    background-color: var(--accent);
+    color: #11111b;
+    font-weight: 700;
 }
