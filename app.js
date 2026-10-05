@@ -2513,6 +2513,15 @@ function closeSettingsModal() {
     if (modal) modal.style.display = 'none';
 }
 
+const SETTINGS_TAB_TITLES = {
+    'tab-gdrive': 'Google Drive',
+    'tab-offline': 'Offline & Storage',
+    'tab-migration': 'Import & Export',
+    'tab-github': 'GitHub Sync',
+    'tab-security': 'Security & E2EE',
+    'tab-bug': 'Bug Report'
+};
+
 function switchSettingsTab(tabId) {
     document.querySelectorAll('.settings-tab-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.tab === tabId);
@@ -2520,6 +2529,10 @@ function switchSettingsTab(tabId) {
     document.querySelectorAll('.settings-tab-pane').forEach(p => {
         p.classList.toggle('active', p.id === tabId);
     });
+    const titleEl = document.getElementById('settings-current-tab-title');
+    if (titleEl && SETTINGS_TAB_TITLES[tabId]) {
+        titleEl.textContent = SETTINGS_TAB_TITLES[tabId];
+    }
 }
 
 function updateSettingsUI() {
@@ -2594,11 +2607,10 @@ function updateSettingsUI() {
     }
 }
 
+const OFFICIAL_BUG_URL = 'https://github.com/Prekarshamaxx123/CyberNote/issues';
+
 function openBugReportPage() {
-    const bugInput = document.getElementById('bug-report-url-input');
-    const url = (bugInput?.value.trim()) || 'https://github.com/Prekarshamaxx123/CyberNote/issues/new';
-    localStorage.setItem('cybernote_bug_url', url);
-    window.open(url, '_blank');
+    window.open(OFFICIAL_BUG_URL, '_blank');
 }
 
 function saveGitHubSettingsFromTab() {
@@ -2654,11 +2666,21 @@ function setupEventListeners() {
     const btnDriveSignout = document.getElementById('btn-drive-signout');
     if (btnDriveSignout) btnDriveSignout.onclick = signoutGoogle;
 
-    // Bug Report Button & URL Input
+    // Settings Tab Search Filter (Matches photo)
+    const settingsSearch = document.getElementById('settings-tab-search');
+    if (settingsSearch) {
+        settingsSearch.oninput = (e) => {
+            const q = e.target.value.toLowerCase().trim();
+            document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+                const text = btn.textContent.toLowerCase();
+                btn.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
+            });
+        };
+    }
+
+    // Bug Report Button (Locked to Official Repository)
     const btnBugReport = document.getElementById('btn-open-bug-report');
     if (btnBugReport) btnBugReport.onclick = openBugReportPage;
-    const bugInput = document.getElementById('bug-report-url-input');
-    if (bugInput) bugInput.onchange = (e) => localStorage.setItem('cybernote_bug_url', e.target.value.trim());
 
     // First-Visit Welcome Gateway Modal Buttons
     const btnWelcomeSignin = document.getElementById('btn-welcome-google-signin');
