@@ -2444,31 +2444,190 @@ function closeAllRibbonPopovers() {
     });
 }
 
+// Helper to locate existing styled text span for combining or modifying effects
+function getActiveStyledSpan(range) {
+    if (!range) return null;
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    if (node && noteEditor.contains(node)) {
+        const found = node.closest('.neon-text, [class*="anim-"]');
+        if (found && noteEditor.contains(found)) return found;
+    }
+    if (range.startContainer) {
+        let sNode = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentNode : range.startContainer;
+        let sFound = sNode?.closest?.('.neon-text, [class*="anim-"]');
+        if (sFound && noteEditor.contains(sFound)) return sFound;
+    }
+    if (range.endContainer) {
+        let eNode = range.endContainer.nodeType === Node.TEXT_NODE ? range.endContainer.parentNode : range.endContainer;
+        let eFound = eNode?.closest?.('.neon-text, [class*="anim-"]');
+        if (eFound && noteEditor.contains(eFound)) return eFound;
+    }
+    return null;
+}
+
 function applyNeonEffect(color) {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
     restoreSelection();
-    const sel = window.getSelection();
-    let text = 'Glowing Neon Text';
-    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-        text = sel.getRangeAt(0).toString() || text;
+    let sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        noteEditor.focus();
+        sel = window.getSelection();
     }
-    const html = `<span class="neon-text neon-${color}">${escapeHtml(text)}</span>&nbsp;`;
-    insertHtmlAtCursor(html);
+    if (!sel || sel.rangeCount === 0) return;
+
+    let range = sel.getRangeAt(0);
+    let targetSpan = getActiveStyledSpan(range);
+
+    // If no existing span and range is collapsed, auto-expand to word
+    if (!targetSpan && range.collapsed) {
+        const node = range.startContainer;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent;
+            let start = range.startOffset;
+            let end = range.endOffset;
+            while (start > 0 && /\S/.test(text[start - 1])) start--;
+            while (end < text.length && /\S/.test(text[end])) end++;
+            if (start < end) {
+                range = document.createRange();
+                range.setStart(node, start);
+                range.setEnd(node, end);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                targetSpan = getActiveStyledSpan(range);
+            }
+        }
+    }
+
+    const neonColors = ['neon-cyan', 'neon-pink', 'neon-green', 'neon-purple', 'neon-gold'];
+
+    if (targetSpan) {
+        if (color === 'none') {
+            targetSpan.classList.remove('neon-text', ...neonColors);
+            if (!Array.from(targetSpan.classList).some(c => c.startsWith('anim-'))) {
+                const parent = targetSpan.parentNode;
+                while (targetSpan.firstChild) {
+                    parent.insertBefore(targetSpan.firstChild, targetSpan);
+                }
+                targetSpan.remove();
+            }
+        } else {
+            targetSpan.classList.remove(...neonColors);
+            targetSpan.classList.add('neon-text', `neon-${color}`);
+        }
+        const newRange = document.createRange();
+        newRange.selectNodeContents(targetSpan);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        saveSelection();
+        handleEditorInput();
+        return;
+    }
+
+    if (color === 'none') return;
+
+    if (range.collapsed) {
+        insertHtmlAtCursor(`<span class="neon-text neon-${color}">Glowing Neon Text</span>&nbsp;`);
+        return;
+    }
+
+    // Wrap selection
+    const span = document.createElement('span');
+    span.className = `neon-text neon-${color}`;
+    const frag = range.extractContents();
+    span.appendChild(frag);
+    range.insertNode(span);
+
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    saveSelection();
+    handleEditorInput();
 }
 
 function applyAnimatedText(type) {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
     restoreSelection();
-    const sel = window.getSelection();
-    let defaultText = type === 'rainbow' ? 'Rainbow Shimmering Title' : (type === 'pulse' ? 'Pulsing Ambient Text' : 'Floating Waves Text');
-    let text = defaultText;
-    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-        text = sel.getRangeAt(0).toString() || defaultText;
+    let sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        noteEditor.focus();
+        sel = window.getSelection();
     }
-    const html = `<span class="anim-${type}-text">${escapeHtml(text)}</span>&nbsp;`;
-    insertHtmlAtCursor(html);
+    if (!sel || sel.rangeCount === 0) return;
+
+    let range = sel.getRangeAt(0);
+    let targetSpan = getActiveStyledSpan(range);
+
+    // If no existing span and range is collapsed, auto-expand to word
+    if (!targetSpan && range.collapsed) {
+        const node = range.startContainer;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent;
+            let start = range.startOffset;
+            let end = range.endOffset;
+            while (start > 0 && /\S/.test(text[start - 1])) start--;
+            while (end < text.length && /\S/.test(text[end])) end++;
+            if (start < end) {
+                range = document.createRange();
+                range.setStart(node, start);
+                range.setEnd(node, end);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                targetSpan = getActiveStyledSpan(range);
+            }
+        }
+    }
+
+    const animClasses = ['anim-rainbow-text', 'anim-pulse-text', 'anim-float-text'];
+
+    if (targetSpan) {
+        targetSpan.classList.remove(...animClasses);
+        if (type !== 'none') {
+            targetSpan.classList.add(`anim-${type}-text`);
+        } else {
+            if (!targetSpan.classList.contains('neon-text')) {
+                const parent = targetSpan.parentNode;
+                while (targetSpan.firstChild) {
+                    parent.insertBefore(targetSpan.firstChild, targetSpan);
+                }
+                targetSpan.remove();
+            }
+        }
+        const newRange = document.createRange();
+        newRange.selectNodeContents(targetSpan);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        saveSelection();
+        handleEditorInput();
+        return;
+    }
+
+    if (type === 'none') return;
+
+    if (range.collapsed) {
+        const defaultText = type === 'rainbow' ? 'Rainbow Shimmering Title' : (type === 'pulse' ? 'Pulsing Ambient Text' : 'Floating Waves Text');
+        insertHtmlAtCursor(`<span class="anim-${type}-text">${defaultText}</span>&nbsp;`);
+        return;
+    }
+
+    // Wrap selection
+    const span = document.createElement('span');
+    span.className = `anim-${type}-text`;
+    const frag = range.extractContents();
+    span.appendChild(frag);
+    range.insertNode(span);
+
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    saveSelection();
+    handleEditorInput();
 }
 
 function insertSymbol(sym) {

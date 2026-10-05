@@ -3890,7 +3890,7 @@ body {
     100% { text-shadow: 0 0 12px #89b4fa, 0 0 24px rgba(137, 180, 250, 0.9), 0 0 32px #cba6f7; }
 }
 .anim-pulse-text {
-    color: #cdd6f4 !important;
+    color: #cdd6f4;
     display: inline-block;
     font-weight: 700;
     animation: pulseGlowAmbient 2s ease-in-out infinite alternate;
@@ -3906,6 +3906,77 @@ body {
     font-weight: 600;
     color: var(--accent);
     animation: floatGentleWave 2.2s ease-in-out infinite;
+}
+
+/* Combined Neon + Animation Effects (Allows text to be both Neon and Animated) */
+@keyframes pulseNeonCyan {
+    0% { text-shadow: 0 0 3px #00ffff, 0 0 8px rgba(0, 255, 255, 0.5); opacity: 0.92; }
+    100% { text-shadow: 0 0 8px #00ffff, 0 0 20px rgba(0, 255, 255, 0.95), 0 0 32px #00ffff; opacity: 1; }
+}
+@keyframes pulseNeonPink {
+    0% { text-shadow: 0 0 3px #ff2e93, 0 0 8px rgba(255, 46, 147, 0.5); opacity: 0.92; }
+    100% { text-shadow: 0 0 8px #ff2e93, 0 0 20px rgba(255, 46, 147, 0.95), 0 0 32px #ff2e93; opacity: 1; }
+}
+@keyframes pulseNeonGreen {
+    0% { text-shadow: 0 0 3px #00ff66, 0 0 8px rgba(0, 255, 102, 0.5); opacity: 0.92; }
+    100% { text-shadow: 0 0 8px #00ff66, 0 0 20px rgba(0, 255, 102, 0.95), 0 0 32px #00ff66; opacity: 1; }
+}
+@keyframes pulseNeonPurple {
+    0% { text-shadow: 0 0 3px #c724ff, 0 0 8px rgba(199, 36, 255, 0.5); opacity: 0.92; }
+    100% { text-shadow: 0 0 8px #c724ff, 0 0 20px rgba(199, 36, 255, 0.95), 0 0 32px #c724ff; opacity: 1; }
+}
+@keyframes pulseNeonGold {
+    0% { text-shadow: 0 0 3px #ffaa00, 0 0 8px rgba(255, 170, 0, 0.5); opacity: 0.92; }
+    100% { text-shadow: 0 0 8px #ffaa00, 0 0 20px rgba(255, 170, 0, 0.95), 0 0 32px #ffaa00; opacity: 1; }
+}
+
+.neon-cyan.anim-pulse-text {
+    color: #ffffff !important;
+    animation: pulseNeonCyan 1.8s ease-in-out infinite alternate !important;
+}
+.neon-pink.anim-pulse-text {
+    color: #ffffff !important;
+    animation: pulseNeonPink 1.8s ease-in-out infinite alternate !important;
+}
+.neon-green.anim-pulse-text {
+    color: #ffffff !important;
+    animation: pulseNeonGreen 1.8s ease-in-out infinite alternate !important;
+}
+.neon-purple.anim-pulse-text {
+    color: #ffffff !important;
+    animation: pulseNeonPurple 1.8s ease-in-out infinite alternate !important;
+}
+.neon-gold.anim-pulse-text {
+    color: #ffffff !important;
+    animation: pulseNeonGold 1.8s ease-in-out infinite alternate !important;
+}
+
+.neon-text.anim-float-text {
+    animation: floatGentleWave 2.2s ease-in-out infinite !important;
+}
+
+.neon-text.anim-rainbow-text {
+    background: linear-gradient(90deg, #ff007f, #00ffff, #00ff66, #ffaa00, #ff007f);
+    background-size: 300% 300%;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    animation: rainbowGradientFlow 4s ease infinite !important;
+    text-shadow: none !important;
+}
+.neon-cyan.anim-rainbow-text {
+    filter: drop-shadow(0 0 6px #00ffff) drop-shadow(0 0 14px rgba(0, 255, 255, 0.7));
+}
+.neon-pink.anim-rainbow-text {
+    filter: drop-shadow(0 0 6px #ff2e93) drop-shadow(0 0 14px rgba(255, 46, 147, 0.7));
+}
+.neon-green.anim-rainbow-text {
+    filter: drop-shadow(0 0 6px #00ff66) drop-shadow(0 0 14px rgba(0, 255, 102, 0.7));
+}
+.neon-purple.anim-rainbow-text {
+    filter: drop-shadow(0 0 6px #c724ff) drop-shadow(0 0 14px rgba(199, 36, 255, 0.7));
+}
+.neon-gold.anim-rainbow-text {
+    filter: drop-shadow(0 0 6px #ffaa00) drop-shadow(0 0 14px rgba(255, 170, 0, 0.7));
 }
 
 /* Flow Steps Ribbon */
