@@ -13,7 +13,7 @@
     <!-- Header -->
     <header class="app-header">
         <div class="header-left">
-            <button id="btn-toggle-sidebar" class="icon-btn mobile-only" title="Toggle Sidebar">☰</button>
+            <button id="btn-toggle-sidebar" class="icon-btn" title="Toggle Sidebar (Ctrl+\)">☰</button>
             <div class="logo">
                 <span class="logo-icon">🛡️</span>
                 <span class="logo-text">CyberNote</span>
@@ -118,109 +118,200 @@
                     <input type="text" id="note-tags" class="note-tags-input" placeholder="e.g. overthewire, linux, cybersecurity">
                 </div>
 
-                <!-- Rich Formatting Toolbar (Row 1: Fonts, Sizes, Styles & Colors) -->
-                <div class="editor-toolbar toolbar-row1">
-                    <div class="tb-group">
-                        <button id="btn-undo" class="tb-btn" title="Undo (Ctrl+Z)">↶</button>
-                        <button id="btn-redo" class="tb-btn" title="Redo (Ctrl+Y)">↷</button>
-                        <span class="tb-divider"></span>
+                <!-- CyberNote Categorized Studio Ribbon -->
+                <div class="editor-ribbon">
+                    <!-- Ribbon Row 1: Insert & Creative Studio Bar -->
+                    <div class="ribbon-row ribbon-row-studio">
+                        <div class="ribbon-cluster ribbon-cluster-nav">
+                            <button id="btn-toggle-sidebar-view" class="ribbon-btn ribbon-btn-icon" title="Toggle Sidebar (Ctrl+\)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                            </button>
+                            <button id="btn-undo" class="ribbon-btn ribbon-btn-icon" title="Undo (Ctrl+Z)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                            </button>
+                            <button id="btn-redo" class="ribbon-btn ribbon-btn-icon" title="Redo (Ctrl+Y)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+                            </button>
+                            <button id="btn-toggle-find" class="ribbon-btn ribbon-btn-icon" title="Find & Replace in Note (Ctrl+F)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <span>Find</span>
+                            </button>
+                        </div>
+
+                        <div class="ribbon-divider"></div>
+
+                        <!-- Creative & Blocks Studio Badges -->
+                        <div class="ribbon-cluster ribbon-cluster-studio">
+                            <button id="btn-open-paint" class="ribbon-btn ribbon-badge-paint" title="Paint Studio & Handwritten Signature">
+                                <span class="badge-icon">🎨</span>
+                                <span class="badge-label">Paint / Sign</span>
+                            </button>
+                            <button id="btn-insert-image" class="ribbon-btn ribbon-badge-action" title="Insert Photo or Screenshot (Ctrl+V)">
+                                <span class="badge-icon">🖼️</span>
+                                <span class="badge-label">Photo</span>
+                            </button>
+                            <input type="file" id="image-file-input" accept="image/*" style="display:none;">
+
+                            <button id="btn-open-table-modal" class="ribbon-btn ribbon-badge-action" title="Insert Table (Rows × Columns)">
+                                <span class="badge-icon">▦</span>
+                                <span class="badge-label">Table</span>
+                            </button>
+
+                            <button id="btn-insert-codebox" class="ribbon-btn ribbon-badge-action" title="Insert Code Box with 1-Click Copy">
+                                <span class="badge-icon">💻</span>
+                                <span class="badge-label">CodeBox</span>
+                            </button>
+
+                            <button id="btn-insert-todo" class="ribbon-btn ribbon-badge-action" title="Interactive Checklist (To-Do)">
+                                <span class="badge-icon">☑</span>
+                                <span class="badge-label">To-Do</span>
+                            </button>
+
+                            <div class="ribbon-select-wrap">
+                                <select id="select-callout" class="ribbon-select" title="Insert Callout Box">
+                                    <option value="">💡 Callouts...</option>
+                                    <option value="tip">💡 Tip Box</option>
+                                    <option value="warning">⚠️ Warning Box</option>
+                                    <option value="info">ℹ️ Info Note</option>
+                                    <option value="danger">🚨 Danger / Alert</option>
+                                </select>
+                            </div>
+
+                            <button id="btn-insert-link" class="ribbon-btn ribbon-btn-compact" title="Insert Hyperlink (Ctrl+K)">
+                                <span>🔗 Link</span>
+                            </button>
+                            <button id="btn-insert-nodelink" class="ribbon-btn ribbon-btn-compact" title="Internal Link to another Node">
+                                <span>📌 Node Link</span>
+                            </button>
+                            <button id="btn-insert-timestamp" class="ribbon-btn ribbon-btn-compact" title="Insert Date & Time">
+                                <span>📅 Date</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="tb-group">
-                        <!-- Font Family -->
-                        <select id="select-font-family" class="tb-select" title="Font Family">
-                            <option value="inherit">Sans-Serif (Default)</option>
-                            <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
-                            <option value="'Fira Code', monospace">Fira Code</option>
-                            <option value="Georgia, serif">Georgia (Serif)</option>
-                            <option value="'Times New Roman', serif">Times New Roman</option>
-                            <option value="'Segoe UI', Roboto, sans-serif">Segoe UI / Roboto</option>
-                            <option value="'Comic Sans MS', cursive">Comic Sans</option>
-                        </select>
+                    <!-- Ribbon Row 2: Typography & Styling Ribbon -->
+                    <div class="ribbon-row ribbon-row-format">
+                        <!-- Typography Group -->
+                        <div class="ribbon-cluster">
+                            <select id="select-heading" class="ribbon-select ribbon-heading-select" title="Text Style">
+                                <option value="p">Paragraph</option>
+                                <option value="h1">Heading 1</option>
+                                <option value="h2">Heading 2</option>
+                                <option value="h3">Heading 3</option>
+                                <option value="h4">Heading 4</option>
+                            </select>
 
-                        <!-- Font Size -->
-                        <select id="select-font-size" class="tb-select" title="Font Size">
-                            <option value="12px">12px (Small)</option>
-                            <option value="14px">14px (Normal)</option>
-                            <option value="16px" selected>16px (Medium)</option>
-                            <option value="20px">20px (Large)</option>
-                            <option value="26px">26px (Heading)</option>
-                            <option value="34px">34px (Huge)</option>
-                        </select>
+                            <select id="select-font-family" class="ribbon-select ribbon-font-select" title="Font Family">
+                                <option value="inherit">Sans-Serif</option>
+                                <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                                <option value="'Fira Code', monospace">Fira Code</option>
+                                <option value="Georgia, serif">Georgia</option>
+                                <option value="'Times New Roman', serif">Times New Roman</option>
+                                <option value="'Segoe UI', Roboto, sans-serif">Segoe UI</option>
+                            </select>
 
-                        <!-- Heading -->
-                        <select id="select-heading" class="tb-select" title="Text Style">
-                            <option value="p">Paragraph</option>
-                            <option value="h1">Heading 1</option>
-                            <option value="h2">Heading 2</option>
-                            <option value="h3">Heading 3</option>
-                            <option value="h4">Heading 4</option>
-                        </select>
-                    </div>
+                            <select id="select-font-size" class="ribbon-select ribbon-size-select" title="Font Size">
+                                <option value="12px">12px</option>
+                                <option value="14px">14px</option>
+                                <option value="16px" selected>16px</option>
+                                <option value="20px">20px</option>
+                                <option value="26px">26px</option>
+                                <option value="34px">34px</option>
+                            </select>
+                        </div>
 
-                    <div class="tb-group">
-                        <button class="tb-btn" id="btn-bold" title="Bold (Ctrl+B)"><b>B</b></button>
-                        <button class="tb-btn" id="btn-italic" title="Italic (Ctrl+I)"><i>I</i></button>
-                        <button class="tb-btn" id="btn-underline" title="Underline (Ctrl+U)"><u>U</u></button>
-                        <button class="tb-btn" id="btn-strike" title="Strikethrough"><s>S</s></button>
-                        <button class="tb-btn" id="btn-subscript" title="Subscript">X<sub>2</sub></button>
-                        <button class="tb-btn" id="btn-superscript" title="Superscript">X<sup>2</sup></button>
-                    </div>
+                        <div class="ribbon-divider"></div>
 
-                    <div class="tb-group">
-                        <!-- Text Color Picker -->
-                        <label class="color-picker-label" title="Text Foreground Color">
-                            🎨 <input type="color" id="text-color-picker" value="#f38ba8">
-                        </label>
-                        <!-- Background Highlight Color Picker -->
-                        <label class="color-picker-label" title="Highlight / Marker Color">
-                            🖍 <input type="color" id="bg-color-picker" value="#f5c211">
-                        </label>
-                    </div>
+                        <!-- Character Styles -->
+                        <div class="ribbon-cluster">
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-italic" title="Italic (Ctrl+I)"><i>I</i></button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-underline" title="Underline (Ctrl+U)"><u>U</u></button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-strike" title="Strikethrough"><s>S</s></button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-subscript" title="Subscript">X<sub>2</sub></button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-superscript" title="Superscript">X<sup>2</sup></button>
+                        </div>
 
-                    <div class="tb-group">
-                        <button class="tb-btn" id="btn-align-left" title="Align Left">⫷</button>
-                        <button class="tb-btn" id="btn-align-center" title="Align Center">⫸⫷</button>
-                        <button class="tb-btn" id="btn-align-right" title="Align Right">⫸</button>
-                        <button class="tb-btn" id="btn-align-justify" title="Justify">☰</button>
-                        <button class="tb-btn" id="btn-clear-format" title="Clear Formatting">Tₓ</button>
+                        <div class="ribbon-divider"></div>
+
+                        <!-- Colors -->
+                        <div class="ribbon-cluster">
+                            <label class="ribbon-color-btn" title="Text Color">
+                                <span class="color-icon-char">A</span>
+                                <span class="color-indicator-bar" id="text-color-indicator"></span>
+                                <input type="color" id="text-color-picker" value="#f38ba8">
+                            </label>
+                            <label class="ribbon-color-btn" title="Highlight / Marker Color">
+                                <span class="color-icon-char">🖍</span>
+                                <span class="color-indicator-bar" id="bg-color-indicator"></span>
+                                <input type="color" id="bg-color-picker" value="#f5c211">
+                            </label>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-clear-format" title="Clear Formatting (Tₓ)">
+                                <span style="font-size:0.85rem; font-weight:700;">Tₓ</span>
+                            </button>
+                        </div>
+
+                        <div class="ribbon-divider"></div>
+
+                        <!-- Alignments -->
+                        <div class="ribbon-cluster">
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-align-left" title="Align Left">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+                            </button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-align-center" title="Align Center">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
+                            </button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-align-right" title="Align Right">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+                            </button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-align-justify" title="Justify">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="ribbon-divider"></div>
+
+                        <!-- Paragraph Elements -->
+                        <div class="ribbon-cluster">
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-bullet-list" title="Bullet List">• List</button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-numbered-list" title="Numbered List">1. List</button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-quote" title="Quote Block">❝ Quote</button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-hr" title="Horizontal Divider">― Divider</button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Rich Insertion Toolbar (Row 2: Paint, Photos, Tables, Code, RemNote Blocks) -->
-                <div class="editor-toolbar toolbar-row2">
-                    <div class="tb-group">
-                        <!-- Paint & Signature Studio -->
-                        <button id="btn-open-paint" class="tb-btn tb-highlight-btn" title="Paint Studio & Handwritten Signature">🎨 Paint / Signature</button>
-                        <!-- Photo Insertion -->
-                        <button id="btn-insert-image" class="tb-btn" title="Insert Photo / Screenshot (or paste with Ctrl+V)">🖼️ Photo</button>
-                        <input type="file" id="image-file-input" accept="image/*" style="display:none;">
-                        <!-- Table Insertion -->
-                        <button id="btn-open-table-modal" class="tb-btn" title="Draw / Insert Table">▦ Table</button>
-                        <!-- CodeBox with Copy Button -->
-                        <button id="btn-insert-codebox" class="tb-btn" title="Insert Code Box with 1-Click Copy">💻 CodeBox</button>
-                        <!-- Interactive Checklist -->
-                        <button id="btn-insert-todo" class="tb-btn" title="Interactive Checklist (To-Do)">☑ To-Do</button>
-                    </div>
+                <!-- Floating Selection Bubble (Notion-style Hover Toolbar) -->
+                <div id="selection-bubble" class="selection-bubble" style="display: none;">
+                    <button class="bubble-btn" id="bubble-bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                    <button class="bubble-btn" id="bubble-italic" title="Italic (Ctrl+I)"><i>I</i></button>
+                    <button class="bubble-btn" id="bubble-underline" title="Underline (Ctrl+U)"><u>U</u></button>
+                    <button class="bubble-btn" id="bubble-strike" title="Strikethrough"><s>S</s></button>
+                    <button class="bubble-btn" id="bubble-code" title="Inline Code"><code>&lt;/&gt;</code></button>
+                    <span class="bubble-sep"></span>
+                    <button class="bubble-btn" id="bubble-h1" title="Heading 1"><b>H1</b></button>
+                    <button class="bubble-btn" id="bubble-h2" title="Heading 2"><b>H2</b></button>
+                    <button class="bubble-btn" id="bubble-quote" title="Quote">❝</button>
+                    <span class="bubble-sep"></span>
+                    <label class="bubble-color-label" title="Text Color">
+                        <span class="bubble-color-glyph">A</span>
+                        <input type="color" id="bubble-text-color" value="#f38ba8">
+                    </label>
+                    <label class="bubble-color-label" title="Highlight Color">
+                        <span class="bubble-color-glyph">🖍</span>
+                        <input type="color" id="bubble-bg-color" value="#f5c211">
+                    </label>
+                    <button class="bubble-btn" id="bubble-link" title="Insert Link">🔗</button>
+                </div>
 
-                    <div class="tb-group">
-                        <!-- Callout / RemNote Blocks -->
-                        <select id="select-callout" class="tb-select" title="Insert Callout Box">
-                            <option value="">💡 Callouts...</option>
-                            <option value="tip">💡 Tip Box</option>
-                            <option value="warning">⚠️ Warning Box</option>
-                            <option value="info">ℹ️ Info Note</option>
-                            <option value="danger">🚨 Danger / Alert</option>
-                        </select>
-                        <button class="tb-btn" id="btn-bullet-list" title="Bullet List">• List</button>
-                        <button class="tb-btn" id="btn-numbered-list" title="Numbered List">1. List</button>
-                        <button class="tb-btn" id="btn-quote" title="Quote Block">❝ Quote</button>
-                        <button class="tb-btn" id="btn-hr" title="Horizontal Divider">― Divider</button>
-                        <button id="btn-insert-timestamp" class="tb-btn" title="Insert Current Date & Time">📅 Timestamp</button>
-                        <button class="tb-btn" id="btn-insert-link" title="Hyperlink">🔗 Link</button>
-                        <button id="btn-insert-nodelink" class="tb-btn" title="Internal Link to another Node">📌 Node Link</button>
-                        <span class="tb-divider"></span>
-                        <button id="btn-toggle-find" class="tb-btn" title="Find & Replace in note (Ctrl+F)">🔍 Find</button>
+                <!-- Slash Command Palette (Notion / RemNote style) -->
+                <div id="slash-menu" class="slash-menu" style="display: none;">
+                    <div class="slash-menu-header">
+                        <span class="slash-title">⚡ QUICK ACTIONS</span>
+                        <span class="slash-hint">Type to filter • ↑↓ to navigate • ↵ to select</span>
+                    </div>
+                    <div class="slash-items-list" id="slash-items-list">
+                        <!-- Populated dynamically via JS -->
                     </div>
                 </div>
 
@@ -265,7 +356,7 @@
 
                 <!-- DIRECT IN-PLACE WYSIWYG DOCUMENT CANVAS (NO PREVIEW TAB) -->
                 <div class="editor-scroll-area" id="editor-scroll-area">
-                    <div id="note-editor" class="wysiwyg-canvas" contenteditable="true" spellcheck="true" data-placeholder="Start typing your rich notes, paste screenshots (Ctrl+V), insert tables, codeboxes, or paint..."></div>
+                    <div id="note-editor" class="wysiwyg-canvas" contenteditable="true" spellcheck="true" data-placeholder="Start typing notes, or type '/' for quick actions (paint, tables, codebox, checklist, callouts)..."></div>
                 </div>
             </div>
         </main>
