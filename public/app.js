@@ -697,7 +697,9 @@ async function loadTree() {
         renderTree();
 
         const lastActive = localStorage.getItem('cybernote_active');
-        if (lastActive && state.nodes.has(lastActive)) {
+        if (lastActive === '__all_notes__') {
+            showAllNotesView();
+        } else if (lastActive && state.nodes.has(lastActive)) {
             selectNode(lastActive);
         } else if (data.nodes.length > 0) {
             selectNode(data.nodes[0].id);
@@ -733,7 +735,9 @@ function loadLocalNodes() {
 
     renderTree();
     const lastActive = localStorage.getItem('cybernote_active');
-    if (lastActive && state.nodes.has(lastActive)) {
+    if (lastActive === '__all_notes__') {
+        showAllNotesView();
+    } else if (lastActive && state.nodes.has(lastActive)) {
         selectNode(lastActive);
     } else if (state.nodes.size > 0) {
         selectNode(state.nodes.keys().next().value);
@@ -1110,6 +1114,13 @@ function renderTree() {
     }
 
     buildBranch(null, treeContainer);
+
+    // Update All Notes count badge in sidebar
+    const allNotesCountEl = document.getElementById('sidebar-all-notes-count');
+    if (allNotesCountEl) {
+        allNotesCountEl.textContent = state.nodes.size;
+    }
+
     const sidebarEl = document.getElementById('sidebar');
     if (sidebarEl) {
         sidebarEl.oncontextmenu = (e) => {
@@ -1163,6 +1174,9 @@ function togglePinNode(nodeId) {
     }
     sendDeltaPatch(nodeId, { is_pinned: newPinned });
     renderTree();
+    if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
+        renderAllNotesView();
+    }
 }
 
 function updatePinButtonUI(isPinned) {
@@ -1289,9 +1303,249 @@ function closeTreeContextMenu() {
     activeContextMenuNodeId = null;
 }
 
+// --- All Notes View (Google Keep Style Dashboard) ---
+function hexToRgba(hex, alpha = 0.15) {
+    if (!hex) return '';
+    let c = hex.replace('#', '');
+    if (c.length === 3) {
+        c = c.split('').map(x => x + x).join('');
+    }
+    if (c.length === 6) {
+        const num = parseInt(c, 16);
+        const r = (num >> 16) & 255;
+        const g = (num >> 8) & 255;
+        const b = num & 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    return hex;
+}
+
+function isAllNotesViewActive() {
+    const allNotesView = document.getElementById('all-notes-view');
+    return allNotesView && allNotesView.style.display !== 'none';
+}
+
+function showAllNotesView() {
+    hideFloatingToolbars();
+    const allNotesView = document.getElementById('all-notes-view');
+    const noteView = document.getElementById('note-view');
+    const noNoteSelected = document.getElementById('no-note-selected');
+    const navAllNotes = document.getElementById('nav-all-notes');
+
+    if (!allNotesView) return;
+
+    allNotesView.style.display = 'flex';
+    if (noteView) noteView.style.display = 'none';
+    if (noNoteSelected) noNoteSelected.style.display = 'none';
+
+    if (navAllNotes) navAllNotes.classList.add('active');
+
+    // Deselect active tree node styling in sidebar
+    document.querySelectorAll('.tree-node.active').forEach(el => el.classList.remove('active'));
+
+    state.activeNodeId = null;
+    localStorage.setItem('cybernote_active', '__all_notes__');
+
+    if (footerPath) footerPath.textContent = 'View: All Notes (Favorites & Nodes)';
+    if (footerStats) footerStats.textContent = `${state.nodes.size} notes total`;
+
+    renderAllNotesView();
+}
+
+function renderAllNotesView() {
+    const pinnedSection = document.getElementById('keep-section-pinned');
+    const pinnedGrid = document.getElementById('keep-grid-pinned');
+    const pinnedBadge = document.getElementById('pinned-notes-count');
+
+    const othersSection = document.getElementById('keep-section-others');
+    const othersGrid = document.getElementById('keep-grid-others');
+    const othersBadge = document.getElementById('others-notes-count');
+
+    const statsSubtitle = document.getElementById('all-notes-stats-subtitle');
+    const sidebarCount = document.getElementById('sidebar-all-notes-count');
+
+    if (!pinnedGrid || !othersGrid) return;
+
+    pinnedGrid.innerHTML = '';
+    othersGrid.innerHTML = '';
+
+    const allNodes = Array.from(state.nodes.values());
+    if (sidebarCount) sidebarCount.textContent = allNodes.length;
+
+    const pinnedNodes = allNodes.filter(n => !!n.is_pinned);
+    const otherNodes = allNodes.filter(n => !n.is_pinned);
+
+    // Sort by updated_at descending (latest first)
+    pinnedNodes.sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+    otherNodes.sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+
+    if (pinnedBadge) pinnedBadge.textContent = pinnedNodes.length;
+    if (othersBadge) othersBadge.textContent = otherNodes.length;
+
+    if (statsSubtitle) {
+        statsSubtitle.textContent = `${allNodes.length} notes total • ${pinnedNodes.length} favorites / pinned • ${otherNodes.length} other notes`;
+    }
+
+    // Toggle pinned section visibility based on whether pinned nodes exist
+    if (pinnedSection) {
+        pinnedSection.style.display = pinnedNodes.length > 0 ? 'block' : 'none';
+    }
+
+    if (pinnedNodes.length > 0) {
+        pinnedNodes.forEach(node => {
+            pinnedGrid.appendChild(createKeepCard(node));
+        });
+    }
+
+    if (otherNodes.length > 0) {
+        otherNodes.forEach(node => {
+            othersGrid.appendChild(createKeepCard(node));
+        });
+    } else if (pinnedNodes.length === 0) {
+        // Empty state when user has zero notes
+        othersGrid.innerHTML = `
+            <div class="keep-empty-state">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--text-muted);opacity:0.6;">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                </svg>
+                <div style="font-weight:600;font-size:1rem;color:var(--text-primary);">No notes yet</div>
+                <div style="font-size:0.82rem;color:var(--text-muted);">Create your first note to see it here in Google Keep style.</div>
+                <button class="btn btn-primary btn-sm" onclick="createNewRootNode()">+ Create Note</button>
+            </div>
+        `;
+    }
+}
+
+function createKeepCard(node) {
+    const card = document.createElement('div');
+    card.className = `keep-card ${node.is_pinned ? 'is-pinned' : ''}`;
+    card.dataset.id = node.id;
+
+    if (node.color) {
+        card.style.backgroundColor = hexToRgba(node.color, 0.12);
+        card.style.borderColor = hexToRgba(node.color, 0.38);
+    }
+
+    // Header: Icon + Title + Pin Button
+    const header = document.createElement('div');
+    header.className = 'keep-card-header';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'keep-card-title-group';
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'keep-card-icon';
+    iconSpan.textContent = ICON_MAP[node.icon] || '📁';
+
+    const titleSpan = document.createElement('div');
+    titleSpan.className = 'keep-card-title';
+    titleSpan.textContent = node.title || 'Untitled Note';
+    if (node.color) titleSpan.style.color = node.color;
+
+    titleGroup.appendChild(iconSpan);
+    titleGroup.appendChild(titleSpan);
+
+    const pinBtn = document.createElement('button');
+    pinBtn.className = `keep-card-pin-btn ${node.is_pinned ? 'pinned' : ''}`;
+    pinBtn.title = node.is_pinned ? 'Unpin note' : 'Pin to favorites';
+    pinBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="${node.is_pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24Z"/></svg>`;
+    pinBtn.onclick = (e) => {
+        e.stopPropagation();
+        togglePinNode(node.id);
+        renderAllNotesView();
+    };
+
+    header.appendChild(titleGroup);
+    header.appendChild(pinBtn);
+    card.appendChild(header);
+
+    // Parent path if any
+    const pathStr = getNodePathString(node.id);
+    if (pathStr) {
+        const pathEl = document.createElement('div');
+        pathEl.className = 'keep-card-path';
+        pathEl.textContent = `📁 ${pathStr}`;
+        card.appendChild(pathEl);
+    }
+
+    // Snippet content
+    const plainText = stripHtml(node.content || '').trim();
+    if (plainText) {
+        const contentEl = document.createElement('div');
+        contentEl.className = 'keep-card-content';
+        contentEl.textContent = plainText;
+        card.appendChild(contentEl);
+    }
+
+    // Tags
+    if (node.tags) {
+        const tagList = node.tags.split(',').map(t => t.trim()).filter(Boolean);
+        if (tagList.length > 0) {
+            const tagsEl = document.createElement('div');
+            tagsEl.className = 'keep-card-tags';
+            tagList.forEach(t => {
+                const tagChip = document.createElement('span');
+                tagChip.className = 'keep-card-tag';
+                tagChip.textContent = `#${t}`;
+                tagsEl.appendChild(tagChip);
+            });
+            card.appendChild(tagsEl);
+        }
+    }
+
+    // Footer with date and actions
+    const footer = document.createElement('div');
+    footer.className = 'keep-card-footer';
+
+    const dateSpan = document.createElement('span');
+    const dt = new Date(node.updated_at || node.created_at || Date.now());
+    dateSpan.textContent = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+    const actions = document.createElement('div');
+    actions.className = 'keep-card-actions';
+
+    const addSubBtn = document.createElement('button');
+    addSubBtn.className = 'keep-card-btn-action';
+    addSubBtn.title = 'Add Sub-Node';
+    addSubBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+    addSubBtn.onclick = (e) => {
+        e.stopPropagation();
+        createSubNode(node.id);
+    };
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'keep-card-btn-action';
+    delBtn.title = 'Delete Note';
+    delBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+    delBtn.onclick = async (e) => {
+        e.stopPropagation();
+        await deleteNode(node.id);
+        renderAllNotesView();
+    };
+
+    actions.appendChild(addSubBtn);
+    actions.appendChild(delBtn);
+
+    footer.appendChild(dateSpan);
+    footer.appendChild(actions);
+    card.appendChild(footer);
+
+    // Clicking card opens node in editor
+    card.onclick = () => {
+        selectNode(node.id);
+    };
+
+    return card;
+}
+
 // --- Node Selection & In-Place Loading ---
 function selectNode(id) {
     hideFloatingToolbars();
+
+    const allNotesView = document.getElementById('all-notes-view');
+    if (allNotesView) allNotesView.style.display = 'none';
+    const navAllNotes = document.getElementById('nav-all-notes');
+    if (navAllNotes) navAllNotes.classList.remove('active');
 
     if (!id || !state.nodes.has(id)) {
         state.activeNodeId = null;
@@ -1598,6 +1852,7 @@ async function deleteNode(id) {
         if (state.activeNodeId === id) selectNode(null);
         renderTree();
     }
+    if (isAllNotesViewActive()) renderAllNotesView();
     scheduleDriveAutoBackup();
 }
 
@@ -2949,6 +3204,10 @@ function saveGitHubSettingsFromTab() {
 function setupEventListeners() {
     // Theme toggle
     document.getElementById('btn-theme').onclick = toggleTheme;
+
+    // All Notes Navigation (Google Keep style overview)
+    const navAllNotes = document.getElementById('nav-all-notes');
+    if (navAllNotes) navAllNotes.onclick = showAllNotesView;
 
     // Google Sign-In & Settings Hub
     if (btnGoogleLogin) btnGoogleLogin.onclick = requestGoogleLogin;
