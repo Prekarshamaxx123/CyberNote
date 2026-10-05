@@ -772,6 +772,7 @@ function setupSSE() {
                     }
                     updateBreadcrumbs(updated.id);
                     updateNodeColorDot(updated.color);
+                    applyReadOnlyState(!!updated.is_readonly);
                 }
                 renderTree();
             }
@@ -2166,6 +2167,7 @@ async function createNewRootNode(type = 'note') {
         position: state.nodes.size,
         is_expanded: 1,
         is_folder: isFolder ? 1 : 0,
+        is_readonly: 0,
         created_at: now,
         updated_at: now
     };
@@ -2197,6 +2199,12 @@ async function createNewRootNode(type = 'note') {
 }
 
 async function createSubNode(parentId, type = 'note') {
+    const parentNode = state.nodes.get(parentId);
+    if (parentNode && parentNode.is_readonly) {
+        showToast('🔒 Cannot add sub-nodes to a locked note. Unlock it first.', 'warning');
+        return;
+    }
+
     const isFolder = type === 'folder';
     const now = Date.now();
     const newId = 'node-' + Math.random().toString(36).substring(2, 10) + '-' + now;
@@ -2211,6 +2219,7 @@ async function createSubNode(parentId, type = 'note') {
         position: 0,
         is_expanded: 1,
         is_folder: isFolder ? 1 : 0,
+        is_readonly: 0,
         created_at: now,
         updated_at: now
     };
@@ -2287,6 +2296,12 @@ async function duplicateCurrentNode() {
 }
 
 async function deleteNode(id) {
+    const targetNode = state.nodes.get(id);
+    if (targetNode && targetNode.is_readonly) {
+        showToast('🔒 Note is locked. Unlock it first before deleting.', 'warning');
+        return;
+    }
+
     if (!confirm('Are you sure you want to delete this note and its sub-nodes?')) return;
 
     if (state.isServerMode) {
@@ -2339,6 +2354,16 @@ function moveActiveNode(direction) {
     renderTree();
 }
 
+// Helper functions to safely hide overlays & floating toolbars without ReferenceError
+function hideImageResizeOverlay() {
+    const overlay = document.getElementById('image-resize-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function hideTableToolbar() {
+    hideTableResizeOverlay();
+}
+
 // --- Read-Only Mode ---
 function toggleReadOnlyMode(targetNodeId = null) {
     const nodeId = (typeof targetNodeId === 'string' && targetNodeId) ? targetNodeId : state.activeNodeId;
@@ -2348,9 +2373,13 @@ function toggleReadOnlyMode(targetNodeId = null) {
     node.is_readonly = newStatus ? 1 : 0;
     node.updated_at = Date.now();
 
-    if (nodeId === state.activeNodeId) {
+    // If target node is not currently active, select it so the user sees the updated note
+    if (nodeId !== state.activeNodeId) {
+        selectNode(nodeId);
+    } else {
         applyReadOnlyState(newStatus);
     }
+
     persistActiveNodeImmediately(nodeId, { is_readonly: node.is_readonly });
     sendDeltaPatch(nodeId, { is_readonly: node.is_readonly });
     renderTree();
@@ -2363,19 +2392,19 @@ function toggleReadOnlyMode(targetNodeId = null) {
 function applyReadOnlyState(isReadOnly) {
     state.isReadOnly = isReadOnly;
 
-    // 1. Hide/Show Ribbon Toolbar (as requested by user)
+    // 1. Hide/Show Ribbon Toolbar
     const ribbon = document.getElementById('editor-ribbon');
     if (ribbon) {
         ribbon.style.display = isReadOnly ? 'none' : '';
     }
 
-    // 2. Hide all floating toolbars, overlays, and popovers
+    // 2. Safely hide all floating toolbars, overlays, and popovers
     if (isReadOnly) {
-        closeAllRibbonPopovers();
-        hideImageToolbar();
-        hideTableToolbar();
-        hideImageResizeOverlay();
-        hideTableResizeOverlay();
+        try { closeAllRibbonPopovers(); } catch (e) {}
+        try { hideImageToolbar(); } catch (e) {}
+        try { hideImageResizeOverlay(); } catch (e) {}
+        try { hideTableToolbar(); } catch (e) {}
+        try { hideTableResizeOverlay(); } catch (e) {}
         const selectionBubble = document.getElementById('selection-bubble');
         if (selectionBubble) selectionBubble.style.display = 'none';
         const slashMenu = document.getElementById('slash-command-menu');
