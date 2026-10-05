@@ -568,6 +568,23 @@ async function syncWithGoogleDrive({ silent = false, forcePull = false, forcePus
     if (state.isSyncing) return;
     state.lastDriveSyncAttempt = Date.now();
 
+    // Flush any pending active editor keystrokes immediately before syncing!
+    if (state.activeNodeId && !state.isReadOnly) {
+        const node = state.nodes.get(state.activeNodeId);
+        if (node) {
+            const titleVal = noteTitleInput ? noteTitleInput.value : node.title;
+            const contentVal = noteEditor ? noteEditor.innerHTML : node.content;
+            const tagsVal = noteTagsInput ? noteTagsInput.value : (node.tags || '');
+            if (node.title !== titleVal || node.content !== contentVal || node.tags !== tagsVal) {
+                node.title = titleVal;
+                node.content = contentVal;
+                node.tags = tagsVal;
+                node.updated_at = Date.now();
+                persistActiveNodeImmediately(state.activeNodeId, { title: titleVal, content: contentVal, tags: tagsVal });
+            }
+        }
+    }
+
     // 1. Verify access token
     const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
     const savedToken = localStorage.getItem('cybernote_google_token');
@@ -751,8 +768,8 @@ async function syncWithGoogleDrive({ silent = false, forcePull = false, forcePus
             }
         }
 
-        // 4. Push to Cloud if local had newer changes or deleted nodes
-        if (hasLocalChangesToPush) {
+        // 4. Push to Cloud if local had newer changes, deleted nodes, or forcePush was requested
+        if (hasLocalChangesToPush || forcePush) {
             await backupToGoogleDrive(true);
         }
 
@@ -789,6 +806,23 @@ async function backupToGoogleDrive(silent = false) {
     if (!state.googleAccessToken) {
         if (!silent) alert('Please sign in with Google first.');
         return;
+    }
+
+    // Flush pending editor typing immediately
+    if (state.activeNodeId && !state.isReadOnly) {
+        const node = state.nodes.get(state.activeNodeId);
+        if (node) {
+            const titleVal = noteTitleInput ? noteTitleInput.value : node.title;
+            const contentVal = noteEditor ? noteEditor.innerHTML : node.content;
+            const tagsVal = noteTagsInput ? noteTagsInput.value : (node.tags || '');
+            if (node.title !== titleVal || node.content !== contentVal || node.tags !== tagsVal) {
+                node.title = titleVal;
+                node.content = contentVal;
+                node.tags = tagsVal;
+                node.updated_at = Date.now();
+                persistActiveNodeImmediately(state.activeNodeId, { title: titleVal, content: contentVal, tags: tagsVal });
+            }
+        }
     }
 
     setSyncStatus('syncing', 'Syncing to Google Drive...');
@@ -2544,6 +2578,9 @@ function scheduleSave(field, value, targetNodeId = null) {
         flushNodeDelta(nodeId);
     }, 250);
     nodeSaveTimers.set(nodeId, timer);
+
+    // 5. Automatically schedule cloud sync to Google Drive
+    scheduleDriveAutoBackup();
 }
 
 // Flush active note changes immediately when closing/reloading page
