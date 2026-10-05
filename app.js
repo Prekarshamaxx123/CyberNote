@@ -4631,10 +4631,7 @@ function setupEventListeners() {
     const btnPrint = document.getElementById('btn-print-note');
     if (btnPrint) btnPrint.onclick = handlePrintNote;
 
-    // Creative Ribbon Popovers (Emoji, Neon, Animations, Arrows, Shapes)
-    const btnEmoji = document.getElementById('btn-emoji-picker');
-    if (btnEmoji) btnEmoji.onclick = (e) => toggleRibbonPopover('emoji-dropdown-menu', btnEmoji, e);
-
+    // Creative Ribbon Popovers (Neon, Animations, Arrows, Shapes)
     const btnNeon = document.getElementById('btn-neon-effects');
     if (btnNeon) btnNeon.onclick = (e) => toggleRibbonPopover('neon-dropdown-menu', btnNeon, e);
 
@@ -4661,6 +4658,15 @@ function setupEventListeners() {
             closeAllRibbonPopovers();
         }
         if (!e.target.closest('#tree-context-menu')) {
+            closeTreeContextMenu();
+        }
+    });
+
+    // Close popovers immediately when focusing in editor or pressing Escape
+    noteEditor.addEventListener('focusin', closeAllRibbonPopovers);
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeAllRibbonPopovers();
             closeTreeContextMenu();
         }
     });
