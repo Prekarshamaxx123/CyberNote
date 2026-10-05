@@ -2833,6 +2833,146 @@ function handleTextCaseChange(caseType) {
     updateDocumentStats();
 }
 
+function insertTimeline() {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    const html = `
+        <div class="note-timeline-card" contenteditable="false">
+            <div class="timeline-step">
+                <div class="step-num">1</div>
+                <div class="step-content" contenteditable="true">
+                    <b>Phase 1: Planning & Setup</b>
+                    <div>Define requirements and configure environment.</div>
+                </div>
+            </div>
+            <div class="timeline-step">
+                <div class="step-num">2</div>
+                <div class="step-content" contenteditable="true">
+                    <b>Phase 2: Execution & Testing</b>
+                    <div>Implement features and run automated tests.</div>
+                </div>
+            </div>
+            <div class="timeline-step">
+                <div class="step-num">3</div>
+                <div class="step-content" contenteditable="true">
+                    <b>Phase 3: Launch & Sync</b>
+                    <div>Deploy to production and sync cloud backups.</div>
+                </div>
+            </div>
+        </div>
+        <p><br></p>
+    `;
+    insertHtmlAtCursor(html);
+}
+
+function insertQuoteCard() {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    const html = `
+        <div class="note-quote-card" contenteditable="true">
+            <div class="quote-text">“Simplicity is prerequisite for reliability.”</div>
+            <div class="quote-author">— Edsger W. Dijkstra</div>
+        </div>
+        <p><br></p>
+    `;
+    insertHtmlAtCursor(html);
+}
+
+function insertFancyDivider() {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    const html = `<div class="fancy-divider-gradient" contenteditable="false"></div><p><br></p>`;
+    insertHtmlAtCursor(html);
+}
+
+function toggleZenMode() {
+    const isZen = document.body.classList.toggle('zen-mode-active');
+    const btn = document.getElementById('btn-zen-mode');
+    if (btn) btn.classList.toggle('active', isZen);
+    showToast(isZen ? 'Zen Focus Mode activated' : 'Zen Focus Mode exited');
+}
+
+function htmlToMarkdown(html, title) {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+
+    temp.querySelectorAll('h1').forEach(el => el.replaceWith(`\n# ${el.textContent}\n`));
+    temp.querySelectorAll('h2').forEach(el => el.replaceWith(`\n## ${el.textContent}\n`));
+    temp.querySelectorAll('h3').forEach(el => el.replaceWith(`\n### ${el.textContent}\n`));
+    temp.querySelectorAll('h4').forEach(el => el.replaceWith(`\n#### ${el.textContent}\n`));
+    temp.querySelectorAll('p').forEach(el => el.replaceWith(`\n${el.textContent}\n`));
+    temp.querySelectorAll('b, strong').forEach(el => el.replaceWith(`**${el.textContent}**`));
+    temp.querySelectorAll('i, em').forEach(el => el.replaceWith(`*${el.textContent}*`));
+    temp.querySelectorAll('code').forEach(el => el.replaceWith(`\`${el.textContent}\``));
+    temp.querySelectorAll('blockquote').forEach(el => el.replaceWith(`\n> ${el.textContent}\n`));
+    temp.querySelectorAll('li').forEach(el => el.replaceWith(`\n- ${el.textContent}`));
+    temp.querySelectorAll('hr').forEach(el => el.replaceWith(`\n---\n`));
+
+    return `# ${title}\n\n${temp.textContent.trim()}\n`;
+}
+
+function exportNoteAs(format) {
+    closeAllRibbonPopovers();
+    if (!state.activeNodeId) {
+        showToast('Please select a note to export');
+        return;
+    }
+    const node = state.nodes.get(state.activeNodeId);
+    if (!node) return;
+    if (node.type === 'folder') {
+        showToast('Folders cannot be exported as single notes');
+        return;
+    }
+    const title = node.title || 'Untitled Note';
+    const content = noteEditor.innerHTML || '';
+    let data = '';
+    let mime = 'text/plain';
+
+    if (format === 'md') {
+        data = htmlToMarkdown(content, title);
+        mime = 'text/markdown';
+    } else if (format === 'html') {
+        data = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>${escapeHtml(title)}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 820px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #222; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 8px; }
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th, td { border: 1px solid #ccc; padding: 8px 12px; }
+        th { background: #f5f5f5; }
+        code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+        blockquote { border-left: 4px solid #89b4fa; margin: 16px 0; padding-left: 12px; color: #555; }
+    </style>
+</head>
+<body>
+    <h1>${escapeHtml(title)}</h1>
+    ${content}
+</body>
+</html>`;
+        mime = 'text/html';
+    } else if (format === 'txt') {
+        data = `${title}\n${'='.repeat(title.length)}\n\n${noteEditor.innerText || ''}`;
+        mime = 'text/plain';
+    } else if (format === 'json') {
+        data = JSON.stringify(node, null, 2);
+        mime = 'application/json';
+    }
+
+    const blob = new Blob([data], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[^\w\s-]/g, '').trim() || 'note'}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast(`✓ Exported note as .${format}`);
+}
+
 function handlePrintNote() {
     window.print();
 }
@@ -2841,8 +2981,11 @@ function updateDocumentStats() {
     const badge = document.getElementById('ribbon-word-count');
     if (!badge || !noteEditor) return;
     const text = noteEditor.innerText || '';
-    const words = text.trim() ? text.trim().split(/\\s+/).length : 0;
-    badge.textContent = `${words} words`;
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const chars = text.length;
+    const readTime = Math.max(1, Math.ceil(words / 200));
+    badge.textContent = `${words} words • ${readTime}m read`;
+    badge.title = `${words} words, ${chars} characters, ~${readTime} min read time`;
 }
 
 // Expose functions globally for inline HTML onclick handlers
@@ -2865,6 +3008,12 @@ window.handlePrintNote = handlePrintNote;
 window.updateDocumentStats = updateDocumentStats;
 window.createNewRootNode = createNewRootNode;
 window.createSubNode = createSubNode;
+window.openPaintModal = openPaintModal;
+window.exportNoteAs = exportNoteAs;
+window.insertTimeline = insertTimeline;
+window.insertQuoteCard = insertQuoteCard;
+window.insertFancyDivider = insertFancyDivider;
+window.toggleZenMode = toggleZenMode;
 
 // --- WYSIWYG Formatting Actions ---
 function execFormat(command, value = null) {
@@ -3829,28 +3978,92 @@ function hideFloatingToolbars() {
     hideImageToolbar();
 }
 
-// Helper for drawing arrows on HTML5 canvas
-function drawCanvasArrow(ctx, fromX, fromY, toX, toY, color, width) {
-    const headLen = Math.max(12, width * 3.5);
-    const angle = Math.atan2(toY - fromY, toX - fromX);
+// Helper for drawing shapes and arrows on HTML5 canvas
+function drawCanvasShape(ctx, shape, x1, y1, x2, y2, color, width, isFilled) {
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     ctx.lineWidth = width;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    ctx.beginPath();
-    ctx.moveTo(fromX, fromY);
-    ctx.lineTo(toX, toY);
-    ctx.stroke();
+    if (shape === 'arrow') {
+        const headLen = Math.max(12, width * 3.5);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
 
-    // Arrowhead triangle
-    ctx.beginPath();
-    ctx.moveTo(toX, toY);
-    ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
-    ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
-    ctx.closePath();
-    ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        return;
+    }
+
+    if (shape === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        return;
+    }
+
+    if (shape === 'rect') {
+        const w = x2 - x1;
+        const h = y2 - y1;
+        ctx.beginPath();
+        ctx.rect(x1, y1, w, h);
+        if (isFilled) ctx.fill();
+        ctx.stroke();
+        return;
+    }
+
+    if (shape === 'circle') {
+        const rx = Math.abs(x2 - x1) / 2;
+        const ry = Math.abs(y2 - y1) / 2;
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, Math.max(1, rx), Math.max(1, ry), 0, 0, 2 * Math.PI);
+        if (isFilled) ctx.fill();
+        ctx.stroke();
+        return;
+    }
+
+    if (shape === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo((x1 + x2) / 2, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x1, y2);
+        ctx.closePath();
+        if (isFilled) ctx.fill();
+        ctx.stroke();
+        return;
+    }
+
+    if (shape === 'star') {
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        const outerR = Math.max(8, Math.hypot(x2 - x1, y2 - y1) / 2);
+        const innerR = outerR * 0.42;
+        const points = 5;
+        ctx.beginPath();
+        for (let i = 0; i < points * 2; i++) {
+            const r = i % 2 === 0 ? outerR : innerR;
+            const a = (i * Math.PI) / points - Math.PI / 2;
+            const px = cx + r * Math.cos(a);
+            const py = cy + r * Math.sin(a);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        if (isFilled) ctx.fill();
+        ctx.stroke();
+        return;
+    }
 }
 
 // --- Windows Paint & Signature Studio ---
@@ -3862,14 +4075,35 @@ function setupPaintStudio() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    let arrowStartPoint = null;
+    const isShape = (t) => ['arrow', 'rect', 'circle', 'triangle', 'line', 'star'].includes(t);
+    let shapeStartPoint = null;
     let canvasSnapshot = null;
 
     document.getElementById('btn-paint-tool-signature').onclick = () => setPaintTool('signature');
     document.getElementById('btn-paint-tool-brush').onclick = () => setPaintTool('brush');
+    document.getElementById('btn-paint-tool-eraser').onclick = () => setPaintTool('eraser');
     const btnArrow = document.getElementById('btn-paint-tool-arrow');
     if (btnArrow) btnArrow.onclick = () => setPaintTool('arrow');
-    document.getElementById('btn-paint-tool-eraser').onclick = () => setPaintTool('eraser');
+    const btnRect = document.getElementById('btn-paint-tool-rect');
+    if (btnRect) btnRect.onclick = () => setPaintTool('rect');
+    const btnCircle = document.getElementById('btn-paint-tool-circle');
+    if (btnCircle) btnCircle.onclick = () => setPaintTool('circle');
+    const btnTriangle = document.getElementById('btn-paint-tool-triangle');
+    if (btnTriangle) btnTriangle.onclick = () => setPaintTool('triangle');
+    const btnStar = document.getElementById('btn-paint-tool-star');
+    if (btnStar) btnStar.onclick = () => setPaintTool('star');
+    const btnLine = document.getElementById('btn-paint-tool-line');
+    if (btnLine) btnLine.onclick = () => setPaintTool('line');
+
+    const btnFillToggle = document.getElementById('btn-paint-fill-toggle');
+    const fillLabel = document.getElementById('paint-fill-label');
+    if (btnFillToggle) {
+        btnFillToggle.onclick = () => {
+            state.paintFill = !state.paintFill;
+            btnFillToggle.classList.toggle('active', state.paintFill);
+            if (fillLabel) fillLabel.textContent = state.paintFill ? 'Filled' : 'Outline';
+        };
+    }
 
     const widthSlider = document.getElementById('paint-width-slider');
     const widthVal = document.getElementById('paint-width-val');
@@ -3912,8 +4146,8 @@ function setupPaintStudio() {
         state.isPainting = true;
         const pt = getCanvasCoords(e);
         state.paintPoints = [pt];
-        if (state.paintTool === 'arrow') {
-            arrowStartPoint = pt;
+        if (isShape(state.paintTool)) {
+            shapeStartPoint = pt;
             canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
         } else {
             ctx.beginPath();
@@ -3926,10 +4160,10 @@ function setupPaintStudio() {
         const pt = getCanvasCoords(e);
         state.paintPoints.push(pt);
 
-        if (state.paintTool === 'arrow') {
-            if (canvasSnapshot && arrowStartPoint) {
+        if (isShape(state.paintTool)) {
+            if (canvasSnapshot && shapeStartPoint) {
                 ctx.putImageData(canvasSnapshot, 0, 0);
-                drawCanvasArrow(ctx, arrowStartPoint.x, arrowStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth);
+                drawCanvasShape(ctx, state.paintTool, shapeStartPoint.x, shapeStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth, state.paintFill);
             }
             return;
         }
@@ -3964,14 +4198,14 @@ function setupPaintStudio() {
 
     window.addEventListener('mouseup', () => {
         if (state.isPainting) {
-            if (state.paintTool === 'arrow' && arrowStartPoint && state.paintPoints.length > 0) {
+            if (isShape(state.paintTool) && shapeStartPoint && state.paintPoints.length > 0) {
                 const pt = state.paintPoints[state.paintPoints.length - 1];
                 if (canvasSnapshot) ctx.putImageData(canvasSnapshot, 0, 0);
-                drawCanvasArrow(ctx, arrowStartPoint.x, arrowStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth);
+                drawCanvasShape(ctx, state.paintTool, shapeStartPoint.x, shapeStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth, state.paintFill);
             }
             state.isPainting = false;
             state.paintPoints = [];
-            arrowStartPoint = null;
+            shapeStartPoint = null;
             canvasSnapshot = null;
         }
     });
@@ -3982,8 +4216,8 @@ function setupPaintStudio() {
             state.isPainting = true;
             const pt = getCanvasCoords(e.touches[0]);
             state.paintPoints = [pt];
-            if (state.paintTool === 'arrow') {
-                arrowStartPoint = pt;
+            if (isShape(state.paintTool)) {
+                shapeStartPoint = pt;
                 canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
             } else {
                 ctx.beginPath();
@@ -3998,10 +4232,10 @@ function setupPaintStudio() {
         const pt = getCanvasCoords(e.touches[0]);
         state.paintPoints.push(pt);
 
-        if (state.paintTool === 'arrow') {
-            if (canvasSnapshot && arrowStartPoint) {
+        if (isShape(state.paintTool)) {
+            if (canvasSnapshot && shapeStartPoint) {
                 ctx.putImageData(canvasSnapshot, 0, 0);
-                drawCanvasArrow(ctx, arrowStartPoint.x, arrowStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth);
+                drawCanvasShape(ctx, state.paintTool, shapeStartPoint.x, shapeStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth, state.paintFill);
             }
             return;
         }
@@ -4016,14 +4250,14 @@ function setupPaintStudio() {
 
     canvas.addEventListener('touchend', () => {
         if (state.isPainting) {
-            if (state.paintTool === 'arrow' && arrowStartPoint && state.paintPoints.length > 0) {
+            if (isShape(state.paintTool) && shapeStartPoint && state.paintPoints.length > 0) {
                 const pt = state.paintPoints[state.paintPoints.length - 1];
                 if (canvasSnapshot) ctx.putImageData(canvasSnapshot, 0, 0);
-                drawCanvasArrow(ctx, arrowStartPoint.x, arrowStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth);
+                drawCanvasShape(ctx, state.paintTool, shapeStartPoint.x, shapeStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth, state.paintFill);
             }
             state.isPainting = false;
             state.paintPoints = [];
-            arrowStartPoint = null;
+            shapeStartPoint = null;
             canvasSnapshot = null;
         }
     });
@@ -4032,22 +4266,27 @@ function setupPaintStudio() {
         const dataUrl = canvas.toDataURL('image/png');
         closePaintModal();
         restoreSelection();
-        insertImageElement(dataUrl, state.paintTool === 'signature' ? 'Handwritten Signature' : (state.paintTool === 'arrow' ? 'Arrow Diagram' : 'Paint Drawing'));
+        let label = 'Paint Drawing';
+        if (state.paintTool === 'signature') label = 'Handwritten Signature';
+        else if (state.paintTool === 'arrow') label = 'Arrow Diagram';
+        else if (isShape(state.paintTool)) label = 'Drawn Shape';
+        insertImageElement(dataUrl, label);
     };
 }
 
 function setPaintTool(tool) {
     state.paintTool = tool;
-    document.getElementById('btn-paint-tool-signature').classList.toggle('active', tool === 'signature');
-    document.getElementById('btn-paint-tool-brush').classList.toggle('active', tool === 'brush');
-    document.getElementById('btn-paint-tool-eraser').classList.toggle('active', tool === 'eraser');
-    const btnArrow = document.getElementById('btn-paint-tool-arrow');
-    if (btnArrow) btnArrow.classList.toggle('active', tool === 'arrow');
+    const tools = ['signature', 'brush', 'eraser', 'arrow', 'rect', 'circle', 'triangle', 'star', 'line'];
+    tools.forEach(t => {
+        const btn = document.getElementById(`btn-paint-tool-${t}`);
+        if (btn) btn.classList.toggle('active', tool === t);
+    });
 }
 
-function openPaintModal() {
+function openPaintModal(initialTool = 'brush') {
     saveSelection();
     document.getElementById('paint-modal').style.display = 'flex';
+    setPaintTool(initialTool);
 }
 
 function closePaintModal() {
@@ -5076,6 +5315,32 @@ function setupEventListeners() {
 
     const btnShapes = document.getElementById('btn-shapes-menu');
     if (btnShapes) btnShapes.onclick = (e) => toggleRibbonPopover('shapes-dropdown-menu', btnShapes, e);
+
+    const btnDrawShape = document.getElementById('btn-draw-shape');
+    if (btnDrawShape) btnDrawShape.onclick = () => openPaintModal('rect');
+
+    const btnTimeline = document.getElementById('btn-insert-timeline');
+    if (btnTimeline) btnTimeline.onclick = insertTimeline;
+
+    const btnQuoteCard = document.getElementById('btn-insert-quote');
+    if (btnQuoteCard) btnQuoteCard.onclick = insertQuoteCard;
+
+    const btnFancyDivider = document.getElementById('btn-insert-divider-fancy');
+    if (btnFancyDivider) btnFancyDivider.onclick = insertFancyDivider;
+
+    const btnZenMode = document.getElementById('btn-zen-mode');
+    if (btnZenMode) btnZenMode.onclick = toggleZenMode;
+
+    const selectLineSpacing = document.getElementById('select-line-spacing');
+    if (selectLineSpacing) {
+        selectLineSpacing.onchange = (e) => {
+            noteEditor.style.lineHeight = e.target.value;
+            handleEditorInput();
+        };
+    }
+
+    const btnExportMenu = document.getElementById('btn-export-menu');
+    if (btnExportMenu) btnExportMenu.onclick = (e) => toggleRibbonPopover('export-dropdown-menu', btnExportMenu, e);
 
     // Prevent toolbar click from stealing focus from noteEditor
     document.querySelector('.editor-ribbon')?.addEventListener('mousedown', (e) => {
