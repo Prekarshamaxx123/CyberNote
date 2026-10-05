@@ -31,6 +31,7 @@ db.exec(`
         color TEXT DEFAULT '',
         position INTEGER DEFAULT 0,
         is_expanded INTEGER DEFAULT 1,
+        is_pinned INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         deleted INTEGER DEFAULT 0
@@ -42,6 +43,12 @@ db.exec(`
 
 try {
     db.exec("ALTER TABLE nodes ADD COLUMN color TEXT DEFAULT ''");
+} catch (e) {
+    // Column already exists
+}
+
+try {
+    db.exec("ALTER TABLE nodes ADD COLUMN is_pinned INTEGER DEFAULT 0");
 } catch (e) {
     // Column already exists
 }
@@ -178,8 +185,8 @@ const server = http.createServer(async (req, res) => {
             // Retrieve entire tree index (with or without content based on ?full=1)
             const full = parsedUrl.searchParams.get('full') === '1';
             const sql = full
-                ? 'SELECT * FROM nodes WHERE deleted = 0 ORDER BY position ASC, created_at ASC'
-                : 'SELECT id, parent_id, title, icon, tags, color, position, is_expanded, updated_at FROM nodes WHERE deleted = 0 ORDER BY position ASC, created_at ASC';
+                ? 'SELECT * FROM nodes WHERE deleted = 0 ORDER BY is_pinned DESC, position ASC, created_at ASC'
+                : 'SELECT id, parent_id, title, icon, tags, color, position, is_expanded, is_pinned, updated_at FROM nodes WHERE deleted = 0 ORDER BY is_pinned DESC, position ASC, created_at ASC';
             const rows = db.prepare(sql).all();
             return sendJson(res, 200, { nodes: rows });
         }
@@ -195,16 +202,17 @@ const server = http.createServer(async (req, res) => {
                 const icon = body.icon || 'file-text';
                 const tags = body.tags || '';
                 const color = body.color || '';
+                const is_pinned = body.is_pinned ? 1 : 0;
 
                 // Get max position for siblings
                 const posRow = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM nodes WHERE parent_id IS ? AND deleted = 0').get(parent_id);
                 const position = body.position !== undefined ? body.position : posRow.next_pos;
 
                 const stmt = db.prepare(`
-                    INSERT INTO nodes (id, parent_id, title, content, icon, tags, color, position, is_expanded, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    INSERT INTO nodes (id, parent_id, title, content, icon, tags, color, position, is_expanded, is_pinned, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
                 `);
-                stmt.run(id, parent_id, title, content, icon, tags, color, position, now, now);
+                stmt.run(id, parent_id, title, content, icon, tags, color, position, is_pinned, now, now);
 
                 const created = db.prepare('SELECT * FROM nodes WHERE id = ?').get(id);
                 broadcastEvent('node_create', created);
@@ -241,6 +249,7 @@ const server = http.createServer(async (req, res) => {
                 if (body.color !== undefined) { updates.push('color = ?'); values.push(body.color); }
                 if (body.position !== undefined) { updates.push('position = ?'); values.push(body.position); }
                 if (body.is_expanded !== undefined) { updates.push('is_expanded = ?'); values.push(body.is_expanded ? 1 : 0); }
+                if (body.is_pinned !== undefined) { updates.push('is_pinned = ?'); values.push(body.is_pinned ? 1 : 0); }
 
                 if (updates.length === 0) {
                     return sendJson(res, 200, { status: 'no changes' });
