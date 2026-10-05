@@ -1674,6 +1674,7 @@ body {
 .editor-scroll-area {
     flex: 1;
     overflow-y: auto;
+    overflow-x: auto;
     padding: 16px 24px 80px 24px;
     background: linear-gradient(180deg, var(--bg-editor) 0%, rgba(20, 20, 32, 0.95) 100%);
     cursor: text;
@@ -1823,19 +1824,27 @@ body {
     word-break: break-all;
 }
 
-/* Tables */
+/* Tables & Resizing */
 .wysiwyg-canvas table {
     width: 100%;
     border-collapse: collapse;
     margin: 1.2em 0;
     border: 1px solid var(--border-color);
+    position: relative;
+    max-width: 100%;
+    table-layout: auto;
 }
 
 .wysiwyg-canvas th, .wysiwyg-canvas td {
     border: 1px solid var(--border-color);
     padding: 8px 12px;
-    min-width: 60px;
+    min-width: 40px;
     outline: none;
+    position: relative;
+    box-sizing: border-box;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .wysiwyg-canvas th {
@@ -1845,7 +1854,14 @@ body {
 }
 
 .wysiwyg-canvas td:focus, .wysiwyg-canvas th:focus {
-    background-color: rgba(137, 180, 250, 0.1);
+    background-color: rgba(137, 180, 250, 0.12);
+    border-color: rgba(137, 180, 250, 0.5);
+}
+
+/* Visual column resizing border indicator */
+.wysiwyg-canvas td[style*="col-resize"],
+.wysiwyg-canvas th[style*="col-resize"] {
+    border-right: 2.5px solid var(--accent) !important;
 }
 
 /* Checklists (To-Do) */
