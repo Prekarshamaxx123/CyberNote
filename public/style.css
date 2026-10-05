@@ -3989,6 +3989,142 @@ body {
     filter: drop-shadow(0 0 6px #ffaa00) drop-shadow(0 0 14px rgba(255, 170, 0, 0.7));
 }
 
+/* Additional Creative Text Animations */
+@keyframes cyberGlitchAnim {
+    0%, 100% { transform: translate(0); text-shadow: 0 0 0; }
+    20% { transform: translate(-2px, 1px); text-shadow: -2px 0 #ff007f, 2px 0 #00ffff; }
+    40% { transform: translate(2px, -1px); text-shadow: 2px 0 #00ffff, -2px 0 #ff007f; }
+    60% { transform: translate(-1px, 2px); text-shadow: -1px 0 #ffaa00, 1px 0 #00ff66; }
+    80% { transform: translate(1px, -2px); text-shadow: 1px 0 #ff007f, -1px 0 #00ffff; }
+}
+.anim-glitch-text {
+    display: inline-block;
+    font-weight: 700;
+    color: #00ffff;
+    letter-spacing: 0.5px;
+    animation: cyberGlitchAnim 1.6s infinite cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes shimmerSweep {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+.anim-shimmer-text {
+    display: inline-block;
+    font-weight: 700;
+    background: linear-gradient(90deg, #cdd6f4 0%, #ffffff 40%, #89b4fa 50%, #ffffff 60%, #cdd6f4 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmerSweep 3s linear infinite;
+}
+
+@keyframes bouncePlayful {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-7px); }
+    60% { transform: translateY(-3px); }
+}
+.anim-bounce-text {
+    display: inline-block;
+    font-weight: 700;
+    color: var(--accent);
+    animation: bouncePlayful 1.8s ease infinite;
+}
+
+@keyframes neonCathodeFlicker {
+    0%, 19.999%, 22%, 62.999%, 64%, 64.999%, 70%, 100% {
+        opacity: 1;
+        text-shadow: 0 0 4px currentColor, 0 0 12px currentColor;
+    }
+    20%, 21.999%, 63%, 63.999%, 65%, 69.999% {
+        opacity: 0.25;
+        text-shadow: none;
+    }
+}
+.anim-flicker-text {
+    display: inline-block;
+    font-weight: 700;
+    color: #f9e2af;
+    animation: neonCathodeFlicker 3s linear infinite;
+}
+
+@keyframes hueCycleSpectrum {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+}
+.anim-hue-text {
+    display: inline-block;
+    font-weight: 700;
+    color: #f38ba8;
+    animation: hueCycleSpectrum 4s linear infinite;
+}
+
+@keyframes flameFlickerPulse {
+    0% { text-shadow: 0 -2px 5px #ffaa00, 0 -4px 10px #ff3b30, 0 -7px 18px #ff2a6d; color: #fff3d4; }
+    50% { text-shadow: 0 -3px 7px #ffcc00, 0 -6px 14px #ff4500, 0 -10px 24px #e0245e; color: #ffffff; }
+    100% { text-shadow: 0 -2px 5px #ffaa00, 0 -4px 10px #ff3b30, 0 -7px 18px #ff2a6d; color: #fff3d4; }
+}
+.anim-flame-text {
+    display: inline-block;
+    font-weight: 700;
+    animation: flameFlickerPulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes terminalCursorBlink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.3; }
+}
+.anim-blink-text {
+    display: inline-block;
+    font-weight: 700;
+    color: #a6e3a1;
+    animation: terminalCursorBlink 1.2s infinite;
+}
+
+@keyframes popPulseScale {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+.anim-pop-text {
+    display: inline-block;
+    font-weight: 700;
+    color: #cba6f7;
+    animation: popPulseScale 1.6s ease-in-out infinite;
+}
+
+/* Neon Text Combos for New Animations */
+.neon-text.anim-glitch-text {
+    color: #ffffff !important;
+    animation: cyberGlitchAnim 1.6s infinite cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+.neon-text.anim-bounce-text {
+    animation: bouncePlayful 1.8s ease infinite !important;
+}
+.neon-text.anim-flicker-text {
+    animation: neonCathodeFlicker 3s linear infinite !important;
+}
+.neon-text.anim-hue-text {
+    animation: hueCycleSpectrum 4s linear infinite !important;
+}
+.neon-text.anim-flame-text {
+    animation: flameFlickerPulse 1.4s ease-in-out infinite alternate !important;
+}
+.neon-text.anim-blink-text {
+    animation: terminalCursorBlink 1.2s infinite !important;
+}
+.neon-text.anim-pop-text {
+    animation: popPulseScale 1.6s ease-in-out infinite !important;
+}
+.neon-text.anim-shimmer-text {
+    background: linear-gradient(90deg, rgba(255,255,255,0.4) 0%, #ffffff 50%, rgba(255,255,255,0.4) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    animation: shimmerSweep 3s linear infinite !important;
+    text-shadow: none !important;
+}
+
 /* Flow Steps Ribbon */
 .flow-steps-container {
     display: flex;
