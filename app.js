@@ -2107,29 +2107,32 @@ function selectNode(id) {
     iconPickerBtn.innerHTML = getNodeIconSvg(node.icon, node.color, isFolder, false, 18);
     updateNodeColorDot(node.color);
 
+    applyReadOnlyState(!!node.is_readonly);
+    updatePinButtonUI(!!node.is_pinned);
+
     const ribbonEl = document.getElementById('editor-ribbon');
     const tagsEl = document.getElementById('tags-container');
-    const editorContainer = document.querySelector('.editor-container');
+    const scrollArea = document.getElementById('editor-scroll-area');
     const folderViewEl = document.getElementById('folder-explorer-view');
+    const btnToggleRo = document.getElementById('btn-toggle-readonly');
 
     if (isFolder) {
         if (ribbonEl) ribbonEl.style.display = 'none';
         if (tagsEl) tagsEl.style.display = 'none';
-        if (editorContainer) editorContainer.style.display = 'none';
+        if (scrollArea) scrollArea.style.display = 'none';
         if (folderViewEl) folderViewEl.style.display = 'flex';
+        if (btnToggleRo) btnToggleRo.style.display = 'none';
         noteTitleInput.placeholder = 'Folder Name...';
         renderFolderExplorerView(id);
     } else {
         if (folderViewEl) folderViewEl.style.display = 'none';
         if (tagsEl) tagsEl.style.display = 'flex';
-        if (editorContainer) editorContainer.style.display = 'flex';
-        if (ribbonEl) ribbonEl.style.display = node.is_readonly ? 'none' : 'flex';
+        if (scrollArea) scrollArea.style.display = 'flex';
+        if (ribbonEl) ribbonEl.style.display = node.is_readonly ? 'none' : '';
+        if (btnToggleRo) btnToggleRo.style.display = 'inline-flex';
         noteTitleInput.placeholder = 'Note Title...';
         setEditorContent(node.content || '');
     }
-
-    applyReadOnlyState(!!node.is_readonly);
-    updatePinButtonUI(!!node.is_pinned);
 
     updateBreadcrumbs(id);
     updateWordStats();
@@ -2631,7 +2634,13 @@ function applyReadOnlyState(isReadOnly) {
     // 1. Hide/Show Ribbon Toolbar
     const ribbon = document.getElementById('editor-ribbon');
     if (ribbon) {
-        ribbon.style.display = isReadOnly ? 'none' : '';
+        const activeNode = state.activeNodeId ? state.nodes.get(state.activeNodeId) : null;
+        const isFolder = activeNode && (activeNode.is_folder || activeNode.icon === 'folder');
+        if (isFolder) {
+            ribbon.style.display = 'none';
+        } else {
+            ribbon.style.display = isReadOnly ? 'none' : '';
+        }
     }
 
     // 2. Safely hide all floating toolbars, overlays, and popovers
