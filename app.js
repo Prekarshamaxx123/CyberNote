@@ -1466,6 +1466,14 @@ function renderTree() {
         allNotesCountEl.textContent = state.nodes.size;
     }
 
+    // Refresh Folder Explorer view if active node is a folder
+    if (state.activeNodeId) {
+        const activeNode = state.nodes.get(state.activeNodeId);
+        if (activeNode && (activeNode.is_folder || activeNode.icon === 'folder')) {
+            renderFolderExplorerView(state.activeNodeId);
+        }
+    }
+
     const sidebarEl = document.getElementById('sidebar');
     if (sidebarEl) {
         sidebarEl.oncontextmenu = (e) => {
@@ -1903,6 +1911,149 @@ function createKeepCard(node) {
     return card;
 }
 
+// --- Folder Explorer View (Subfolders & Notes Grid) ---
+function createFolderCard(folderNode) {
+    const card = document.createElement('div');
+    card.className = 'folder-card';
+    card.setAttribute('data-id', folderNode.id);
+
+    // Count direct children inside this subfolder
+    let count = 0;
+    for (const n of state.nodes.values()) {
+        if (n.parent_id === folderNode.id) count++;
+    }
+
+    const main = document.createElement('div');
+    main.className = 'folder-card-main';
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'folder-card-icon';
+    iconSpan.innerHTML = getNodeIconSvg(folderNode.icon, folderNode.color, true, false, 20);
+
+    const info = document.createElement('div');
+    info.className = 'folder-card-info';
+
+    const title = document.createElement('span');
+    title.className = 'folder-card-title';
+    title.textContent = folderNode.title || 'Untitled Folder';
+    if (folderNode.color) title.style.color = folderNode.color;
+
+    const sub = document.createElement('span');
+    sub.className = 'folder-card-count';
+    sub.textContent = `${count} ${count === 1 ? 'item' : 'items'}`;
+
+    info.appendChild(title);
+    info.appendChild(sub);
+
+    main.appendChild(iconSpan);
+    main.appendChild(info);
+
+    card.appendChild(main);
+
+    // Card Action Buttons (Hover)
+    const actions = document.createElement('div');
+    actions.className = 'folder-card-actions';
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'icon-btn-small';
+    addBtn.title = 'Add note inside';
+    addBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+    addBtn.onclick = (e) => {
+        e.stopPropagation();
+        createSubNode(folderNode.id, 'note');
+    };
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'icon-btn-small';
+    delBtn.title = 'Delete folder';
+    delBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+    delBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteNode(folderNode.id);
+    };
+
+    actions.appendChild(addBtn);
+    actions.appendChild(delBtn);
+    card.appendChild(actions);
+
+    card.onclick = () => {
+        selectNode(folderNode.id);
+    };
+
+    return card;
+}
+
+function renderFolderExplorerView(folderId) {
+    const folderView = document.getElementById('folder-explorer-view');
+    if (!folderView) return;
+    const node = state.nodes.get(folderId);
+    if (!node) return;
+
+    const subfoldersGrid = document.getElementById('folder-subfolders-grid');
+    const notesGrid = document.getElementById('folder-notes-grid');
+    const emptyState = document.getElementById('folder-empty-state');
+    const subfoldersSection = document.getElementById('folder-subfolders-section');
+    const notesSection = document.getElementById('folder-notes-section');
+    const itemsCountBadge = document.getElementById('folder-items-count');
+    const subfoldersCountEl = document.getElementById('folder-subfolders-count');
+    const notesCountEl = document.getElementById('folder-notes-count');
+
+    if (!subfoldersGrid || !notesGrid) return;
+
+    subfoldersGrid.innerHTML = '';
+    notesGrid.innerHTML = '';
+
+    // Collect children
+    const children = [];
+    for (const n of state.nodes.values()) {
+        if (n.parent_id === folderId) {
+            children.push(n);
+        }
+    }
+    children.sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || (b.updated_at ?? 0) - (a.updated_at ?? 0));
+
+    const subfolders = children.filter(c => c.is_folder || c.icon === 'folder');
+    const notes = children.filter(c => !c.is_folder && c.icon !== 'folder');
+
+    const totalItems = children.length;
+    if (itemsCountBadge) {
+        itemsCountBadge.textContent = `${totalItems} ${totalItems === 1 ? 'item' : 'items'} (${subfolders.length} ${subfolders.length === 1 ? 'folder' : 'folders'}, ${notes.length} ${notes.length === 1 ? 'note' : 'notes'})`;
+    }
+
+    if (totalItems === 0) {
+        if (emptyState) emptyState.style.display = 'flex';
+        if (subfoldersSection) subfoldersSection.style.display = 'none';
+        if (notesSection) notesSection.style.display = 'none';
+        return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+
+    // Render Subfolders
+    if (subfolders.length > 0) {
+        if (subfoldersSection) subfoldersSection.style.display = 'block';
+        if (subfoldersCountEl) subfoldersCountEl.textContent = subfolders.length;
+        subfolders.forEach(sf => {
+            const card = createFolderCard(sf);
+            subfoldersGrid.appendChild(card);
+        });
+    } else {
+        if (subfoldersSection) subfoldersSection.style.display = 'none';
+    }
+
+    // Render Notes
+    if (notes.length > 0) {
+        if (notesSection) notesSection.style.display = 'block';
+        if (notesCountEl) notesCountEl.textContent = notes.length;
+        notes.forEach(nt => {
+            const card = createKeepCard(nt);
+            notesGrid.appendChild(card);
+        });
+    } else {
+        if (notesSection) notesSection.style.display = 'none';
+    }
+}
+
 // --- Node Selection & In-Place Loading ---
 function selectNode(id) {
     hideFloatingToolbars();
@@ -1952,11 +2103,31 @@ function selectNode(id) {
     noteTitleInput.value = node.title || '';
     if (noteTagsInput) noteTagsInput.value = node.tags || '';
     renderTagChips(node.tags || '');
-    const isFolder = node.is_folder || node.icon === 'folder';
+    const isFolder = !!(node.is_folder || node.icon === 'folder');
     iconPickerBtn.innerHTML = getNodeIconSvg(node.icon, node.color, isFolder, false, 18);
     updateNodeColorDot(node.color);
 
-    setEditorContent(node.content || '');
+    const ribbonEl = document.getElementById('editor-ribbon');
+    const tagsEl = document.getElementById('tags-container');
+    const editorContainer = document.querySelector('.editor-container');
+    const folderViewEl = document.getElementById('folder-explorer-view');
+
+    if (isFolder) {
+        if (ribbonEl) ribbonEl.style.display = 'none';
+        if (tagsEl) tagsEl.style.display = 'none';
+        if (editorContainer) editorContainer.style.display = 'none';
+        if (folderViewEl) folderViewEl.style.display = 'flex';
+        noteTitleInput.placeholder = 'Folder Name...';
+        renderFolderExplorerView(id);
+    } else {
+        if (folderViewEl) folderViewEl.style.display = 'none';
+        if (tagsEl) tagsEl.style.display = 'flex';
+        if (editorContainer) editorContainer.style.display = 'flex';
+        if (ribbonEl) ribbonEl.style.display = node.is_readonly ? 'none' : 'flex';
+        noteTitleInput.placeholder = 'Note Title...';
+        setEditorContent(node.content || '');
+    }
+
     applyReadOnlyState(!!node.is_readonly);
     updatePinButtonUI(!!node.is_pinned);
 
@@ -5582,6 +5753,17 @@ function handleEditorInput() {
 }
 
 function updateWordStats() {
+    if (state.activeNodeId) {
+        const activeNode = state.nodes.get(state.activeNodeId);
+        if (activeNode && (activeNode.is_folder || activeNode.icon === 'folder')) {
+            const children = Array.from(state.nodes.values()).filter(n => n.parent_id === state.activeNodeId);
+            const subf = children.filter(c => c.is_folder || c.icon === 'folder').length;
+            const subn = children.length - subf;
+            footerStats.textContent = `${children.length} items (${subf} folders, ${subn} notes)`;
+            return;
+        }
+    }
+
     const text = noteEditor.innerText || '';
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
