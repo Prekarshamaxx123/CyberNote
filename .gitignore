@@ -1,0 +1,12 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+
+# Local SQLite databases (Keep notes.json template if present, ignore local sqlite runtime files)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# OS files
+.DS_Store
+Thumbs.db

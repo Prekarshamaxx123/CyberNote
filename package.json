@@ -1,0 +1,20 @@
+{
+  "name": "treekeep",
+  "version": "1.0.0",
+  "description": "Lightning-fast hierarchical tree notes app with Google Keep-speed micro delta sync",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "notes",
+    "hierarchy",
+    "tree",
+    "cherrytree",
+    "google-keep",
+    "delta-sync",
+    "markdown"
+  ],
+  "author": "TreeKeep Team",
+  "license": "MIT"
+}
