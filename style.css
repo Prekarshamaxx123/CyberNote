@@ -1122,22 +1122,54 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 3px 8px;
+    padding: 3px 10px;
     border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 600;
     background-color: rgba(243, 139, 168, 0.15);
     color: var(--danger);
-    border: 1px solid rgba(243, 139, 168, 0.3);
+    border: 1px solid rgba(243, 139, 168, 0.35);
     margin-left: 8px;
     flex-shrink: 0;
     user-select: none;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: all 0.18s ease;
 }
 
 .readonly-badge:hover {
-    background-color: rgba(243, 139, 168, 0.25);
+    background-color: rgba(243, 139, 168, 0.28);
+    border-color: var(--danger);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(243, 139, 168, 0.25);
+}
+
+.wysiwyg-canvas.readonly-mode {
+    cursor: default !important;
+    user-select: text !important;
+}
+
+.wysiwyg-canvas.readonly-mode [contenteditable] {
+    user-modify: read-only !important;
+    -webkit-user-modify: read-only !important;
+    cursor: default !important;
+}
+
+.wysiwyg-canvas.readonly-mode input[type="checkbox"] {
+    pointer-events: none !important;
+    cursor: default !important;
+}
+
+.wysiwyg-canvas.readonly-mode .editor-img-wrap {
+    cursor: default !important;
+}
+
+.readonly-input {
+    cursor: default !important;
+    user-select: text !important;
+}
+
+.readonly-tags .tags-chip-remove {
+    display: none !important;
 }
 
 .tags-container {

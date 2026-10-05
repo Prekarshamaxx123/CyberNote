@@ -2046,6 +2046,10 @@ function scheduleSave(field, value, targetNodeId = null) {
     const nodeId = targetNodeId || state.activeNodeId;
     if (!nodeId) return;
 
+    if (state.isReadOnly && nodeId === state.activeNodeId && field !== 'is_readonly') {
+        return;
+    }
+
     const node = state.nodes.get(nodeId);
     if (node) {
         node[field] = value;
@@ -2335,10 +2339,90 @@ function toggleReadOnlyMode() {
     sendDeltaPatch(state.activeNodeId, { is_readonly: node.is_readonly });
     renderTree();
     if (isAllNotesViewActive()) renderAllNotesView();
+    showToast(newStatus ? '🔒 Note is now Read-Only (Toolbar hidden)' : '🔓 Note is now Editable (Toolbar visible)');
 }
 
 function applyReadOnlyState(isReadOnly) {
     state.isReadOnly = isReadOnly;
+
+    // 1. Hide/Show Ribbon Toolbar (as requested by user)
+    const ribbon = document.getElementById('editor-ribbon');
+    if (ribbon) {
+        ribbon.style.display = isReadOnly ? 'none' : '';
+    }
+
+    // 2. Hide all floating toolbars, overlays, and popovers
+    if (isReadOnly) {
+        closeAllRibbonPopovers();
+        hideImageToolbar();
+        hideTableToolbar();
+        hideImageResizeOverlay();
+        hideTableResizeOverlay();
+        const selectionBubble = document.getElementById('selection-bubble');
+        if (selectionBubble) selectionBubble.style.display = 'none';
+        const slashMenu = document.getElementById('slash-command-menu');
+        if (slashMenu) slashMenu.style.display = 'none';
+    }
+
+    // 3. Read-Only Badge UI next to Title
+    const badge = document.getElementById('readonly-badge');
+    if (badge) {
+        badge.style.display = isReadOnly ? 'inline-flex' : 'none';
+        badge.title = isReadOnly ? 'Note is locked (Read-Only). Click to unlock and edit.' : '';
+    }
+
+    // 4. Editor Canvas and Nested Editable Elements
+    if (noteEditor) {
+        noteEditor.setAttribute('contenteditable', isReadOnly ? 'false' : 'true');
+        noteEditor.contentEditable = !isReadOnly;
+        noteEditor.classList.toggle('readonly-mode', isReadOnly);
+
+        // Update all nested elements with contenteditable (tables, callouts, codeboxes, etc.)
+        noteEditor.querySelectorAll('[contenteditable]').forEach(el => {
+            if (isReadOnly) {
+                if (!el.hasAttribute('data-orig-contenteditable')) {
+                    el.setAttribute('data-orig-contenteditable', el.getAttribute('contenteditable') || 'true');
+                }
+                el.setAttribute('contenteditable', 'false');
+                el.contentEditable = false;
+            } else {
+                const orig = el.getAttribute('data-orig-contenteditable') || 'true';
+                el.setAttribute('contenteditable', orig);
+                el.contentEditable = (orig === 'true');
+                el.removeAttribute('data-orig-contenteditable');
+            }
+        });
+
+        // Checkboxes in To-Do lists
+        noteEditor.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.disabled = isReadOnly;
+        });
+    }
+
+    // 5. Note Title & Tags
+    if (noteTitleInput) {
+        noteTitleInput.readOnly = isReadOnly;
+        noteTitleInput.classList.toggle('readonly-input', isReadOnly);
+    }
+    if (noteTagsInput) {
+        noteTagsInput.readOnly = isReadOnly;
+        noteTagsInput.style.display = isReadOnly ? 'none' : '';
+    }
+    const tagsWrapper = document.getElementById('tags-container');
+    if (tagsWrapper) {
+        tagsWrapper.classList.toggle('readonly-tags', isReadOnly);
+    }
+    const iconPickerBtn = document.getElementById('btn-icon-picker');
+    if (iconPickerBtn) {
+        iconPickerBtn.style.pointerEvents = isReadOnly ? 'none' : '';
+        iconPickerBtn.style.opacity = isReadOnly ? '0.75' : '';
+    }
+    const titleColorDot = document.getElementById('title-color-dot');
+    if (titleColorDot) {
+        titleColorDot.style.pointerEvents = isReadOnly ? 'none' : '';
+    }
+
+    // 6. Context menu button state
     const btn = document.getElementById('btn-toggle-readonly');
     if (btn) {
         const lockSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
@@ -2346,13 +2430,6 @@ function applyReadOnlyState(isReadOnly) {
         btn.innerHTML = `${isReadOnly ? lockSvg : unlockSvg}<span>${isReadOnly ? 'Read Only' : 'Read/Write'}</span>`;
         btn.className = `btn btn-sm ${isReadOnly ? 'btn-danger' : 'btn-secondary'}`;
     }
-    const badge = document.getElementById('readonly-badge');
-    if (badge) {
-        badge.style.display = isReadOnly ? 'inline-flex' : 'none';
-    }
-    noteEditor.contentEditable = !isReadOnly;
-    noteTitleInput.readOnly = isReadOnly;
-    if (noteTagsInput) noteTagsInput.readOnly = isReadOnly;
 }
 
 // --- Selection Management & Safe Cursor Insertion ---
@@ -3372,6 +3449,11 @@ function insertImageElement(src, alt) {
 // Floating Image Controls & Corner Resizing
 function setupImageInteractions() {
     noteEditor.addEventListener('click', (e) => {
+        if (state.isReadOnly) {
+            hideImageToolbar();
+            hideImageResizeOverlay();
+            return;
+        }
         const img = e.target.tagName === 'IMG' ? e.target : e.target.closest('.editor-img-wrap')?.querySelector('img');
         if (img) {
             selectImageElement(img);
@@ -3385,6 +3467,7 @@ function setupImageInteractions() {
 }
 
 function selectImageElement(img) {
+    if (state.isReadOnly) return;
     state.activeImageElement = img;
     document.querySelectorAll('.wysiwyg-canvas img').forEach(i => i.classList.remove('selected-img'));
     img.classList.add('selected-img');
@@ -4042,6 +4125,11 @@ function setupTableInteractions() {
 
     // Table click & selection
     noteEditor.addEventListener('click', (e) => {
+        if (state.isReadOnly) {
+            hideTableToolbar();
+            hideTableResizeOverlay();
+            return;
+        }
         const table = e.target.closest('table');
         const cell = e.target.closest('td, th');
         if (table) {
@@ -4056,6 +4144,11 @@ function setupTableInteractions() {
 
     // Focus listener to show table toolbar and overlay
     noteEditor.addEventListener('focusin', (e) => {
+        if (state.isReadOnly) {
+            hideTableToolbar();
+            hideTableResizeOverlay();
+            return;
+        }
         const cell = e.target.closest('td, th');
         const table = e.target.closest('table');
         if (cell && table) {
@@ -5841,6 +5934,59 @@ function setupEventListeners() {
         scheduleSave('tags', e.target.value);
     });
 
+    // Strict Read-Only Input Protection (Capture Phase - blocks any attempt to edit nested elements)
+    noteEditor.addEventListener('beforeinput', (e) => {
+        if (state.isReadOnly) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
+
+    noteEditor.addEventListener('keydown', (e) => {
+        if (state.isReadOnly) {
+            // Allow copy (Ctrl+C, Cmd+C) and select all (Ctrl+A, Cmd+A)
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C' || e.key === 'a' || e.key === 'A')) {
+                return;
+            }
+            // Allow cursor navigation and reading keys
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
+
+    noteEditor.addEventListener('paste', (e) => {
+        if (state.isReadOnly) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
+
+    noteEditor.addEventListener('cut', (e) => {
+        if (state.isReadOnly) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
+
+    noteEditor.addEventListener('drop', (e) => {
+        if (state.isReadOnly) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
+
+    noteEditor.addEventListener('click', (e) => {
+        if (state.isReadOnly) {
+            if (e.target.tagName === 'INPUT' || e.target.type === 'checkbox') {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }
+    }, true);
+
     // Editor content editing
     noteEditor.addEventListener('input', handleEditorInput);
     noteEditor.addEventListener('paste', handleClipboardPaste);
@@ -6824,6 +6970,7 @@ function setupSlashCommandMenu() {
     if (!slashMenu || !noteEditor) return;
 
     noteEditor.addEventListener('keydown', (e) => {
+        if (state.isReadOnly) return;
         if (!slashState.active) {
             if (e.key === '/') {
                 setTimeout(() => {
