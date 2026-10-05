@@ -210,6 +210,113 @@ body {
     background-color: #2f363d;
 }
 
+.btn-google {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #ffffff;
+    color: #3c4043;
+    font-weight: 600;
+    border: 1px solid #dadce0;
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    transition: var(--transition);
+}
+
+.btn-google:hover {
+    background-color: #f8f9fa;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+}
+
+.btn-drive {
+    background-color: #1a73e8;
+    color: #ffffff;
+    border: 1px solid #1557b0;
+}
+
+.btn-drive:hover {
+    background-color: #1765cc;
+}
+
+.google-svg {
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.user-profile-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background-color: var(--bg-toolbar);
+    border: 1px solid var(--border-color);
+    padding: 3px 10px 3px 4px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: var(--transition);
+}
+
+.user-profile-badge:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--accent);
+}
+
+.user-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--border-color);
+}
+
+.user-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.drive-sync-indicator {
+    font-size: 0.85rem;
+}
+
+.drive-status-box {
+    background-color: var(--bg-toolbar);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.drive-actions-group {
+    display: flex;
+    gap: 10px;
+    margin: 8px 0;
+}
+
+.security-badge {
+    font-size: 0.72rem;
+    background-color: rgba(166, 227, 161, 0.15);
+    color: var(--success);
+    border: 1px solid var(--success);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-weight: 600;
+}
+
+.modal-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
 .btn-danger {
     background-color: transparent;
     color: var(--danger);

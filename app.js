@@ -1,10 +1,13 @@
 // ==========================================================================
-// TreeKeep - Ultimate Hierarchical Knowledge & Cloud Notes System
+// CyberNote 🛡️ - Secure Hierarchical Knowledge & Cloud Notes System
+// Google Account Sign-In, Google Drive Auto-Restore & Encrypted Cloud Backup
 // Direct In-Place WYSIWYG Document Editor (No Split Screen, No Preview Tab)
-// Windows Paint Studio, Handwritten Signatures, Tables, CodeBoxes & Cloud Sync
+// Windows Paint Studio, Handwritten Signatures, Tables, CodeBoxes & E2EE
 // ==========================================================================
 
 const API_BASE = '';
+const DEFAULT_GOOGLE_CLIENT_ID = '872135362876-levmtlpqku4dimbfe2hdpa5m40a7bleq.apps.googleusercontent.com';
+
 const ICON_MAP = {
     'folder': '📁',
     'terminal': '💻',
@@ -29,8 +32,8 @@ const state = {
     nodes: new Map(),
     activeNodeId: null,
     searchQuery: '',
-    theme: localStorage.getItem('treekeep_theme') || 'dark',
-    expandedNodes: new Set(JSON.parse(localStorage.getItem('treekeep_expanded') || '[]')),
+    theme: localStorage.getItem('cybernote_theme') || localStorage.getItem('treekeep_theme') || 'dark',
+    expandedNodes: new Set(JSON.parse(localStorage.getItem('cybernote_expanded') || localStorage.getItem('treekeep_expanded') || '[]')),
     saveTimer: null,
     isSyncing: false,
     isReadOnly: false,
@@ -39,8 +42,16 @@ const state = {
     activeTableCell: null,
     activeImageElement: null,
     savedSelectionRange: null,
+    // Google & Cloud Sync State
+    tokenClient: null,
+    googleUser: JSON.parse(localStorage.getItem('cybernote_user') || 'null'),
+    googleAccessToken: localStorage.getItem('cybernote_google_token') || null,
+    driveFileId: localStorage.getItem('cybernote_drive_file_id') || null,
+    driveSaveTimer: null,
+    e2eeEnabled: localStorage.getItem('cybernote_e2ee_enabled') === 'true',
+    e2eePassword: '',
     // Paint Studio State
-    paintTool: 'signature', // 'signature', 'brush', 'eraser'
+    paintTool: 'signature',
     paintColor: '#111111',
     paintWidth: 3,
     isPainting: false,
@@ -63,6 +74,12 @@ const footerTime = document.getElementById('footer-time');
 const footerStats = document.getElementById('footer-stats');
 const footerPath = document.getElementById('footer-path');
 
+// Google UI Elements
+const btnGoogleLogin = document.getElementById('btn-google-login');
+const userProfileBadge = document.getElementById('user-profile-badge');
+const userAvatar = document.getElementById('user-avatar');
+const userName = document.getElementById('user-name');
+
 // Floating Toolbars
 const tableToolbar = document.getElementById('table-toolbar');
 const imageToolbar = document.getElementById('image-toolbar');
@@ -76,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(state.theme);
     setupEventListeners();
     setupPaintStudio();
+    initGoogleAuth();
     initApp();
 });
 
@@ -89,11 +107,11 @@ async function initApp() {
             return;
         }
     } catch (e) {
-        console.log('Local Node server not found, operating in Static / GitHub Pages mode.');
+        console.log('Local Node server not found, operating in Static / Cloud mode.');
     }
 
     state.isServerMode = false;
-    setSyncStatus('live', 'GitHub Cloud Mode (Local Storage + Cloud Sync)');
+    setSyncStatus('live', 'CyberNote Cloud Mode');
     loadLocalNodes();
 }
 
@@ -103,14 +121,338 @@ function applyTheme(theme) {
     document.body.className = theme === 'light' ? 'theme-light' : 'theme-dark';
     const themeBtn = document.getElementById('btn-theme');
     if (themeBtn) themeBtn.textContent = theme === 'light' ? '☀️' : '🌙';
-    localStorage.setItem('treekeep_theme', theme);
+    localStorage.setItem('cybernote_theme', theme);
 }
 
 function toggleTheme() {
     applyTheme(state.theme === 'light' ? 'dark' : 'light');
 }
 
-// --- Server-Sent Events (SSE) ---
+// --- Google Authentication & Google Drive Integration ---
+function initGoogleAuth() {
+    updateGoogleUserUI();
+
+    // Check token expiry
+    const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
+    if (Date.now() > expiry) {
+        state.googleAccessToken = null;
+    }
+
+    // Initialize GIS Client
+    function tryInitGIS() {
+        if (window.google?.accounts?.oauth2) {
+            const clientId = document.getElementById('google-client-id-input')?.value.trim() || DEFAULT_GOOGLE_CLIENT_ID;
+            try {
+                state.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: clientId,
+                    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                    callback: handleGoogleTokenResponse
+                });
+            } catch (err) {
+                console.warn('GIS Token client init:', err);
+            }
+        } else {
+            setTimeout(tryInitGIS, 600);
+        }
+    }
+    tryInitGIS();
+}
+
+function updateGoogleUserUI() {
+    if (state.googleUser && state.googleAccessToken) {
+        if (btnGoogleLogin) btnGoogleLogin.style.display = 'none';
+        if (userProfileBadge) {
+            userProfileBadge.style.display = 'flex';
+            if (userAvatar) userAvatar.src = state.googleUser.picture || '';
+            if (userName) userName.textContent = state.googleUser.name || state.googleUser.email || 'User';
+        }
+        document.getElementById('btn-drive-signout').style.display = 'inline-block';
+        updateDriveModalStatus(true);
+    } else {
+        if (btnGoogleLogin) btnGoogleLogin.style.display = 'inline-flex';
+        if (userProfileBadge) userProfileBadge.style.display = 'none';
+        document.getElementById('btn-drive-signout').style.display = 'none';
+        updateDriveModalStatus(false);
+    }
+}
+
+function updateDriveModalStatus(isSignedIn) {
+    const nameEl = document.getElementById('drive-status-name');
+    const detailEl = document.getElementById('drive-status-detail');
+    if (isSignedIn && state.googleUser) {
+        if (nameEl) nameEl.innerHTML = `<span style="color:var(--success);">● Connected:</span> ${state.googleUser.name} (${state.googleUser.email})`;
+        if (detailEl) detailEl.textContent = 'Automatic Google Drive backup active. Changes are synced seamlessly.';
+    } else {
+        if (nameEl) nameEl.textContent = 'Not Signed In';
+        if (detailEl) detailEl.textContent = 'Sign in with Google to enable automatic cloud backup & restore.';
+    }
+}
+
+function requestGoogleLogin() {
+    if (state.tokenClient) {
+        state.tokenClient.requestAccessToken({ prompt: 'consent' });
+    } else {
+        alert('Google authentication service is loading... please click again in a moment.');
+        initGoogleAuth();
+    }
+}
+
+async function handleGoogleTokenResponse(tokenResponse) {
+    if (tokenResponse.error) {
+        console.error('Google Auth Error:', tokenResponse);
+        alert('Google Sign-In failed: ' + tokenResponse.error);
+        return;
+    }
+
+    state.googleAccessToken = tokenResponse.access_token;
+    localStorage.setItem('cybernote_google_token', tokenResponse.access_token);
+    localStorage.setItem('cybernote_google_token_expiry', Date.now() + ((tokenResponse.expires_in || 3600) * 1000));
+
+    // Fetch user profile info
+    await fetchGoogleUserProfile();
+
+    // Automatically Restore or Create Initial Backup on Drive!
+    await autoRestoreFromDriveOnSignIn();
+}
+
+async function fetchGoogleUserProfile() {
+    try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${state.googleAccessToken}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            state.googleUser = {
+                name: data.name,
+                email: data.email,
+                picture: data.picture,
+                id: data.sub
+            };
+            localStorage.setItem('cybernote_user', JSON.stringify(state.googleUser));
+            updateGoogleUserUI();
+        }
+    } catch (err) {
+        console.error('Failed to fetch user profile:', err);
+    }
+}
+
+function signoutGoogle() {
+    state.googleAccessToken = null;
+    state.googleUser = null;
+    localStorage.removeItem('cybernote_google_token');
+    localStorage.removeItem('cybernote_google_token_expiry');
+    localStorage.removeItem('cybernote_user');
+    updateGoogleUserUI();
+    closeDriveModal();
+    setSyncStatus('live', 'Signed out from Google Drive');
+}
+
+// --- Automatic Drive Restore upon Sign-in ("එහෙම sign උන ගමන් drive එකෙන් Backup එක එනවා") ---
+async function autoRestoreFromDriveOnSignIn() {
+    setSyncStatus('syncing', 'Connecting to Google Drive...');
+    const logDiv = document.getElementById('drive-sync-log');
+    if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">🔍 Checking Google Drive for CyberNote backup...</span>';
+
+    try {
+        // Search Drive for CyberNote_Backup.json
+        const searchRes = await fetch("https://www.googleapis.com/drive/v3/files?q=name='CyberNote_Backup.json' and trashed=false&fields=files(id,name,modifiedTime)", {
+            headers: { Authorization: `Bearer ${state.googleAccessToken}` }
+        });
+        const searchData = await searchRes.json();
+
+        if (searchData.files && searchData.files.length > 0) {
+            const file = searchData.files[0];
+            state.driveFileId = file.id;
+            localStorage.setItem('cybernote_drive_file_id', file.id);
+
+            if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">📥 Downloading latest notes from Google Drive...</span>';
+
+            const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+                headers: { Authorization: `Bearer ${state.googleAccessToken}` }
+            });
+            const rawContent = await dlRes.text();
+
+            let finalJson = rawContent;
+            // Check if E2EE encrypted
+            try {
+                const parsed = JSON.parse(rawContent);
+                if (parsed.e2ee) {
+                    const pass = prompt('🔒 This backup is encrypted! Enter your Master Password to decrypt:');
+                    if (pass) {
+                        finalJson = await decryptData(parsed, pass);
+                        state.e2eePassword = pass;
+                    } else {
+                        throw new Error('Master password required to decrypt.');
+                    }
+                }
+            } catch (e) {
+                if (e.message.includes('password')) throw e;
+            }
+
+            const importedNodes = JSON.parse(finalJson);
+            if (Array.isArray(importedNodes) && importedNodes.length > 0) {
+                state.nodes.clear();
+                for (const n of importedNodes) {
+                    state.nodes.set(n.id, n);
+                    // If in server mode, sync each node into SQLite DB as well
+                    if (state.isServerMode) {
+                        fetch(`${API_BASE}/api/nodes`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(n)
+                        }).catch(() => {});
+                    }
+                }
+                saveLocalNodesBackup();
+                renderTree();
+                selectNode(importedNodes[0].id);
+
+                setSyncStatus('live', `✓ Drive Restored: ${importedNodes.length} notes synced!`);
+                if (logDiv) logDiv.innerHTML = `<span style="color:var(--success); font-weight:600;">✓ Successfully restored ${importedNodes.length} notes from Google Drive!</span>`;
+            }
+        } else {
+            // No backup exists on Drive yet -> automatically create initial backup of current notes!
+            if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">No existing backup on Drive. Creating initial backup now...</span>';
+            await backupToGoogleDrive(true);
+            setSyncStatus('live', '✓ Google Drive Connected & Initial Backup Created');
+            if (logDiv) logDiv.innerHTML = '<span style="color:var(--success); font-weight:600;">✓ Connected! Initial backup safely created on Google Drive.</span>';
+        }
+    } catch (err) {
+        console.error('Auto restore from drive error:', err);
+        if (logDiv) logDiv.innerHTML = `<span style="color:var(--danger);">Error: ${err.message}</span>`;
+        setSyncStatus('live', 'Google Drive connected');
+    }
+}
+
+// --- Backup & Restore to Google Drive with Optional AES-256 E2EE ---
+async function backupToGoogleDrive(silent = false) {
+    if (!state.googleAccessToken) {
+        if (!silent) alert('Please sign in with Google first.');
+        return;
+    }
+
+    const logDiv = document.getElementById('drive-sync-log');
+    if (!silent && logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">Encrypting & uploading to Google Drive...</span>';
+
+    try {
+        const allNodes = Array.from(state.nodes.values());
+        let payload = JSON.stringify(allNodes, null, 2);
+
+        // Check if AES-256 E2EE Encryption is enabled
+        if (state.e2eeEnabled) {
+            const password = state.e2eePassword || document.getElementById('e2ee-password')?.value.trim();
+            if (password) {
+                payload = await encryptData(payload, password);
+            }
+        }
+
+        // Upload to Drive
+        if (state.driveFileId) {
+            // Update existing file
+            const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${state.googleAccessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: payload
+            });
+            if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+        } else {
+            // Create new file on Drive
+            const metadata = { name: 'CyberNote_Backup.json', mimeType: 'application/json' };
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', new Blob([payload], { type: 'application/json' }));
+
+            const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${state.googleAccessToken}` },
+                body: form
+            });
+            const data = await res.json();
+            if (data.id) {
+                state.driveFileId = data.id;
+                localStorage.setItem('cybernote_drive_file_id', data.id);
+            }
+        }
+
+        const nowStr = new Date().toLocaleTimeString();
+        setSyncStatus('live', `✓ Drive Synced (${nowStr})`);
+        if (!silent && logDiv) {
+            logDiv.innerHTML = `<span style="color:var(--success); font-weight:600;">✓ Successfully backed up ${state.nodes.size} notes to Google Drive at ${nowStr}!</span>`;
+        }
+    } catch (err) {
+        console.error('Backup to Google Drive error:', err);
+        if (!silent && logDiv) logDiv.innerHTML = `<span style="color:var(--danger);">Backup failed: ${err.message}</span>`;
+    }
+}
+
+function scheduleDriveAutoBackup() {
+    if (!state.googleAccessToken) return;
+    clearTimeout(state.driveSaveTimer);
+    // Debounce auto-backup to Google Drive 2.5 seconds after editing pauses
+    state.driveSaveTimer = setTimeout(() => {
+        backupToGoogleDrive(true);
+    }, 2500);
+}
+
+// --- End-to-End Cryptography (AES-256-GCM + PBKDF2) ---
+async function deriveKey(password, salt) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        enc.encode(password),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: salt,
+            iterations: 100000,
+            hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+}
+
+async function encryptData(plaintext, password) {
+    const enc = new TextEncoder();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const encrypted = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        enc.encode(plaintext)
+    );
+    return JSON.stringify({
+        e2ee: true,
+        salt: Array.from(salt),
+        iv: Array.from(iv),
+        data: Array.from(new Uint8Array(encrypted))
+    });
+}
+
+async function decryptData(cipherObj, password) {
+    const salt = new Uint8Array(cipherObj.salt);
+    const iv = new Uint8Array(cipherObj.iv);
+    const data = new Uint8Array(cipherObj.data);
+    const key = await deriveKey(password, salt);
+    const decrypted = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        data
+    );
+    return new TextDecoder().decode(decrypted);
+}
+
+// --- Real-time Delta Sync (SSE) ---
 function setupSSE() {
     if (!state.isServerMode) return;
     try {
@@ -185,7 +527,7 @@ async function loadTree() {
         saveLocalNodesBackup();
         renderTree();
 
-        const lastActive = localStorage.getItem('treekeep_active');
+        const lastActive = localStorage.getItem('cybernote_active');
         if (lastActive && state.nodes.has(lastActive)) {
             selectNode(lastActive);
         } else if (data.nodes.length > 0) {
@@ -201,11 +543,11 @@ async function loadTree() {
 
 function saveLocalNodesBackup() {
     const list = Array.from(state.nodes.values());
-    localStorage.setItem('treekeep_local_db', JSON.stringify(list));
+    localStorage.setItem('cybernote_local_db', JSON.stringify(list));
 }
 
 function loadLocalNodes() {
-    const raw = localStorage.getItem('treekeep_local_db');
+    const raw = localStorage.getItem('cybernote_local_db') || localStorage.getItem('treekeep_local_db');
     state.nodes.clear();
     if (raw) {
         try {
@@ -221,7 +563,7 @@ function loadLocalNodes() {
     }
 
     renderTree();
-    const lastActive = localStorage.getItem('treekeep_active');
+    const lastActive = localStorage.getItem('cybernote_active');
     if (lastActive && state.nodes.has(lastActive)) {
         selectNode(lastActive);
     } else if (state.nodes.size > 0) {
@@ -236,25 +578,25 @@ function seedDefaultLocalNotes() {
     const welcome = {
         id: 'welcome-root',
         parent_id: null,
-        title: 'Welcome to TreeKeep 🌲',
-        content: `<h1>Welcome to TreeKeep 🌲</h1>
-<p><b>TreeKeep</b> is your ultimate hierarchical cloud notebook featuring <b>direct in-place WYSIWYG editing</b>, Paint & handwritten signatures, tables, and micro-sync!</p>
+        title: 'Welcome to CyberNote 🛡️',
+        content: `<h1>Welcome to CyberNote 🛡️</h1>
+<p><b>CyberNote</b> is your secure, all-in-one hierarchical cloud notebook featuring <b>direct in-place WYSIWYG editing</b>, Google Account Sign-In, and automatic Google Drive backup!</p>
 <div class="callout-box callout-tip">
     <span class="callout-icon">💡</span>
-    <div class="callout-content" contenteditable="true"><b>No preview tab!</b> You type and format directly right here on this page, exactly like Microsoft Word or Notion.</div>
+    <div class="callout-content" contenteditable="true"><b>Google Account Sign-In:</b> Click "Sign in with Google" at the top right to automatically restore your backup from Google Drive!</div>
 </div>
-<h3>🚀 Highlights:</h3>
-<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Direct In-Place WYSIWYG editing (No markdown preview)</span></div>
-<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Windows Paint Studio & Smooth Handwritten Signatures</span></div>
-<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Draw & edit Tables with cell toolbar</span></div>
+<h3>🚀 Key Capabilities:</h3>
+<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Direct In-Place WYSIWYG editing (No split preview tab!)</span></div>
+<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Google Drive auto-backup & instant restore on login</span></div>
+<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Full security with optional AES-256-GCM End-to-End Encryption</span></div>
+<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Windows Paint Studio & smooth handwritten signatures</span></div>
 <div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Paste screenshots directly with Ctrl+V</span></div>
-<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Host on GitHub Pages for free worldwide access</span></div>
 <div class="code-box" contenteditable="false">
     <div class="code-box-header"><span>BASH</span><button class="btn-copy-code" onclick="copySnippet(this)">📋 Copy Code</button></div>
-    <pre contenteditable="true"><code>echo "Organize all your cybersecurity, code, and personal notes!"</code></pre>
+    <pre contenteditable="true"><code>echo "Your knowledge, secure in the cloud with CyberNote!"</code></pre>
 </div>`,
-        icon: 'book',
-        tags: 'intro,welcome',
+        icon: 'shield',
+        tags: 'intro,welcome,security',
         color: '#89b4fa',
         position: 0,
         is_expanded: 1,
@@ -375,19 +717,19 @@ function toggleNodeExpand(id) {
     } else {
         state.expandedNodes.add(id);
     }
-    localStorage.setItem('treekeep_expanded', JSON.stringify(Array.from(state.expandedNodes)));
+    localStorage.setItem('cybernote_expanded', JSON.stringify(Array.from(state.expandedNodes)));
     renderTree();
 }
 
 function expandAll() {
     for (const id of state.nodes.keys()) state.expandedNodes.add(id);
-    localStorage.setItem('treekeep_expanded', JSON.stringify(Array.from(state.expandedNodes)));
+    localStorage.setItem('cybernote_expanded', JSON.stringify(Array.from(state.expandedNodes)));
     renderTree();
 }
 
 function collapseAll() {
     state.expandedNodes.clear();
-    localStorage.setItem('treekeep_expanded', JSON.stringify([]));
+    localStorage.setItem('cybernote_expanded', JSON.stringify([]));
     renderTree();
 }
 
@@ -404,7 +746,7 @@ function selectNode(id) {
     }
 
     state.activeNodeId = id;
-    localStorage.setItem('treekeep_active', id);
+    localStorage.setItem('cybernote_active', id);
     noNoteSelected.style.display = 'none';
     noteView.style.display = 'flex';
 
@@ -414,10 +756,7 @@ function selectNode(id) {
     iconPickerBtn.textContent = ICON_MAP[node.icon] || '📁';
     updateNodeColorDot(node.color);
 
-    // Set content in WYSIWYG editor
     setEditorContent(node.content || '');
-
-    // Read-only state
     applyReadOnlyState(!!node.is_readonly);
 
     updateBreadcrumbs(id);
@@ -434,7 +773,7 @@ function setEditorContent(content) {
         return;
     }
 
-    // If content looks like raw markdown from earlier ctb/ctd import, convert to clean HTML
+    // Convert raw markdown if existing
     if (content.includes('```') || content.includes('# ') || content.includes('- [ ]') || content.includes('| --- |')) {
         noteEditor.innerHTML = convertMarkdownToHtml(content);
     } else {
@@ -485,7 +824,7 @@ async function sendDeltaPatch(nodeId, partialUpdate) {
     if (!nodeId) return;
 
     state.isSyncing = true;
-    setSyncStatus('syncing', 'Saving delta...');
+    setSyncStatus('syncing', 'Saving...');
 
     if (state.nodes.has(nodeId)) {
         const existing = state.nodes.get(nodeId);
@@ -508,13 +847,12 @@ async function sendDeltaPatch(nodeId, partialUpdate) {
                 Object.assign(state.nodes.get(nodeId), updated);
             }
             state.isSyncing = false;
-            setSyncStatus('live', 'Live Delta-Sync Ready');
-            footerSyncDetail.textContent = `Delta saved: ~${byteSize} B`;
+            setSyncStatus('live', 'Live Synced');
+            footerSyncDetail.textContent = `Delta: ~${byteSize} B`;
             footerTime.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
         } catch (err) {
             state.isSyncing = false;
-            setSyncStatus('offline', 'Offline (changes stored locally)');
-            console.error('Delta sync error:', err);
+            setSyncStatus('offline', 'Saved locally');
         }
     } else {
         state.isSyncing = false;
@@ -522,6 +860,9 @@ async function sendDeltaPatch(nodeId, partialUpdate) {
         footerSyncDetail.textContent = `Local Storage (~${new Blob([JSON.stringify(partialUpdate)]).size} B)`;
         footerTime.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
     }
+
+    // Trigger debounced continuous auto-backup to Google Drive
+    scheduleDriveAutoBackup();
 }
 
 function scheduleSave(field, value) {
@@ -575,6 +916,7 @@ async function createNewRootNode() {
         selectNode(newId);
     }
 
+    scheduleDriveAutoBackup();
     noteTitleInput.focus();
     noteTitleInput.select();
 }
@@ -619,6 +961,7 @@ async function createSubNode(parentId) {
         selectNode(newId);
     }
 
+    scheduleDriveAutoBackup();
     noteTitleInput.focus();
     noteTitleInput.select();
 }
@@ -663,10 +1006,11 @@ async function duplicateCurrentNode() {
         renderTree();
         selectNode(dupId);
     }
+    scheduleDriveAutoBackup();
 }
 
 async function deleteNode(id) {
-    if (!confirm('Are you sure you want to delete this note and its sub-notes?')) return;
+    if (!confirm('Are you sure you want to delete this note and its sub-nodes?')) return;
 
     if (state.isServerMode) {
         try {
@@ -689,6 +1033,7 @@ async function deleteNode(id) {
         if (state.activeNodeId === id) selectNode(null);
         renderTree();
     }
+    scheduleDriveAutoBackup();
 }
 
 // --- Node Position Reordering ---
@@ -738,7 +1083,7 @@ function applyReadOnlyState(isReadOnly) {
     noteTagsInput.readOnly = isReadOnly;
 }
 
-// --- WYSIWYG Formatting Actions (ExecCommand + In-place DOM) ---
+// --- WYSIWYG Formatting Actions ---
 function execFormat(command, value = null) {
     if (state.isReadOnly) return;
     noteEditor.focus();
@@ -1141,16 +1486,13 @@ function setupPaintStudio() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // Fill canvas initial background with clean white
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Tools
     document.getElementById('btn-paint-tool-signature').onclick = () => setPaintTool('signature');
     document.getElementById('btn-paint-tool-brush').onclick = () => setPaintTool('brush');
     document.getElementById('btn-paint-tool-eraser').onclick = () => setPaintTool('eraser');
 
-    // Width slider
     const widthSlider = document.getElementById('paint-width-slider');
     const widthVal = document.getElementById('paint-width-val');
     widthSlider.oninput = (e) => {
@@ -1158,7 +1500,6 @@ function setupPaintStudio() {
         widthVal.textContent = state.paintWidth + 'px';
     };
 
-    // Color palette
     document.querySelectorAll('.paint-color-opt').forEach(opt => {
         opt.onclick = () => {
             document.querySelectorAll('.paint-color-opt').forEach(o => o.classList.remove('active'));
@@ -1176,13 +1517,11 @@ function setupPaintStudio() {
         };
     }
 
-    // Clear canvas
     document.getElementById('btn-paint-clear').onclick = () => {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     };
 
-    // Drawing Events
     function getCanvasCoords(e) {
         const rect = canvas.getBoundingClientRect();
         return {
@@ -1213,7 +1552,6 @@ function setupPaintStudio() {
             ctx.lineTo(pt.x, pt.y);
             ctx.stroke();
         } else if (state.paintTool === 'signature') {
-            // Smooth Bezier Curve interpolation for signature
             ctx.strokeStyle = state.paintColor;
             if (state.paintPoints.length >= 3) {
                 const p0 = state.paintPoints[state.paintPoints.length - 2];
@@ -1227,7 +1565,6 @@ function setupPaintStudio() {
                 ctx.stroke();
             }
         } else {
-            // Regular paint brush
             ctx.strokeStyle = state.paintColor;
             ctx.lineTo(pt.x, pt.y);
             ctx.stroke();
@@ -1241,7 +1578,6 @@ function setupPaintStudio() {
         }
     });
 
-    // Touch support for mobile/tablets
     canvas.addEventListener('touchstart', (e) => {
         if (e.touches.length === 1) {
             e.preventDefault();
@@ -1272,7 +1608,6 @@ function setupPaintStudio() {
         state.paintPoints = [];
     });
 
-    // Insert into note
     document.getElementById('btn-paint-insert').onclick = () => {
         const dataUrl = canvas.toDataURL('image/png');
         closePaintModal();
@@ -1458,11 +1793,29 @@ function closeTreeInfoModal() {
     document.getElementById('tree-info-modal').style.display = 'none';
 }
 
+// --- Google Drive & Security Modal ---
+function openDriveModal() {
+    const modal = document.getElementById('drive-modal');
+    modal.style.display = 'flex';
+    updateGoogleUserUI();
+
+    const e2eeToggle = document.getElementById('e2ee-toggle');
+    const e2eePassGroup = document.getElementById('e2ee-password-group');
+    if (e2eeToggle) {
+        e2eeToggle.checked = state.e2eeEnabled;
+        if (e2eePassGroup) e2eePassGroup.style.display = state.e2eeEnabled ? 'flex' : 'none';
+    }
+}
+
+function closeDriveModal() {
+    document.getElementById('drive-modal').style.display = 'none';
+}
+
 // --- GitHub Sync Modal ---
 function openGitHubModal() {
     const modal = document.getElementById('github-modal');
     modal.style.display = 'flex';
-    const conf = JSON.parse(localStorage.getItem('treekeep_gh_config') || '{}');
+    const conf = JSON.parse(localStorage.getItem('cybernote_gh_config') || localStorage.getItem('treekeep_gh_config') || '{}');
     if (conf.username) document.getElementById('gh-username').value = conf.username;
     if (conf.repo) document.getElementById('gh-repo').value = conf.repo;
     if (conf.token) document.getElementById('gh-token').value = conf.token;
@@ -1483,7 +1836,7 @@ async function connectAndSyncGitHub() {
         return;
     }
 
-    localStorage.setItem('treekeep_gh_config', JSON.stringify({ username, repo, token }));
+    localStorage.setItem('cybernote_gh_config', JSON.stringify({ username, repo, token }));
     statusDiv.innerHTML = 'Connecting to GitHub API...';
 
     try {
@@ -1533,9 +1886,9 @@ async function connectAndSyncGitHub() {
 
         if (putRes.ok) {
             statusDiv.innerHTML = `
-                <div style="color:var(--success); font-weight:600;">✓ Successfully connected & synced to GitHub!</div>
+                <div style="color:var(--success); font-weight:600;">✓ Connected & synced to GitHub!</div>
                 <div style="font-size:0.8rem; margin-top:4px;">Repo: <b>${username}/${repo}</b></div>
-                <div style="font-size:0.8rem;">Live URL: <code>https://${username}.github.io/${repo}/</code></div>
+                <div style="font-size:0.8rem;">Live: <code>https://${username}.github.io/${repo}/</code></div>
             `;
             setSyncStatus('live', `Synced to GitHub (${username}/${repo})`);
         } else {
@@ -1593,7 +1946,7 @@ function exportNotes() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `treekeep-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `cybernote-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -1634,7 +1987,6 @@ function updateWordStats() {
 function convertMarkdownToHtml(md) {
     let html = escapeHtml(md);
 
-    // Code Blocks
     html = html.replace(/```([a-zA-Z0-9_\-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
         const language = lang || 'code';
         return `
@@ -1673,6 +2025,40 @@ function escapeHtml(text) {
 function setupEventListeners() {
     // Theme toggle
     document.getElementById('btn-theme').onclick = toggleTheme;
+
+    // Google Sign-In & Profile
+    if (btnGoogleLogin) btnGoogleLogin.onclick = requestGoogleLogin;
+    if (userProfileBadge) userProfileBadge.onclick = openDriveModal;
+    document.getElementById('btn-open-drive-modal').onclick = openDriveModal;
+    document.getElementById('btn-drive-backup-now').onclick = () => backupToGoogleDrive(false);
+    document.getElementById('btn-drive-restore-now').onclick = () => autoRestoreFromDriveOnSignIn();
+    document.getElementById('btn-drive-signout').onclick = signoutGoogle;
+
+    // E2EE Toggle & Password
+    const e2eeToggle = document.getElementById('e2ee-toggle');
+    const e2eePassGroup = document.getElementById('e2ee-password-group');
+    if (e2eeToggle) {
+        e2eeToggle.onchange = (e) => {
+            state.e2eeEnabled = e.target.checked;
+            localStorage.setItem('cybernote_e2ee_enabled', e.target.checked);
+            if (e2eePassGroup) e2eePassGroup.style.display = e.target.checked ? 'flex' : 'none';
+        };
+    }
+
+    const e2eePassInput = document.getElementById('e2ee-password');
+    if (e2eePassInput) {
+        e2eePassInput.oninput = (e) => {
+            state.e2eePassword = e.target.value;
+        };
+    }
+
+    const clientIdInput = document.getElementById('google-client-id-input');
+    if (clientIdInput) {
+        clientIdInput.onchange = (e) => {
+            localStorage.setItem('cybernote_client_id', e.target.value.trim());
+            initGoogleAuth();
+        };
+    }
 
     // Title editing
     noteTitleInput.addEventListener('input', (e) => {
@@ -1855,11 +2241,9 @@ function setupEventListeners() {
         }
     });
 
-    // Setup interactive image and table listeners
     setupImageInteractions();
     setupTableInteractions();
 
-    // Mobile sidebar toggle
     const toggleSidebarBtn = document.getElementById('btn-toggle-sidebar');
     const sidebar = document.getElementById('sidebar');
     if (toggleSidebarBtn && sidebar) {

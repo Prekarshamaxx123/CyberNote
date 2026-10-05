@@ -1,7 +1,7 @@
 {
-  "name": "TreeKeep - Hierarchical Cloud Notes",
-  "short_name": "TreeKeep",
-  "description": "Lightning-fast hierarchical notes with micro delta-sync",
+  "name": "CyberNote - Secure Hierarchical Notes",
+  "short_name": "CyberNote",
+  "description": "Secure hierarchical cloud notes with Google Drive auto-sync, WYSIWYG editor and Paint studio",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e1e2e",
