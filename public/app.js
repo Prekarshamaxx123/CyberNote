@@ -2548,14 +2548,43 @@ function toggleRibbonPopover(menuId, buttonEl, e) {
     const isShowing = targetMenu.style.display !== 'none' && targetMenu.style.display !== '';
     closeAllRibbonPopovers();
     if (!isShowing) {
+        // Mount to document.body so parent overflow-x / clipping NEVER cuts off the popover
+        if (targetMenu.parentNode !== document.body) {
+            document.body.appendChild(targetMenu);
+        }
+
         targetMenu.style.display = targetMenu.classList.contains('emoji-grid-popover') ? 'grid' : 'flex';
-        // Auto-reposition if popover extends beyond the right edge of viewport
-        targetMenu.style.left = '0';
-        targetMenu.style.right = 'auto';
-        const rect = targetMenu.getBoundingClientRect();
-        if (rect.right > window.innerWidth - 10) {
-            targetMenu.style.left = 'auto';
-            targetMenu.style.right = '0';
+
+        // Precise positioning based on the triggering button
+        const btn = buttonEl || (e ? (e.currentTarget || (e.target && e.target.closest('button'))) : null);
+        if (btn) {
+            const btnRect = btn.getBoundingClientRect();
+            targetMenu.style.position = 'fixed';
+            targetMenu.style.zIndex = '999999';
+
+            // Reset temp coordinates to measure rendered dimensions
+            targetMenu.style.left = '0px';
+            targetMenu.style.top = '0px';
+            targetMenu.style.right = 'auto';
+
+            const menuWidth = targetMenu.offsetWidth || 210;
+            const menuHeight = targetMenu.offsetHeight || 220;
+
+            // Vertical placement: below button, or flip above if near bottom
+            if (btnRect.bottom + menuHeight + 12 > window.innerHeight && btnRect.top - menuHeight > 12) {
+                targetMenu.style.top = `${Math.max(8, btnRect.top - menuHeight - 4)}px`;
+            } else {
+                targetMenu.style.top = `${btnRect.bottom + 4}px`;
+            }
+
+            // Horizontal placement: align left with button; flip to right if overflows window
+            if (btnRect.left + menuWidth > window.innerWidth - 12) {
+                targetMenu.style.left = 'auto';
+                targetMenu.style.right = `${Math.max(10, window.innerWidth - btnRect.right)}px`;
+            } else {
+                targetMenu.style.left = `${Math.max(10, btnRect.left)}px`;
+                targetMenu.style.right = 'auto';
+            }
         }
     }
 }
@@ -6221,7 +6250,7 @@ function setupEventListeners() {
 
     // Global outside click & escape closer for ribbon popovers and context menus
     document.addEventListener('pointerdown', (e) => {
-        if (!e.target.closest('.ribbon-dropdown-wrap')) {
+        if (!e.target.closest('.ribbon-dropdown-wrap, .ribbon-popover-menu')) {
             closeAllRibbonPopovers();
         }
         if (!e.target.closest('#tree-context-menu')) {
@@ -6230,13 +6259,19 @@ function setupEventListeners() {
     });
 
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.ribbon-dropdown-wrap')) {
+        if (!e.target.closest('.ribbon-dropdown-wrap, .ribbon-popover-menu')) {
             closeAllRibbonPopovers();
         }
         if (!e.target.closest('#tree-context-menu')) {
             closeTreeContextMenu();
         }
     });
+
+    window.addEventListener('resize', closeAllRibbonPopovers);
+    window.addEventListener('scroll', (e) => {
+        if (e.target && e.target.closest && e.target.closest('.ribbon-popover-menu')) return;
+        closeAllRibbonPopovers();
+    }, true);
 
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
