@@ -1654,6 +1654,31 @@
                             </div>
                         </div>
 
+                        <!-- Google OAuth Client & Origin Settings -->
+                        <div class="oauth-config-box" style="margin-top: 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="font-size: 0.85rem; font-weight: 700; color: var(--accent); display:flex; align-items:center; gap:6px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    Google OAuth Credentials & Origin
+                                </span>
+                                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="font-size: 0.74rem; color: var(--accent); text-decoration: underline;">Open Google Console ↗</a>
+                            </div>
+                            <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
+                                If you see <b>Error 401: invalid_client (no registered origin)</b>, copy the Origin URL below and add it to <b>"Authorized JavaScript origins"</b> in your Google Cloud Console project.
+                            </div>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label style="font-size: 0.74rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Authorized JavaScript Origin (Current URL):</label>
+                                <div style="display: flex; gap: 6px;">
+                                    <input type="text" id="settings-current-origin" class="text-input" style="font-size: 0.75rem; padding: 6px 8px; background: rgba(0,0,0,0.25);" readonly value="http://localhost:3000">
+                                    <button class="btn btn-secondary btn-sm" onclick="copyCurrentOrigin()" style="padding: 6px 12px; font-size: 0.75rem;">Copy</button>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.74rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">OAuth 2.0 Client ID:</label>
+                                <input type="text" id="settings-google-client-id" class="text-input" style="font-size: 0.75rem; padding: 6px 8px;" placeholder="Enter your Google Client ID...">
+                            </div>
+                        </div>
+
                         <!-- State B: Logged In Cloud Controls (Shown when signed in) -->
                         <div id="settings-gdrive-logged-in" class="drive-actions-group" style="display:none; margin-top:14px;">
                             <button id="btn-settings-backup-now" class="btn btn-primary" style="flex:1;">
