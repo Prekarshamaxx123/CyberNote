@@ -3060,6 +3060,16 @@ window.toggleZenMode = toggleZenMode;
 window.performUndo = performUndo;
 window.performRedo = performRedo;
 
+function applyTextColorQuick(color) {
+    if (state.isReadOnly) return;
+    execFormat('foreColor', color);
+    const ind = document.getElementById('text-color-indicator');
+    if (ind) ind.style.backgroundColor = color;
+    const picker = document.getElementById('text-color-picker');
+    if (picker) picker.value = color;
+}
+window.applyTextColorQuick = applyTextColorQuick;
+
 // --- WYSIWYG Formatting Actions ---
 function execFormat(command, value = null) {
     if (state.isReadOnly) return;
