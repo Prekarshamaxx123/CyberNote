@@ -2464,6 +2464,64 @@ function closeAllRibbonPopovers() {
     });
 }
 
+function setupRibbonTabs() {
+    const tabsList = document.querySelector('.ribbon-tabs-list');
+    const tabButtons = document.querySelectorAll('.ribbon-tab-nav-btn');
+    const tabPanes = document.querySelectorAll('.ribbon-tab-pane');
+    if (!tabButtons.length) return;
+
+    function switchRibbonTab(tabId) {
+        let matched = false;
+        tabButtons.forEach(btn => {
+            const isActive = btn.dataset.tab === tabId;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            if (isActive) matched = true;
+        });
+
+        // Fallback to home if tabId was not found
+        if (!matched && tabButtons[0]) {
+            tabId = tabButtons[0].dataset.tab;
+            tabButtons[0].classList.add('active');
+            tabButtons[0].setAttribute('aria-selected', 'true');
+        }
+
+        tabPanes.forEach(pane => {
+            pane.classList.toggle('active', pane.id === tabId);
+        });
+
+        closeAllRibbonPopovers();
+        try {
+            localStorage.setItem('cybernote_active_ribbon_tab', tabId);
+        } catch (_) {}
+    }
+
+    if (tabsList) {
+        tabsList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.ribbon-tab-nav-btn');
+            if (!btn) return;
+            e.preventDefault();
+            const targetTab = btn.dataset.tab;
+            if (targetTab) switchRibbonTab(targetTab);
+        });
+    } else {
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetTab = btn.dataset.tab;
+                if (targetTab) switchRibbonTab(targetTab);
+            });
+        });
+    }
+
+    // Restore saved tab or default to first tab (tab-pane-home)
+    let savedTab = 'tab-pane-home';
+    try {
+        savedTab = localStorage.getItem('cybernote_active_ribbon_tab') || 'tab-pane-home';
+    } catch (_) {}
+    switchRibbonTab(savedTab);
+}
+
 // Helper to locate existing styled text span for combining or modifying effects
 function getActiveStyledSpan(range) {
     if (!range) return null;
@@ -3027,16 +3085,24 @@ function handlePrintNote() {
 
 function updateDocumentStats() {
     const badge = document.getElementById('ribbon-word-count');
-    if (!badge || !noteEditor) return;
+    const quickBadge = document.getElementById('ribbon-quick-word-count');
+    if (!noteEditor) return;
     const text = noteEditor.innerText || '';
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
     const readTime = Math.max(1, Math.ceil(words / 200));
-    badge.textContent = `${words} words • ${readTime}m read`;
-    badge.title = `${words} words, ${chars} characters, ~${readTime} min read time`;
+    if (badge) {
+        badge.textContent = `${words} words • ${readTime}m read`;
+        badge.title = `${words} words, ${chars} characters, ~${readTime} min read time`;
+    }
+    if (quickBadge) {
+        quickBadge.textContent = `${words} words`;
+        quickBadge.title = `${words} words, ${chars} characters, ~${readTime} min read time`;
+    }
 }
 
 // Expose functions globally for inline HTML onclick handlers
+window.setupRibbonTabs = setupRibbonTabs;
 window.toggleRibbonPopover = toggleRibbonPopover;
 window.closeAllRibbonPopovers = closeAllRibbonPopovers;
 window.applyNeonEffect = applyNeonEffect;
@@ -5277,8 +5343,12 @@ function updateWordStats() {
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
     const ribbonBadge = document.getElementById('ribbon-word-count');
+    const quickBadge = document.getElementById('ribbon-quick-word-count');
     if (ribbonBadge) {
         ribbonBadge.textContent = `${words} words`;
+    }
+    if (quickBadge) {
+        quickBadge.textContent = `${words} words`;
     }
     if (chars > 3000) {
         const estCompressedKb = Math.max(1, Math.round((chars * 0.04) / 1024));
@@ -5954,6 +6024,9 @@ function setupEventListeners() {
 
     const btnExportMenu = document.getElementById('btn-export-menu');
     if (btnExportMenu) btnExportMenu.onclick = (e) => toggleRibbonPopover('export-dropdown-menu', btnExportMenu, e);
+
+    // Initialize Microsoft Word-style Ribbon Tabs
+    setupRibbonTabs();
 
     // Prevent toolbar click from stealing focus from noteEditor
     document.querySelector('.editor-ribbon')?.addEventListener('mousedown', (e) => {

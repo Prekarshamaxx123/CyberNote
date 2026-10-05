@@ -1169,7 +1169,7 @@ body {
 }
 
 /* ==========================================================================
-   CYBERNOTE CATEGORIZED STUDIO RIBBON (Clean, Modern, Organized)
+   CYBERNOTE MICROSOFT WORD-STYLE CATEGORIZED RIBBON (Tabs & Grouped Controls)
    ========================================================================== */
 .editor-ribbon {
     background-color: var(--bg-toolbar);
@@ -1177,8 +1177,7 @@ body {
     border-bottom: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 6px 14px;
+    padding: 0;
     user-select: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     width: 100%;
@@ -1194,23 +1193,158 @@ body {
     min-height: 0;
 }
 
-.ribbon-row {
+/* Ribbon Tabs Header (Word-style top navigation) */
+.ribbon-tab-header {
     display: flex;
     align-items: center;
-    gap: 6px 8px;
-    flex-wrap: wrap;
-    overflow: visible;
-    width: 100%;
+    justify-content: space-between;
+    padding: 2px 10px 0 10px;
+    background: rgba(17, 17, 27, 0.45);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    gap: 8px;
     box-sizing: border-box;
 }
 
-.ribbon-row-studio {
-    padding-bottom: 4px;
+.ribbon-tabs-list {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.ribbon-tabs-list::-webkit-scrollbar {
+    display: none;
 }
 
-.ribbon-row-format {
-    padding-top: 6px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+.ribbon-tab-nav-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.ribbon-tab-nav-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.ribbon-tab-nav-btn.active {
+    color: var(--accent);
+    font-weight: 600;
+    background: rgba(0, 255, 255, 0.06);
+    border-bottom: 2px solid var(--accent);
+}
+
+.ribbon-tab-quick-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding-bottom: 2px;
+}
+
+.ribbon-quick-action-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 0.74rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+}
+
+.ribbon-quick-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* Ribbon Tab Panes (Container for Word groups) */
+.ribbon-tab-pane {
+    display: none;
+    align-items: stretch;
+    gap: 2px;
+    padding: 4px 10px 4px 10px;
+    overflow: visible;
+    flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 58px;
+    animation: ribbonPaneFade 0.15s ease-out;
+}
+
+.ribbon-tab-pane.active {
+    display: flex;
+}
+
+@keyframes ribbonPaneFade {
+    from { opacity: 0.7; transform: translateY(-2px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Microsoft Word Group Box */
+.ribbon-word-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px 1px 4px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    border-radius: 6px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.ribbon-word-group:hover {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.04);
+}
+
+.ribbon-group-items {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-wrap: nowrap;
+    min-height: 32px;
+}
+
+.ribbon-group-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    letter-spacing: 0.3px;
+    color: var(--text-muted, #7c7f93);
+    margin-top: 3px;
+    user-select: none;
+    pointer-events: none;
+    text-align: center;
+    line-height: 1;
+}
+
+/* Vertical separator line between Word groups */
+.ribbon-group-sep {
+    width: 1px;
+    margin: 4px 4px;
+    align-self: stretch;
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.12) 20%, rgba(255, 255, 255, 0.12) 80%, transparent);
+    flex-shrink: 0;
 }
 
 /* Paint-Studio-Style Capsules & Clusters */
@@ -1471,15 +1605,15 @@ body {
 }
 
 /* ==========================================================================
-   RESPONSIVE STUDIO RIBBON TOOLBAR (Auto Fluid Re-flow, Never Cuts Off)
+   RESPONSIVE WORD-STYLE RIBBON TOOLBAR (Auto Fluid Re-flow, Never Cuts Off)
    ========================================================================== */
 @media (max-width: 1200px) {
-    .editor-ribbon {
-        padding: 5px 12px;
-        gap: 5px;
+    .ribbon-tab-pane {
+        padding: 4px 8px;
+        gap: 3px;
     }
-    .ribbon-row {
-        gap: 5px 6px;
+    .ribbon-word-group {
+        padding: 2px 3px 1px 3px;
     }
     .ribbon-btn {
         padding: 4px 6px;
@@ -1501,16 +1635,18 @@ body {
 }
 
 @media (max-width: 880px) {
-    .editor-ribbon {
-        padding: 4px 8px;
-        gap: 4px;
+    .ribbon-tab-header {
+        padding: 2px 6px 0 6px;
     }
-    .ribbon-row {
-        gap: 4px 5px;
+    .ribbon-tab-nav-btn {
+        padding: 5px 10px;
+        font-size: 0.78rem;
     }
-    .ribbon-capsule,
-    .ribbon-cluster {
-        padding: 2px 4px;
+    .ribbon-tab-pane {
+        padding: 3px 6px;
+        gap: 2px;
+    }
+    .ribbon-group-items {
         gap: 2px;
     }
     .ribbon-btn-icon {
@@ -1532,18 +1668,19 @@ body {
 }
 
 @media (max-width: 680px) {
-    .editor-ribbon {
-        padding: 4px 6px;
-        gap: 4px;
+    .ribbon-tab-nav-btn {
+        padding: 4px 8px;
+        font-size: 0.75rem;
     }
-    .ribbon-row {
-        gap: 4px;
-    }
-    .ribbon-capsule,
-    .ribbon-cluster {
-        padding: 2px 3px;
+    .ribbon-tab-pane {
+        padding: 3px 4px;
         gap: 2px;
-        flex-wrap: wrap;
+    }
+    .ribbon-word-group {
+        padding: 1px 2px;
+    }
+    .ribbon-group-label {
+        font-size: 0.6rem;
     }
     /* Sleek touch-friendly icon buttons on compact mobile screens */
     .ribbon-badge-action .badge-label,
