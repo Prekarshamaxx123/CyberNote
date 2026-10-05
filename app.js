@@ -27,6 +27,72 @@ const ICON_MAP = {
     'bulb': '💡'
 };
 
+// Vector SVG Icon Definitions & Color Palette for Modern Clean UI
+const SVG_ICON_COLORS = {
+    'file-text': '#89b4fa',
+    'folder': '#f9e2af',
+    'terminal': '#a6e3a1',
+    'code': '#cba6f7',
+    'key': '#fab387',
+    'book': '#89dceb',
+    'shield': '#74c7ec',
+    'lock': '#f38ba8',
+    'bug': '#f38ba8',
+    'database': '#89b4fa',
+    'server': '#b4befe',
+    'check-square': '#a6e3a1',
+    'star': '#f9e2af',
+    'rocket': '#f38ba8',
+    'fire': '#fab387',
+    'bulb': '#f9e2af'
+};
+
+function getNodeIconSvg(iconKey, customColor = null, isFolder = false, isExpanded = false, size = 16) {
+    const key = iconKey || (isFolder ? 'folder' : 'file-text');
+    const color = customColor || SVG_ICON_COLORS[key] || '#89b4fa';
+    
+    if (key === 'folder' || isFolder) {
+        if (isExpanded) {
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polygon points="2 10 22 10 20 21 4 21 2 10" fill="${color}" fill-opacity="0.18"/></svg>`;
+        }
+        return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" fill="${color}" fill-opacity="0.15"/></svg>`;
+    }
+    
+    switch (key) {
+        case 'terminal':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`;
+        case 'code':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`;
+        case 'key':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>`;
+        case 'book':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
+        case 'shield':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+        case 'lock':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+        case 'bug':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="14" x="8" y="6" rx="4"/><path d="m19 7-3 2"/><path d="m5 7 3 2"/><path d="m19 19-3-2"/><path d="m5 19 3-2"/><path d="M20 13h-4"/><path d="M4 13h4"/><path d="m10 4 1 2"/><path d="m14 4-1 2"/></svg>`;
+        case 'database':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`;
+        case 'server':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>`;
+        case 'check-square':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`;
+        case 'star':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+        case 'rocket':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>`;
+        case 'fire':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3.5z"/></svg>`;
+        case 'bulb':
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`;
+        case 'file-text':
+        default:
+            return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
+    }
+}
+
 // Global State
 const state = {
     nodes: new Map(),
@@ -1007,7 +1073,7 @@ function performGlobalSearch(query) {
 
         row.innerHTML = `
             <div class="search-result-top">
-                <span class="search-result-icon">${ICON_MAP[item.node.icon] || '📁'}</span>
+                <span class="search-result-icon">${getNodeIconSvg(item.node.icon, item.node.color, item.node.is_folder || item.node.icon === 'folder', false, 14)}</span>
                 <span class="search-result-title">${highlightedTitle}</span>
                 <span class="search-result-path">${escapeHtml(pathStr)}</span>
             </div>
@@ -1091,10 +1157,14 @@ function renderTree() {
             item.className = `tree-node ${state.activeNodeId === node.id ? 'active' : ''} ${node.is_pinned ? 'pinned' : ''}`;
             item.dataset.id = node.id;
 
-            // Expand arrow
+            // Expand arrow (Modern Chevron SVG)
             const arrow = document.createElement('span');
             arrow.className = `tree-arrow ${hasKids ? (isExpanded ? 'expanded' : '') : 'empty'}`;
-            arrow.textContent = '▶';
+            if (hasKids) {
+                arrow.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+            } else {
+                arrow.innerHTML = '';
+            }
             arrow.onclick = (e) => {
                 e.stopPropagation();
                 if (hasKids) toggleNodeExpand(node.id);
@@ -1109,10 +1179,11 @@ function renderTree() {
                 colorDot.style.display = 'none';
             }
 
-            // Icon
+            // Vector SVG Icon
             const icon = document.createElement('span');
             icon.className = 'tree-icon';
-            icon.textContent = ICON_MAP[node.icon] || '📁';
+            const isFolderNode = node.is_folder || node.icon === 'folder';
+            icon.innerHTML = getNodeIconSvg(node.icon, node.color, isFolderNode, isExpanded, 15);
 
             // Title Label with matching highlight
             const label = document.createElement('span');
@@ -1137,6 +1208,15 @@ function renderTree() {
             }
             if (node.color) label.style.color = node.color;
 
+            // Lock badge if read-only
+            let lockBadge = null;
+            if (node.is_readonly) {
+                lockBadge = document.createElement('span');
+                lockBadge.className = 'tree-lock-badge';
+                lockBadge.title = 'Read-Only (Locked)';
+                lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+            }
+
             // Pin badge if pinned
             let pinBadge = null;
             if (node.is_pinned) {
@@ -1150,7 +1230,7 @@ function renderTree() {
             const actions = document.createElement('div');
             actions.className = 'tree-actions';
             actions.innerHTML = `
-                <button class="tree-btn" title="Add Sub-Note" onclick="event.stopPropagation(); createSubNode('${node.id}')">+</button>
+                <button class="tree-btn" title="Add Sub-Note" onclick="event.stopPropagation(); createSubNode('${node.id}', 'note')">+</button>
                 <button class="tree-btn" title="Delete" onclick="event.stopPropagation(); deleteNode('${node.id}')">✕</button>
             `;
 
@@ -1158,6 +1238,7 @@ function renderTree() {
             item.appendChild(colorDot);
             item.appendChild(icon);
             item.appendChild(label);
+            if (lockBadge) item.appendChild(lockBadge);
             if (pinBadge) item.appendChild(pinBadge);
             item.appendChild(actions);
 
@@ -1297,7 +1378,9 @@ function openTreeContextMenu(e, nodeId) {
     activeContextMenuNodeId = targetId;
 
     const ctxNewRoot = document.getElementById('ctx-new-root');
+    const ctxNewFolder = document.getElementById('ctx-new-folder');
     const ctxSubnode = document.getElementById('ctx-subnode');
+    const ctxSubfolder = document.getElementById('ctx-subfolder');
     const ctxDivider1 = document.getElementById('ctx-divider-1');
     const ctxPin = document.getElementById('ctx-pin');
     const ctxRename = document.getElementById('ctx-rename');
@@ -1334,7 +1417,9 @@ function openTreeContextMenu(e, nodeId) {
         }
 
         if (ctxNewRoot) ctxNewRoot.style.display = 'flex';
+        if (ctxNewFolder) ctxNewFolder.style.display = 'flex';
         if (ctxSubnode) ctxSubnode.style.display = 'flex';
+        if (ctxSubfolder) ctxSubfolder.style.display = 'flex';
         if (ctxDivider1) ctxDivider1.style.display = 'block';
         if (ctxRename) ctxRename.style.display = 'flex';
         if (ctxColor) ctxColor.style.display = 'flex';
@@ -1347,7 +1432,9 @@ function openTreeContextMenu(e, nodeId) {
     } else {
         // No node targeted (empty tree or no active note)
         if (ctxNewRoot) ctxNewRoot.style.display = 'flex';
+        if (ctxNewFolder) ctxNewFolder.style.display = 'flex';
         if (ctxSubnode) ctxSubnode.style.display = 'none';
+        if (ctxSubfolder) ctxSubfolder.style.display = 'none';
         if (ctxDivider1) ctxDivider1.style.display = 'block';
         if (ctxPin) ctxPin.style.display = 'none';
         if (ctxRename) ctxRename.style.display = 'none';
@@ -1513,7 +1600,8 @@ function createKeepCard(node) {
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'keep-card-icon';
-    iconSpan.textContent = ICON_MAP[node.icon] || '📁';
+    const isFolder = node.is_folder || node.icon === 'folder';
+    iconSpan.innerHTML = getNodeIconSvg(node.icon, node.color, isFolder, false, 16);
 
     const titleSpan = document.createElement('div');
     titleSpan.className = 'keep-card-title';
@@ -1522,6 +1610,15 @@ function createKeepCard(node) {
 
     titleGroup.appendChild(iconSpan);
     titleGroup.appendChild(titleSpan);
+
+    if (node.is_readonly) {
+        const lockBadge = document.createElement('span');
+        lockBadge.className = 'tree-lock-badge';
+        lockBadge.title = 'Read-Only (Locked)';
+        lockBadge.style.display = 'inline-flex';
+        lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+        titleGroup.appendChild(lockBadge);
+    }
 
     const pinBtn = document.createElement('button');
     pinBtn.className = `keep-card-pin-btn ${node.is_pinned ? 'pinned' : ''}`;
@@ -1642,7 +1739,8 @@ function selectNode(id) {
     noteTitleInput.value = node.title || '';
     if (noteTagsInput) noteTagsInput.value = node.tags || '';
     renderTagChips(node.tags || '');
-    iconPickerBtn.textContent = ICON_MAP[node.icon] || '📁';
+    const isFolder = node.is_folder || node.icon === 'folder';
+    iconPickerBtn.innerHTML = getNodeIconSvg(node.icon, node.color, isFolder, false, 18);
     updateNodeColorDot(node.color);
 
     setEditorContent(node.content || '');
@@ -1802,19 +1900,21 @@ function scheduleSave(field, value) {
 }
 
 // --- CRUD Node Operations ---
-async function createNewRootNode() {
+async function createNewRootNode(type = 'note') {
+    const isFolder = type === 'folder';
     const now = Date.now();
     const newId = 'node-' + Math.random().toString(36).substring(2, 10) + '-' + now;
     const newNode = {
         id: newId,
         parent_id: null,
-        title: 'New Note',
+        title: isFolder ? 'New Folder' : 'New Note',
         content: '',
-        icon: 'file-text',
+        icon: isFolder ? 'folder' : 'file-text',
         tags: '',
-        color: '',
+        color: isFolder ? '#f9e2af' : '',
         position: state.nodes.size,
         is_expanded: 1,
+        is_folder: isFolder ? 1 : 0,
         created_at: now,
         updated_at: now
     };
@@ -1845,19 +1945,21 @@ async function createNewRootNode() {
     noteTitleInput.select();
 }
 
-async function createSubNode(parentId) {
+async function createSubNode(parentId, type = 'note') {
+    const isFolder = type === 'folder';
     const now = Date.now();
     const newId = 'node-' + Math.random().toString(36).substring(2, 10) + '-' + now;
     const subNode = {
         id: newId,
         parent_id: parentId,
-        title: 'New Sub-Note',
+        title: isFolder ? 'New Sub-Folder' : 'New Sub-Note',
         content: '',
-        icon: 'file-text',
+        icon: isFolder ? 'folder' : 'file-text',
         tags: '',
-        color: '',
+        color: isFolder ? '#f9e2af' : '',
         position: 0,
         is_expanded: 1,
+        is_folder: isFolder ? 1 : 0,
         created_at: now,
         updated_at: now
     };
@@ -1994,6 +2096,8 @@ function toggleReadOnlyMode() {
     node.is_readonly = newStatus ? 1 : 0;
     applyReadOnlyState(newStatus);
     sendDeltaPatch(state.activeNodeId, { is_readonly: node.is_readonly });
+    renderTree();
+    if (isAllNotesViewActive()) renderAllNotesView();
 }
 
 function applyReadOnlyState(isReadOnly) {
@@ -2013,6 +2117,205 @@ function applyReadOnlyState(isReadOnly) {
     noteTitleInput.readOnly = isReadOnly;
     if (noteTagsInput) noteTagsInput.readOnly = isReadOnly;
 }
+
+// --- Creative Ribbon Tools: Neon Glowing Text, Animated Text, Arrows & Shapes ---
+function toggleRibbonPopover(menuId, buttonEl, e) {
+    if (e) e.stopPropagation();
+    const targetMenu = document.getElementById(menuId);
+    if (!targetMenu) return;
+    const isShowing = targetMenu.style.display !== 'none';
+    closeAllRibbonPopovers();
+    if (!isShowing) {
+        targetMenu.style.display = 'flex';
+    }
+}
+
+function closeAllRibbonPopovers() {
+    document.querySelectorAll('.ribbon-popover-menu').forEach(m => m.style.display = 'none');
+}
+
+function applyNeonEffect(color) {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    const sel = window.getSelection();
+    let text = 'Glowing Neon Text';
+    let range = null;
+
+    if (sel && sel.rangeCount > 0) {
+        range = sel.getRangeAt(0);
+        if (!sel.isCollapsed) {
+            text = range.toString() || text;
+            range.deleteContents();
+        }
+    }
+
+    const span = document.createElement('span');
+    span.className = `neon-text neon-${color}`;
+    span.textContent = text;
+
+    if (range) {
+        range.insertNode(span);
+        const space = document.createTextNode('\u00A0');
+        span.parentNode.insertBefore(space, span.nextSibling);
+        const newRange = document.createRange();
+        newRange.setStartAfter(space);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+    } else {
+        noteEditor.appendChild(span);
+    }
+    handleEditorInput();
+}
+
+function applyAnimatedText(type) {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    const sel = window.getSelection();
+    let text = type === 'rainbow' ? 'Rainbow Shimmering Title' : (type === 'pulse' ? 'Pulsing Ambient Text' : 'Floating Waves Text');
+    let range = null;
+
+    if (sel && sel.rangeCount > 0) {
+        range = sel.getRangeAt(0);
+        if (!sel.isCollapsed) {
+            text = range.toString() || text;
+            range.deleteContents();
+        }
+    }
+
+    const span = document.createElement('span');
+    span.className = `anim-${type}-text`;
+    span.textContent = text;
+
+    if (range) {
+        range.insertNode(span);
+        const space = document.createTextNode('\u00A0');
+        span.parentNode.insertBefore(space, span.nextSibling);
+        const newRange = document.createRange();
+        newRange.setStartAfter(space);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+    } else {
+        noteEditor.appendChild(span);
+    }
+    handleEditorInput();
+}
+
+function insertSymbol(sym) {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    document.execCommand('insertHTML', false, `&nbsp;${sym}&nbsp;`);
+    handleEditorInput();
+}
+
+function insertFlowSteps() {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    const html = `
+        <div class="flow-steps-container" contenteditable="false">
+            <span class="flow-step-badge" contenteditable="true">Step 1: Input</span>
+            <span class="flow-arrow-icon">➔</span>
+            <span class="flow-step-badge" contenteditable="true">Step 2: Process</span>
+            <span class="flow-arrow-icon">➔</span>
+            <span class="flow-step-badge" contenteditable="true">Step 3: Complete</span>
+        </div>
+        <p><br></p>
+    `;
+    document.execCommand('insertHTML', false, html);
+    handleEditorInput();
+}
+
+function insertArrowDivider() {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    const html = `
+        <div class="arrow-divider" contenteditable="false">
+            <span class="arrow-divider-line"></span>
+            <span class="arrow-divider-badge">NEXT SECTION ➔</span>
+            <span class="arrow-divider-line"></span>
+        </div>
+        <p><br></p>
+    `;
+    document.execCommand('insertHTML', false, html);
+    handleEditorInput();
+}
+
+function insertNeonBanner() {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    const html = `
+        <div class="neon-banner-card">
+            <div class="neon-banner-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Important CyberNote Notice</span>
+            </div>
+            <div>Enter your key takeaways, instructions or summary here...</div>
+        </div>
+        <p><br></p>
+    `;
+    document.execCommand('insertHTML', false, html);
+    handleEditorInput();
+}
+
+function insertPillBadge(type) {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    let badgeHtml = '';
+    if (type === 'success') {
+        badgeHtml = `<span class="pill-badge pill-success" contenteditable="false">✓ DONE</span>&nbsp;`;
+    } else if (type === 'priority') {
+        badgeHtml = `<span class="pill-badge pill-priority" contenteditable="false">🔥 HIGH</span>&nbsp;`;
+    } else if (type === 'cyber') {
+        badgeHtml = `<span class="pill-badge pill-cyber" contenteditable="false">🛡️ SECURE</span>&nbsp;`;
+    } else {
+        badgeHtml = `<span class="pill-badge pill-pending" contenteditable="false">⏳ PENDING</span>&nbsp;`;
+    }
+    document.execCommand('insertHTML', false, badgeHtml);
+    handleEditorInput();
+}
+
+function insertMetricTile() {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    const html = `
+        <div class="metric-card-grid">
+            <div class="metric-card-tile">
+                <div class="metric-card-val" contenteditable="true">99.9%</div>
+                <div class="metric-card-lbl" contenteditable="true">Uptime / Success</div>
+            </div>
+            <div class="metric-card-tile">
+                <div class="metric-card-val" contenteditable="true">256-bit</div>
+                <div class="metric-card-lbl" contenteditable="true">E2EE Security</div>
+            </div>
+        </div>
+        <p><br></p>
+    `;
+    document.execCommand('insertHTML', false, html);
+    handleEditorInput();
+}
+
+// Expose functions globally for inline HTML onclick handlers
+window.toggleRibbonPopover = toggleRibbonPopover;
+window.closeAllRibbonPopovers = closeAllRibbonPopovers;
+window.applyNeonEffect = applyNeonEffect;
+window.applyAnimatedText = applyAnimatedText;
+window.insertSymbol = insertSymbol;
+window.insertFlowSteps = insertFlowSteps;
+window.insertArrowDivider = insertArrowDivider;
+window.insertNeonBanner = insertNeonBanner;
+window.insertPillBadge = insertPillBadge;
+window.insertMetricTile = insertMetricTile;
+window.createNewRootNode = createNewRootNode;
+window.createSubNode = createSubNode;
 
 // --- WYSIWYG Formatting Actions ---
 function execFormat(command, value = null) {
@@ -2455,6 +2758,30 @@ function hideFloatingToolbars() {
     if (imageToolbar) imageToolbar.style.display = 'none';
 }
 
+// Helper for drawing arrows on HTML5 canvas
+function drawCanvasArrow(ctx, fromX, fromY, toX, toY, color, width) {
+    const headLen = Math.max(12, width * 3.5);
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+
+    // Arrowhead triangle
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+}
+
 // --- Windows Paint & Signature Studio ---
 function setupPaintStudio() {
     const canvas = document.getElementById('paint-canvas');
@@ -2464,8 +2791,13 @@ function setupPaintStudio() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    let arrowStartPoint = null;
+    let canvasSnapshot = null;
+
     document.getElementById('btn-paint-tool-signature').onclick = () => setPaintTool('signature');
     document.getElementById('btn-paint-tool-brush').onclick = () => setPaintTool('brush');
+    const btnArrow = document.getElementById('btn-paint-tool-arrow');
+    if (btnArrow) btnArrow.onclick = () => setPaintTool('arrow');
     document.getElementById('btn-paint-tool-eraser').onclick = () => setPaintTool('eraser');
 
     const widthSlider = document.getElementById('paint-width-slider');
@@ -2509,14 +2841,27 @@ function setupPaintStudio() {
         state.isPainting = true;
         const pt = getCanvasCoords(e);
         state.paintPoints = [pt];
-        ctx.beginPath();
-        ctx.moveTo(pt.x, pt.y);
+        if (state.paintTool === 'arrow') {
+            arrowStartPoint = pt;
+            canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        } else {
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y);
+        }
     });
 
     canvas.addEventListener('mousemove', (e) => {
         if (!state.isPainting) return;
         const pt = getCanvasCoords(e);
         state.paintPoints.push(pt);
+
+        if (state.paintTool === 'arrow') {
+            if (canvasSnapshot && arrowStartPoint) {
+                ctx.putImageData(canvasSnapshot, 0, 0);
+                drawCanvasArrow(ctx, arrowStartPoint.x, arrowStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth);
+            }
+            return;
+        }
 
         ctx.lineWidth = state.paintWidth;
         ctx.lineCap = 'round';
@@ -2548,8 +2893,15 @@ function setupPaintStudio() {
 
     window.addEventListener('mouseup', () => {
         if (state.isPainting) {
+            if (state.paintTool === 'arrow' && arrowStartPoint && state.paintPoints.length > 0) {
+                const pt = state.paintPoints[state.paintPoints.length - 1];
+                if (canvasSnapshot) ctx.putImageData(canvasSnapshot, 0, 0);
+                drawCanvasArrow(ctx, arrowStartPoint.x, arrowStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth);
+            }
             state.isPainting = false;
             state.paintPoints = [];
+            arrowStartPoint = null;
+            canvasSnapshot = null;
         }
     });
 
@@ -2559,8 +2911,13 @@ function setupPaintStudio() {
             state.isPainting = true;
             const pt = getCanvasCoords(e.touches[0]);
             state.paintPoints = [pt];
-            ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y);
+            if (state.paintTool === 'arrow') {
+                arrowStartPoint = pt;
+                canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(pt.x, pt.y);
+            }
         }
     });
 
@@ -2569,6 +2926,14 @@ function setupPaintStudio() {
         e.preventDefault();
         const pt = getCanvasCoords(e.touches[0]);
         state.paintPoints.push(pt);
+
+        if (state.paintTool === 'arrow') {
+            if (canvasSnapshot && arrowStartPoint) {
+                ctx.putImageData(canvasSnapshot, 0, 0);
+                drawCanvasArrow(ctx, arrowStartPoint.x, arrowStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth);
+            }
+            return;
+        }
 
         ctx.lineWidth = state.paintWidth;
         ctx.lineCap = 'round';
@@ -2579,15 +2944,24 @@ function setupPaintStudio() {
     });
 
     canvas.addEventListener('touchend', () => {
-        state.isPainting = false;
-        state.paintPoints = [];
+        if (state.isPainting) {
+            if (state.paintTool === 'arrow' && arrowStartPoint && state.paintPoints.length > 0) {
+                const pt = state.paintPoints[state.paintPoints.length - 1];
+                if (canvasSnapshot) ctx.putImageData(canvasSnapshot, 0, 0);
+                drawCanvasArrow(ctx, arrowStartPoint.x, arrowStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth);
+            }
+            state.isPainting = false;
+            state.paintPoints = [];
+            arrowStartPoint = null;
+            canvasSnapshot = null;
+        }
     });
 
     document.getElementById('btn-paint-insert').onclick = () => {
         const dataUrl = canvas.toDataURL('image/png');
         closePaintModal();
         restoreSelection();
-        insertImageElement(dataUrl, state.paintTool === 'signature' ? 'Handwritten Signature' : 'Paint Drawing');
+        insertImageElement(dataUrl, state.paintTool === 'signature' ? 'Handwritten Signature' : (state.paintTool === 'arrow' ? 'Arrow Diagram' : 'Paint Drawing'));
     };
 }
 
@@ -2596,6 +2970,8 @@ function setPaintTool(tool) {
     document.getElementById('btn-paint-tool-signature').classList.toggle('active', tool === 'signature');
     document.getElementById('btn-paint-tool-brush').classList.toggle('active', tool === 'brush');
     document.getElementById('btn-paint-tool-eraser').classList.toggle('active', tool === 'eraser');
+    const btnArrow = document.getElementById('btn-paint-tool-arrow');
+    if (btnArrow) btnArrow.classList.toggle('active', tool === 'arrow');
 }
 
 function openPaintModal() {
@@ -2652,7 +3028,8 @@ function renderNodeLinkList(search) {
 
         const div = document.createElement('div');
         div.className = 'nodelink-item';
-        div.innerHTML = `${ICON_MAP[node.icon] || '📁'} <b>${node.title}</b>`;
+        const isFolder = node.is_folder || node.icon === 'folder';
+        div.innerHTML = `${getNodeIconSvg(node.icon, node.color, isFolder, false, 14)} <b>${escapeHtml(node.title || 'Untitled')}</b>`;
         div.onclick = () => {
             restoreSelection();
             insertNodeLink(node.id, node.title);
@@ -2944,7 +3321,23 @@ function exportNotes() {
 // --- Icon Picker ---
 function openIconModal() {
     if (state.isReadOnly) return;
-    document.getElementById('icon-modal').style.display = 'flex';
+    const modal = document.getElementById('icon-modal');
+    if (!modal) return;
+    
+    // Style icon options with vector SVG icons
+    const iconGrid = document.getElementById('icon-grid');
+    if (iconGrid && !iconGrid.dataset.svgInitialized) {
+        iconGrid.dataset.svgInitialized = 'true';
+        iconGrid.querySelectorAll('.icon-opt').forEach(opt => {
+            const iconKey = opt.dataset.icon;
+            const label = opt.textContent.replace(/^[^\w\s]+/, '').trim();
+            opt.innerHTML = `${getNodeIconSvg(iconKey, null, iconKey === 'folder', false, 18)} <span>${label}</span>`;
+            opt.style.display = 'inline-flex';
+            opt.style.alignItems = 'center';
+            opt.style.gap = '8px';
+        });
+    }
+    modal.style.display = 'flex';
 }
 
 function closeIconModal() {
@@ -2953,7 +3346,10 @@ function closeIconModal() {
 
 function selectIcon(iconName) {
     if (!state.activeNodeId || state.isReadOnly) return;
-    iconPickerBtn.textContent = ICON_MAP[iconName] || '📁';
+    const node = state.nodes.get(state.activeNodeId);
+    if (node) node.icon = iconName;
+    const isFolder = node ? (node.is_folder || iconName === 'folder') : false;
+    iconPickerBtn.innerHTML = getNodeIconSvg(iconName, node?.color, isFolder, false, 18);
     closeIconModal();
     sendDeltaPatch(state.activeNodeId, { icon: iconName });
     renderTree();
@@ -3272,10 +3668,10 @@ function updateSettingsUI() {
         ? 'All edits are saved locally and synced continuously with the cloud.'
         : 'Running in offline mode. Notes are saved locally in browser storage & SQLite.';
 
-    // 4. Bug report URL persistence
+    // 4. Bug report URL strictly locked to official repository
+    localStorage.removeItem('cybernote_bug_url');
     const bugInput = document.getElementById('bug-report-url-input');
-    const savedBugUrl = localStorage.getItem('cybernote_bug_url');
-    if (bugInput && savedBugUrl) bugInput.value = savedBugUrl;
+    if (bugInput) bugInput.value = OFFICIAL_BUG_URL;
 
     // 5. E2EE toggle
     const e2eeToggle = document.getElementById('settings-e2ee-toggle');
@@ -3519,6 +3915,29 @@ function setupEventListeners() {
     document.getElementById('btn-insert-nodelink').onclick = openNodeLinkModal;
     document.getElementById('nodelink-search').oninput = (e) => renderNodeLinkList(e.target.value);
 
+    // Creative Ribbon Popovers (Neon, Animations, Arrows, Shapes)
+    const btnNeon = document.getElementById('btn-neon-effects');
+    if (btnNeon) btnNeon.onclick = (e) => toggleRibbonPopover('neon-dropdown-menu', btnNeon, e);
+
+    const btnAnim = document.getElementById('btn-anim-effects');
+    if (btnAnim) btnAnim.onclick = (e) => toggleRibbonPopover('anim-dropdown-menu', btnAnim, e);
+
+    const btnArrows = document.getElementById('btn-arrows-menu');
+    if (btnArrows) btnArrows.onclick = (e) => toggleRibbonPopover('arrows-dropdown-menu', btnArrows, e);
+
+    const btnShapes = document.getElementById('btn-shapes-menu');
+    if (btnShapes) btnShapes.onclick = (e) => toggleRibbonPopover('shapes-dropdown-menu', btnShapes, e);
+
+    // Global outside click closer for ribbon popovers and context menus
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.ribbon-dropdown-wrap')) {
+            closeAllRibbonPopovers();
+        }
+        if (!e.target.closest('#tree-context-menu')) {
+            closeTreeContextMenu();
+        }
+    });
+
     // Floating Image Toolbar Actions
     document.getElementById('btn-img-size-25').onclick = () => setImageSize('25%');
     document.getElementById('btn-img-size-50').onclick = () => setImageSize('50%');
@@ -3539,16 +3958,25 @@ function setupEventListeners() {
 
     // Node Actions
     const btnNewRoot = document.getElementById('btn-new-root');
-    if (btnNewRoot) btnNewRoot.onclick = createNewRootNode;
+    if (btnNewRoot) btnNewRoot.onclick = () => createNewRootNode('note');
     const btnNewMeta = document.getElementById('btn-new-note-meta');
-    if (btnNewMeta) btnNewMeta.onclick = createNewRootNode;
+    if (btnNewMeta) btnNewMeta.onclick = () => createNewRootNode('note');
+    const btnSidebarNewNote = document.getElementById('btn-sidebar-new-note');
+    if (btnSidebarNewNote) btnSidebarNewNote.onclick = () => createNewRootNode('note');
+    const btnSidebarNewFolder = document.getElementById('btn-sidebar-new-folder');
+    if (btnSidebarNewFolder) btnSidebarNewFolder.onclick = () => createNewRootNode('folder');
+    const btnKeepNewNote = document.getElementById('btn-keep-new-note');
+    if (btnKeepNewNote) btnKeepNewNote.onclick = () => createNewRootNode('note');
+    const btnKeepNewFolder = document.getElementById('btn-keep-new-folder');
+    if (btnKeepNewFolder) btnKeepNewFolder.onclick = () => createNewRootNode('folder');
+
     const btnPin = document.getElementById('btn-pin-node');
     if (btnPin) btnPin.onclick = togglePinActiveNode;
     const btnRename = document.getElementById('btn-rename-node');
     if (btnRename) btnRename.onclick = renameActiveNode;
     const btnAddSub = document.getElementById('btn-add-subnode');
     if (btnAddSub) btnAddSub.onclick = () => {
-        if (state.activeNodeId) createSubNode(state.activeNodeId);
+        if (state.activeNodeId) createSubNode(state.activeNodeId, 'note');
     };
     const btnDup = document.getElementById('btn-duplicate-node');
     if (btnDup) btnDup.onclick = duplicateCurrentNode;
@@ -3565,14 +3993,26 @@ function setupEventListeners() {
     const ctxNewRoot = document.getElementById('ctx-new-root');
     if (ctxNewRoot) ctxNewRoot.onclick = () => {
         closeTreeContextMenu();
-        createNewRootNode();
+        createNewRootNode('note');
+    };
+    const ctxNewFolder = document.getElementById('ctx-new-folder');
+    if (ctxNewFolder) ctxNewFolder.onclick = () => {
+        closeTreeContextMenu();
+        createNewRootNode('folder');
     };
     const ctxSubnode = document.getElementById('ctx-subnode');
     if (ctxSubnode) ctxSubnode.onclick = () => {
         const tid = activeContextMenuNodeId || state.activeNodeId;
         closeTreeContextMenu();
-        if (tid) createSubNode(tid);
-        else createNewRootNode();
+        if (tid) createSubNode(tid, 'note');
+        else createNewRootNode('note');
+    };
+    const ctxSubfolder = document.getElementById('ctx-subfolder');
+    if (ctxSubfolder) ctxSubfolder.onclick = () => {
+        const tid = activeContextMenuNodeId || state.activeNodeId;
+        closeTreeContextMenu();
+        if (tid) createSubNode(tid, 'folder');
+        else createNewRootNode('folder');
     };
     const ctxPin = document.getElementById('ctx-pin');
     if (ctxPin) ctxPin.onclick = () => {
