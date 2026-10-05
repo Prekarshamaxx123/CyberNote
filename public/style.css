@@ -5423,62 +5423,196 @@ kbd.editor-kbd, .editor-kbd {
     right: 0;
 }
 
-/* Folder View in Editor */
-.folder-dashboard-view {
-    padding: 24px 32px;
+/* ==========================================================================
+   FOLDER EXPLORER VIEW (Container for Subfolders & Notes)
+   ========================================================================== */
+.folder-explorer-view {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    overflow: hidden;
+    background-color: var(--bg-editor);
+    min-height: 0;
 }
-.folder-header-hero {
+
+.folder-toolbar-bar {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding-bottom: 16px;
+    justify-content: space-between;
+    padding: 10px 24px;
     border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+    gap: 12px;
+    flex-shrink: 0;
 }
-.folder-hero-icon {
-    width: 48px;
-    height: 48px;
+
+.folder-stats-badge {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 3px 10px;
     border-radius: 12px;
-    background: rgba(249, 226, 175, 0.12);
-    border: 1px solid rgba(249, 226, 175, 0.3);
-    color: #f9e2af;
+    border: 1px solid var(--border-color);
+}
+
+.folder-toolbar-right {
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 8px;
 }
-.folder-hero-title {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
+
+.folder-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px 80px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
 }
-.folder-hero-sub {
+
+.folder-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.folder-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 6px;
+}
+
+.folder-section-title {
     font-size: 0.8rem;
-    color: var(--text-muted);
-    margin: 2px 0 0 0;
+    font-weight: 700;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.5px;
 }
-.folder-grid-items {
+
+.folder-section-count {
+    font-size: 0.74rem;
+    font-weight: 600;
+    background: rgba(137, 180, 250, 0.15);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.folder-items-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     gap: 12px;
 }
-.folder-item-card {
+
+.folder-card {
     padding: 12px 14px;
-    background-color: var(--bg-card);
+    background: var(--bg-toolbar);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     transition: all 0.18s ease;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 10px;
 }
-.folder-item-card:hover {
+
+.folder-card:hover {
     border-color: var(--accent);
+    background: var(--bg-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.folder-card-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+
+.folder-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.folder-card-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.folder-card-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.folder-card-count {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.folder-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 50px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    gap: 10px;
+}
+
+.folder-empty-icon {
+    color: var(--accent);
+    opacity: 0.6;
+    margin-bottom: 4px;
+}
+
+.folder-empty-state h3 {
+    font-size: 1.15rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    margin: 0;
+}
+
+.folder-empty-state p {
+    font-size: 0.84rem;
+    max-width: 320px;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.folder-empty-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+@media (max-width: 600px) {
+    .folder-toolbar-bar {
+        padding: 8px 12px;
+    }
+    .folder-scroll-area {
+        padding: 12px 12px 60px 12px;
+        gap: 16px;
+    }
+    .folder-items-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Onboarding Guide & Star GitHub Floating Banner */
