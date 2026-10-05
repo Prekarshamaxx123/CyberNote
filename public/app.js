@@ -3303,22 +3303,38 @@ function insertImageElement(src, alt) {
 }
 
 // Floating Image Controls & Corner Resizing
+// Floating Image Controls & Corner Resizing
 function setupImageInteractions() {
     noteEditor.addEventListener('click', (e) => {
-        if (e.target.tagName === 'IMG') {
-            selectImageElement(e.target);
-        } else if (!e.target.closest('#image-toolbar') && !e.target.closest('#image-resize-overlay')) {
+        const img = e.target.tagName === 'IMG' ? e.target : e.target.closest('.editor-img-wrap')?.querySelector('img');
+        if (img) {
+            selectImageElement(img);
+        } else if (!e.target.closest('#image-toolbar') && !e.target.closest('#image-resize-overlay') && !e.target.closest('#editor-drop-line')) {
             hideImageToolbar();
         }
     });
 
     setupImageResizeHandles();
+    setupImageMoveInteractions();
 }
 
 function selectImageElement(img) {
     state.activeImageElement = img;
     document.querySelectorAll('.wysiwyg-canvas img').forEach(i => i.classList.remove('selected-img'));
     img.classList.add('selected-img');
+
+    // Customize title label dynamically for Shape / Signature / Photo
+    const typeLabel = document.getElementById('img-tb-type-label');
+    if (typeLabel) {
+        if (img.classList.contains('note-vector-shape') || img.closest('.editor-shape-wrap')) {
+            typeLabel.textContent = 'Shape:';
+        } else if (img.classList.contains('note-signature-img') || img.closest('.editor-signature-wrap')) {
+            typeLabel.textContent = 'Signature:';
+        } else {
+            typeLabel.textContent = 'Image:';
+        }
+    }
+
     imageToolbar.style.display = 'flex';
     updateImageResizeOverlay();
 }
@@ -3510,21 +3526,76 @@ function setImageSize(pct) {
     handleEditorInput();
 }
 
+function moveActiveImageUp() {
+    if (!state.activeImageElement) return;
+    const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+    let prev = wrap.previousElementSibling;
+    while (prev && (prev.id === 'editor-drop-line' || prev.classList?.contains('image-resize-overlay') || prev.classList?.contains('table-resize-overlay'))) {
+        prev = prev.previousElementSibling;
+    }
+    if (prev && wrap.parentNode) {
+        wrap.parentNode.insertBefore(wrap, prev);
+        updateImageResizeOverlay();
+        handleEditorInput();
+        showToast('⬆ Moved Up');
+    }
+}
+
+function moveActiveImageDown() {
+    if (!state.activeImageElement) return;
+    const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+    let next = wrap.nextElementSibling;
+    while (next && (next.id === 'editor-drop-line' || next.classList?.contains('image-resize-overlay') || next.classList?.contains('table-resize-overlay'))) {
+        next = next.nextElementSibling;
+    }
+    if (next && wrap.parentNode) {
+        wrap.parentNode.insertBefore(wrap, next.nextSibling);
+        updateImageResizeOverlay();
+        handleEditorInput();
+        showToast('⬇ Moved Down');
+    }
+}
+
 function setImageAlign(alignment) {
     if (!state.activeImageElement) return;
     const img = state.activeImageElement;
+    const wrap = img.closest('.editor-img-wrap') || img;
+
     if (alignment === 'left') {
+        wrap.style.display = 'block';
+        wrap.style.float = 'none';
+        wrap.style.margin = '14px 0';
+        wrap.style.textAlign = 'left';
+        img.style.margin = '0';
         img.style.display = 'inline-block';
-        img.style.float = 'left';
-        img.style.margin = '0 16px 16px 0';
     } else if (alignment === 'center') {
-        img.style.display = 'block';
-        img.style.float = 'none';
-        img.style.margin = '16px auto';
-    } else if (alignment === 'right') {
+        wrap.style.display = 'block';
+        wrap.style.float = 'none';
+        wrap.style.margin = '14px auto';
+        wrap.style.textAlign = 'center';
+        img.style.margin = '0 auto';
         img.style.display = 'inline-block';
-        img.style.float = 'right';
-        img.style.margin = '0 0 16px 16px';
+    } else if (alignment === 'right') {
+        wrap.style.display = 'block';
+        wrap.style.float = 'none';
+        wrap.style.margin = '14px 0 14px auto';
+        wrap.style.textAlign = 'right';
+        img.style.margin = '0 0 0 auto';
+        img.style.display = 'inline-block';
+    } else if (alignment === 'float-left') {
+        wrap.style.display = 'inline-block';
+        wrap.style.float = 'left';
+        wrap.style.margin = '4px 16px 12px 0';
+        wrap.style.textAlign = 'left';
+        img.style.margin = '0';
+        img.style.display = 'block';
+    } else if (alignment === 'float-right') {
+        wrap.style.display = 'inline-block';
+        wrap.style.float = 'right';
+        wrap.style.margin = '4px 0 12px 16px';
+        wrap.style.textAlign = 'right';
+        img.style.margin = '0';
+        img.style.display = 'block';
     }
     updateImageResizeOverlay();
     handleEditorInput();
@@ -3532,9 +3603,145 @@ function setImageAlign(alignment) {
 
 function deleteActiveImage() {
     if (!state.activeImageElement) return;
-    state.activeImageElement.remove();
+    const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+    wrap.remove();
     hideImageToolbar();
     handleEditorInput();
+}
+
+function setupImageMoveInteractions() {
+    const moveHandle = document.getElementById('img-move-handle');
+    const dropLine = document.getElementById('editor-drop-line');
+    const scrollArea = document.getElementById('editor-scroll-area');
+    if (!moveHandle || !dropLine || !scrollArea) return;
+
+    let isMoving = false;
+    let currentDropTarget = null;
+    let activeWrap = null;
+
+    const startMove = (clientY) => {
+        if (!state.activeImageElement || state.isReadOnly) return;
+        activeWrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+        isMoving = true;
+        currentDropTarget = null;
+        document.body.style.userSelect = 'none';
+        moveHandle.classList.add('dragging');
+        if (activeWrap) activeWrap.classList.add('moving-active');
+    };
+
+    const handlePointerMove = (clientX, clientY) => {
+        if (!isMoving || !activeWrap) return;
+
+        // Find candidate block elements in noteEditor
+        const blocks = Array.from(noteEditor.children).filter(el => 
+            el !== activeWrap && 
+            el.id !== 'editor-drop-line' && 
+            el.id !== 'image-resize-overlay' && 
+            el.id !== 'table-resize-overlay' &&
+            !el.classList.contains('image-resize-overlay') &&
+            !el.classList.contains('table-resize-overlay')
+        );
+
+        if (blocks.length === 0) {
+            currentDropTarget = null;
+            dropLine.style.display = 'none';
+            return;
+        }
+
+        let bestBlock = null;
+        let bestDist = Infinity;
+        let insertBefore = true;
+
+        for (const block of blocks) {
+            const rect = block.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            const dist = Math.abs(clientY - midY);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestBlock = block;
+                insertBefore = clientY < midY;
+            }
+        }
+
+        if (bestBlock) {
+            const blockRect = bestBlock.getBoundingClientRect();
+            const scrollRect = scrollArea.getBoundingClientRect();
+            const left = blockRect.left - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
+            const targetY = insertBefore ? blockRect.top : blockRect.bottom;
+            const top = targetY - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
+
+            dropLine.style.display = 'flex';
+            dropLine.style.left = `${Math.round(left)}px`;
+            dropLine.style.top = `${Math.round(top - 1)}px`;
+            dropLine.style.width = `${Math.round(blockRect.width)}px`;
+
+            currentDropTarget = { block: bestBlock, insertBefore };
+        }
+    };
+
+    const finishMove = () => {
+        if (!isMoving) return;
+        isMoving = false;
+        document.body.style.userSelect = '';
+        moveHandle.classList.remove('dragging');
+        if (activeWrap) activeWrap.classList.remove('moving-active');
+        dropLine.style.display = 'none';
+
+        if (currentDropTarget && currentDropTarget.block && activeWrap) {
+            const { block, insertBefore } = currentDropTarget;
+            if (insertBefore) {
+                block.parentNode.insertBefore(activeWrap, block);
+            } else {
+                block.parentNode.insertBefore(activeWrap, block.nextSibling);
+            }
+            updateImageResizeOverlay();
+            handleEditorInput();
+            showToast('✓ Element Moved Freely');
+        } else if (activeWrap) {
+            updateImageResizeOverlay();
+        }
+        currentDropTarget = null;
+        activeWrap = null;
+    };
+
+    moveHandle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startMove(e.clientY);
+    });
+
+    moveHandle.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        startMove(e.touches[0].clientY);
+    }, { passive: true });
+
+    // Allow dragging selected image/shape directly
+    noteEditor.addEventListener('mousedown', (e) => {
+        if (e.target.tagName === 'IMG' && e.target === state.activeImageElement) {
+            startMove(e.clientY);
+        }
+    });
+
+    noteEditor.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1 && e.target.tagName === 'IMG' && e.target === state.activeImageElement) {
+            startMove(e.touches[0].clientY);
+        }
+    }, { passive: true });
+
+    window.addEventListener('mousemove', (e) => {
+        if (isMoving) {
+            handlePointerMove(e.clientX, e.clientY);
+        }
+    });
+
+    window.addEventListener('touchmove', (e) => {
+        if (isMoving && e.touches.length === 1) {
+            handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    });
+
+    window.addEventListener('mouseup', finishMove);
+    window.addEventListener('touchend', finishMove);
 }
 
 // --- Draw / Insert Table Studio ---
@@ -5783,12 +5990,20 @@ function setupEventListeners() {
     });
 
     // Floating Image Toolbar Actions
+    const btnImgMoveUp = document.getElementById('btn-img-move-up');
+    if (btnImgMoveUp) btnImgMoveUp.onclick = moveActiveImageUp;
+    const btnImgMoveDown = document.getElementById('btn-img-move-down');
+    if (btnImgMoveDown) btnImgMoveDown.onclick = moveActiveImageDown;
     document.getElementById('btn-img-size-25').onclick = () => setImageSize('25%');
     document.getElementById('btn-img-size-50').onclick = () => setImageSize('50%');
     document.getElementById('btn-img-size-100').onclick = () => setImageSize('100%');
     document.getElementById('btn-img-align-left').onclick = () => setImageAlign('left');
     document.getElementById('btn-img-align-center').onclick = () => setImageAlign('center');
     document.getElementById('btn-img-align-right').onclick = () => setImageAlign('right');
+    const btnImgFloatL = document.getElementById('btn-img-float-left');
+    if (btnImgFloatL) btnImgFloatL.onclick = () => setImageAlign('float-left');
+    const btnImgFloatR = document.getElementById('btn-img-float-right');
+    if (btnImgFloatR) btnImgFloatR.onclick = () => setImageAlign('float-right');
     const btnImgCopy = document.getElementById('btn-img-copy');
     if (btnImgCopy) btnImgCopy.onclick = copyActiveImage;
     document.getElementById('btn-img-delete').onclick = deleteActiveImage;

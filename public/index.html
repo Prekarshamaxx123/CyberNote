@@ -679,26 +679,47 @@
                 <!-- Floating Image Management Toolbar (appears when clicking an image) -->
                 <div id="image-toolbar" class="image-toolbar" style="display: none;">
                     <span class="image-tb-title">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Image:
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span id="img-tb-type-label">Element:</span>
                     </span>
-                    <button id="btn-img-size-25" class="tb-btn-small">25%</button>
-                    <button id="btn-img-size-50" class="tb-btn-small">50%</button>
-                    <button id="btn-img-size-100" class="tb-btn-small">100%</button>
-                    <button id="btn-img-align-left" class="tb-btn-small">Left</button>
-                    <button id="btn-img-align-center" class="tb-btn-small">Center</button>
-                    <button id="btn-img-align-right" class="tb-btn-small">Right</button>
+                    <button id="btn-img-move-up" class="tb-btn-small" title="Move Up Above Previous Paragraph">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px;"><polyline points="18 15 12 9 6 15"/></svg>Up
+                    </button>
+                    <button id="btn-img-move-down" class="tb-btn-small" title="Move Down Below Next Paragraph">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px;"><polyline points="6 9 12 15 18 9"/></svg>Down
+                    </button>
+                    <span class="tb-divider" style="display:inline-block;width:1px;height:16px;background:var(--border-color);margin:0 2px;vertical-align:middle;"></span>
+                    <button id="btn-img-size-25" class="tb-btn-small" title="Resize to 25%">25%</button>
+                    <button id="btn-img-size-50" class="tb-btn-small" title="Resize to 50%">50%</button>
+                    <button id="btn-img-size-100" class="tb-btn-small" title="Full Width (100%)">100%</button>
+                    <span class="tb-divider" style="display:inline-block;width:1px;height:16px;background:var(--border-color);margin:0 2px;vertical-align:middle;"></span>
+                    <button id="btn-img-align-left" class="tb-btn-small" title="Align Left">Left</button>
+                    <button id="btn-img-align-center" class="tb-btn-small" title="Align Center">Center</button>
+                    <button id="btn-img-align-right" class="tb-btn-small" title="Align Right">Right</button>
+                    <button id="btn-img-float-left" class="tb-btn-small" title="Float Left (Text wraps around on right)">Float L</button>
+                    <button id="btn-img-float-right" class="tb-btn-small" title="Float Right (Text wraps around on left)">Float R</button>
+                    <span class="tb-divider" style="display:inline-block;width:1px;height:16px;background:var(--border-color);margin:0 2px;vertical-align:middle;"></span>
                     <button id="btn-img-copy" class="tb-btn-small" title="Copy Image to Clipboard (Ctrl+C)">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy
                     </button>
-                    <button id="btn-img-delete" class="tb-btn-small btn-tb-danger">
+                    <button id="btn-img-delete" class="tb-btn-small btn-tb-danger" title="Delete Element">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete
                     </button>
                 </div>
 
                 <!-- DIRECT IN-PLACE WYSIWYG DOCUMENT CANVAS (NO PREVIEW TAB) -->
                 <div class="editor-scroll-area" id="editor-scroll-area">
-                    <!-- Interactive Corner Resize Overlay for Images & Signatures (inside scroll container) -->
+                    <!-- Drop Line Indicator during dragging -->
+                    <div id="editor-drop-line" class="editor-drop-line" style="display: none;">
+                        <span class="editor-drop-badge">✨ Drop to Move Here</span>
+                    </div>
+
+                    <!-- Interactive Corner Resize Overlay for Images, Shapes & Signatures (inside scroll container) -->
                     <div id="image-resize-overlay" class="image-resize-overlay" style="display: none;">
+                        <!-- Center Drag-to-Move Handle -->
+                        <div class="img-move-handle" id="img-move-handle" title="Click & Drag to move anywhere in note">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+                            <span>Drag to Move</span>
+                        </div>
                         <div class="img-resize-handle handle-nw" data-handle="nw"></div>
                         <div class="img-resize-handle handle-ne" data-handle="ne"></div>
                         <div class="img-resize-handle handle-se" data-handle="se"></div>
