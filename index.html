@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TreeKeep 🌲 - Full-Featured Hierarchical Notes</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e2e">
+</head>
+<body class="theme-dark">
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <button id="btn-toggle-sidebar" class="icon-btn mobile-only" title="Toggle Sidebar">☰</button>
+            <div class="logo">
+                <span class="logo-icon">🌲</span>
+                <span class="logo-text">TreeKeep</span>
+            </div>
+            <div class="sync-badge" id="sync-status">
+                <span class="sync-dot live"></span>
+                <span class="sync-text">Live Delta-Sync Ready</span>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="global-search" placeholder="Search all notes & content (Ctrl+K)...">
+                <span class="search-shortcut">Ctrl K</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <button id="btn-new-root" class="btn btn-primary" title="Create Root Node">+ New Note</button>
+            <button id="btn-github-sync" class="btn btn-github" title="Configure GitHub Hosting & Cloud Sync">🐙 GitHub</button>
+            <button id="btn-import-ct" class="btn btn-secondary" title="Import CherryTree .ctb/.ctd">📥 Import</button>
+            <button id="btn-export" class="btn btn-secondary" title="Export Notes">📤 Export</button>
+            <button id="btn-tree-info" class="icon-btn" title="Tree & Node Info">ℹ️</button>
+            <button id="btn-theme" class="icon-btn" title="Toggle Light/Dark Theme">🌙</button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+        <!-- Sidebar: Hierarchical Tree -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">CHERRYTREE HIERARCHY</span>
+                <div class="sidebar-actions">
+                    <button id="btn-move-up" class="icon-btn-small" title="Move Selected Node Up (Alt+Up)">▲</button>
+                    <button id="btn-move-down" class="icon-btn-small" title="Move Selected Node Down (Alt+Down)">▼</button>
+                    <button id="btn-expand-all" class="icon-btn-small" title="Expand All">⤢</button>
+                    <button id="btn-collapse-all" class="icon-btn-small" title="Collapse All">⤡</button>
+                </div>
+            </div>
+
+            <!-- Tree View Container -->
+            <div class="tree-container" id="tree-container">
+                <!-- Dynamically populated hierarchical nodes -->
+            </div>
+        </aside>
+
+        <!-- Resizer Handle -->
+        <div class="resizer" id="resizer"></div>
+
+        <!-- Note Content & Editor Area -->
+        <main class="editor-pane" id="editor-pane">
+            <div id="no-note-selected" class="empty-state" style="display: none;">
+                <div class="empty-icon">🌲</div>
+                <h2>No Note Selected</h2>
+                <p>Select a note from the tree hierarchy or create a new note to start writing.</p>
+                <button class="btn btn-primary" onclick="createNewRootNode()">+ Create Root Note</button>
+            </div>
+
+            <div id="note-view" class="note-view">
+                <!-- Breadcrumbs & Note Header -->
+                <div class="note-meta-bar">
+                    <div class="breadcrumbs" id="breadcrumbs">
+                        <span>Root</span>
+                    </div>
+                    <div class="node-actions-bar">
+                        <button id="btn-add-subnode" class="btn btn-sm btn-outline">+ Sub-Note</button>
+                        <button id="btn-duplicate-node" class="btn btn-sm btn-secondary" title="Duplicate this node and branch">📄 Duplicate</button>
+                        <button id="btn-toggle-readonly" class="btn btn-sm btn-secondary" title="Toggle Read-Only mode">🔓 Read/Write</button>
+                        <button id="btn-delete-node" class="btn btn-sm btn-danger">Delete</button>
+                    </div>
+                </div>
+
+                <div class="title-container">
+                    <button id="btn-icon-picker" class="icon-selector" title="Change Node Icon">📁</button>
+                    <input type="text" id="note-title" class="note-title-input" placeholder="Note Title...">
+                </div>
+
+                <div class="tags-container">
+                    <span class="tags-label">🏷️ Tags:</span>
+                    <input type="text" id="note-tags" class="note-tags-input" placeholder="e.g. overthewire, linux, cybersecurity">
+                </div>
+
+                <!-- Rich CherryTree Formatting Toolbar (Row 1) -->
+                <div class="editor-toolbar toolbar-row1">
+                    <div class="tb-group">
+                        <button id="btn-undo" class="tb-btn" title="Undo (Ctrl+Z)">↶ Undo</button>
+                        <button id="btn-redo" class="tb-btn" title="Redo (Ctrl+Y)">↷ Redo</button>
+                        <span class="tb-divider"></span>
+                        <button id="btn-toggle-find" class="tb-btn" title="Find & Replace in note (Ctrl+F)">🔍 Find</button>
+                    </div>
+
+                    <div class="tb-group">
+                        <select id="select-heading" class="tb-select" title="Text Style">
+                            <option value="p">Paragraph</option>
+                            <option value="h1">Heading 1</option>
+                            <option value="h2">Heading 2</option>
+                            <option value="h3">Heading 3</option>
+                        </select>
+                        <button class="tb-btn" data-format="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                        <button class="tb-btn" data-format="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+                        <button class="tb-btn" data-format="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+                        <button class="tb-btn" data-format="strike" title="Strikethrough"><s>S</s></button>
+                        <button class="tb-btn" data-format="sub" title="Subscript">X<sub>2</sub></button>
+                        <button class="tb-btn" data-format="sup" title="Superscript">X<sup>2</sup></button>
+                    </div>
+
+                    <div class="tb-group">
+                        <label class="color-picker-label" title="Text Color">
+                            🎨 <input type="color" id="text-color-picker" value="#f38ba8">
+                        </label>
+                        <label class="color-picker-label" title="Highlight Background Color">
+                            🖍 <input type="color" id="bg-color-picker" value="#f5c211">
+                        </label>
+                    </div>
+
+                    <div class="view-mode-tabs">
+                        <button id="btn-mode-split" class="tab-btn active" title="Split Screen">Split</button>
+                        <button id="btn-mode-write" class="tab-btn" title="Editor Only">Write</button>
+                        <button id="btn-mode-preview" class="tab-btn" title="Preview Only">Preview</button>
+                    </div>
+                </div>
+
+                <!-- Rich CherryTree Insertion Toolbar (Row 2) -->
+                <div class="editor-toolbar toolbar-row2">
+                    <div class="tb-group">
+                        <button class="tb-btn" data-format="code" title="Inline Code">`code`</button>
+                        <button id="btn-insert-codebox" class="tb-btn" title="Insert CherryTree CodeBox">💻 CodeBox</button>
+                        <button id="btn-insert-image" class="tb-btn" title="Insert Image / Screenshot">🖼️ Image</button>
+                        <input type="file" id="image-file-input" accept="image/*" style="display:none;">
+                        <button id="btn-insert-table" class="tb-btn" title="Insert Table">▦ Table</button>
+                        <button class="tb-btn" data-format="todo" title="Interactive Checklist">☑ To-Do</button>
+                        <button class="tb-btn" data-format="bullet" title="Bullet List">• List</button>
+                        <button class="tb-btn" data-format="numbered" title="Numbered List">1. List</button>
+                        <button class="tb-btn" data-format="quote" title="Quote">❝ Quote</button>
+                        <button class="tb-btn" data-format="hr" title="Horizontal Divider">― Line</button>
+                        <button id="btn-insert-timestamp" class="tb-btn" title="Insert Current Date & Time">📅 Timestamp</button>
+                        <button class="tb-btn" data-format="link" title="Web Link">🔗 Link</button>
+                        <button id="btn-insert-nodelink" class="tb-btn" title="Link to another Node">📌 Node Link</button>
+                    </div>
+                </div>
+
+                <!-- Find & Replace Floating Panel -->
+                <div id="find-replace-bar" class="find-replace-bar" style="display: none;">
+                    <div class="find-inputs">
+                        <input type="text" id="find-input" placeholder="Find in note...">
+                        <input type="text" id="replace-input" placeholder="Replace with...">
+                    </div>
+                    <div class="find-buttons">
+                        <button id="btn-find-next" class="btn btn-sm btn-secondary">Next</button>
+                        <button id="btn-find-replace" class="btn btn-sm btn-secondary">Replace</button>
+                        <button id="btn-find-replace-all" class="btn btn-sm btn-secondary">Replace All</button>
+                        <button id="btn-find-close" class="icon-btn-small" title="Close Find">✕</button>
+                    </div>
+                    <span id="find-count" class="find-count"></span>
+                </div>
+
+                <!-- Main Content Split (Textarea + Live Render) -->
+                <div class="content-split-wrapper" id="content-split-wrapper">
+                    <div class="editor-container" id="editor-container">
+                        <textarea id="note-content" class="note-textarea" placeholder="Start typing in Markdown, or paste screenshots directly (Ctrl+V)..."></textarea>
+                    </div>
+                    <div class="preview-container" id="preview-container">
+                        <div id="note-preview" class="markdown-body"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Status Bar Footer -->
+    <footer class="app-footer">
+        <div class="footer-left">
+            <span id="footer-path">Node: -</span>
+            <span class="footer-separator">|</span>
+            <span id="footer-stats">0 words, 0 characters</span>
+        </div>
+        <div class="footer-right">
+            <span id="footer-sync-detail">Micro-Sync: ~0.2 KB/edit</span>
+            <span class="footer-separator">|</span>
+            <span id="footer-time">Ready</span>
+        </div>
+    </footer>
+
+    <!-- Icon Picker Modal -->
+    <div id="icon-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Choose Node Icon</h3>
+            <div class="icon-grid" id="icon-grid">
+                <span class="icon-opt" data-icon="folder">📁 Folder</span>
+                <span class="icon-opt" data-icon="terminal">💻 Terminal</span>
+                <span class="icon-opt" data-icon="code">⚡ Code</span>
+                <span class="icon-opt" data-icon="key">🔑 Key</span>
+                <span class="icon-opt" data-icon="book">📖 Book</span>
+                <span class="icon-opt" data-icon="shield">🛡️ Security</span>
+                <span class="icon-opt" data-icon="lock">🔒 Locked</span>
+                <span class="icon-opt" data-icon="bug">🐛 Bug</span>
+                <span class="icon-opt" data-icon="database">🗄️ Database</span>
+                <span class="icon-opt" data-icon="server">🖥️ Server</span>
+                <span class="icon-opt" data-icon="file-text">📝 Note</span>
+                <span class="icon-opt" data-icon="check-square">✅ Checklist</span>
+            </div>
+            <button class="btn btn-secondary modal-close-btn" onclick="closeIconModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- CodeBox Modal -->
+    <div id="codebox-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>💻 Insert CodeBox</h3>
+            <div class="form-group">
+                <label>Programming Language:</label>
+                <select id="codebox-lang" class="text-input">
+                    <option value="bash">Bash / Shell</option>
+                    <option value="python">Python</option>
+                    <option value="c">C</option>
+                    <option value="cpp">C++</option>
+                    <option value="sql">SQL</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="html">HTML</option>
+                    <option value="json">JSON</option>
+                    <option value="rust">Rust</option>
+                    <option value="go">Go</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Code Snippet:</label>
+                <textarea id="codebox-text" class="text-input" style="height: 120px; font-family: monospace;" placeholder="Paste code here..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-insert-codebox-confirm" class="btn btn-primary">Insert CodeBox</button>
+                <button class="btn btn-secondary" onclick="closeCodeBoxModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Node Link Modal -->
+    <div id="nodelink-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>📌 Link to Node</h3>
+            <p>Select another node in the tree to create an internal anchor link:</p>
+            <div class="form-group">
+                <input type="text" id="nodelink-search" class="text-input" placeholder="Search target node...">
+            </div>
+            <div id="nodelink-list" class="nodelink-list"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeNodeLinkModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tree Info Modal -->
+    <div id="tree-info-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>ℹ️ Tree & Node Properties</h3>
+            <div id="tree-info-content" class="info-table-container"></div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="closeTreeInfoModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub Sync & Hosting Modal -->
+    <div id="github-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="width: 500px;">
+            <h3>🐙 GitHub Hosting & Cloud Sync</h3>
+            <p>Host TreeKeep directly on <b>GitHub Pages</b> and sync notes to your private GitHub repository:</p>
+            <div class="form-group">
+                <label>GitHub Username:</label>
+                <input type="text" id="gh-username" class="text-input" placeholder="e.g. your-github-username">
+            </div>
+            <div class="form-group">
+                <label>Repository Name:</label>
+                <input type="text" id="gh-repo" class="text-input" placeholder="e.g. tree-cloud-notes">
+            </div>
+            <div class="form-group">
+                <label>Personal Access Token (PAT):</label>
+                <input type="password" id="gh-token" class="text-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                <small style="color:var(--text-muted);">Requires 'repo' scope to sync notes to your private repository.</small>
+            </div>
+            <div id="gh-sync-status" class="import-status"></div>
+            <div class="modal-actions">
+                <button id="btn-gh-save" class="btn btn-primary">Connect & Sync Now</button>
+                <button class="btn btn-secondary" onclick="closeGitHubModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import CherryTree Modal -->
+    <div id="import-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>📥 Import CherryTree Notes</h3>
+            <p>Directly load existing CherryTree notes (<code>.ctb</code> or <code>.ctd</code>) into TreeKeep:</p>
+            <div class="form-group">
+                <label>CherryTree File Path on system:</label>
+                <input type="text" id="import-file-path" class="text-input" value="/home/kali/Documents/cherry/all.ctb">
+            </div>
+            <div class="modal-actions">
+                <button id="btn-do-import" class="btn btn-primary">Start Import</button>
+                <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+            </div>
+            <div id="import-status" class="import-status"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
