@@ -28,6 +28,7 @@ db.exec(`
         content TEXT DEFAULT '',
         icon TEXT DEFAULT 'file-text',
         tags TEXT DEFAULT '',
+        color TEXT DEFAULT '',
         position INTEGER DEFAULT 0,
         is_expanded INTEGER DEFAULT 1,
         created_at INTEGER NOT NULL,
@@ -38,6 +39,12 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id, position);
     CREATE INDEX IF NOT EXISTS idx_nodes_updated ON nodes(updated_at);
 `);
+
+try {
+    db.exec("ALTER TABLE nodes ADD COLUMN color TEXT DEFAULT ''");
+} catch (e) {
+    // Column already exists
+}
 
 // Seed welcome note if empty
 const countStmt = db.prepare('SELECT COUNT(*) as cnt FROM nodes WHERE deleted = 0');
@@ -172,7 +179,7 @@ const server = http.createServer(async (req, res) => {
             const full = parsedUrl.searchParams.get('full') === '1';
             const sql = full
                 ? 'SELECT * FROM nodes WHERE deleted = 0 ORDER BY position ASC, created_at ASC'
-                : 'SELECT id, parent_id, title, icon, tags, position, is_expanded, updated_at FROM nodes WHERE deleted = 0 ORDER BY position ASC, created_at ASC';
+                : 'SELECT id, parent_id, title, icon, tags, color, position, is_expanded, updated_at FROM nodes WHERE deleted = 0 ORDER BY position ASC, created_at ASC';
             const rows = db.prepare(sql).all();
             return sendJson(res, 200, { nodes: rows });
         }
@@ -187,16 +194,17 @@ const server = http.createServer(async (req, res) => {
                 const content = body.content || '';
                 const icon = body.icon || 'file-text';
                 const tags = body.tags || '';
+                const color = body.color || '';
 
                 // Get max position for siblings
                 const posRow = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM nodes WHERE parent_id IS ? AND deleted = 0').get(parent_id);
                 const position = body.position !== undefined ? body.position : posRow.next_pos;
 
                 const stmt = db.prepare(`
-                    INSERT INTO nodes (id, parent_id, title, content, icon, tags, position, is_expanded, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    INSERT INTO nodes (id, parent_id, title, content, icon, tags, color, position, is_expanded, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                 `);
-                stmt.run(id, parent_id, title, content, icon, tags, position, now, now);
+                stmt.run(id, parent_id, title, content, icon, tags, color, position, now, now);
 
                 const created = db.prepare('SELECT * FROM nodes WHERE id = ?').get(id);
                 broadcastEvent('node_create', created);
@@ -230,6 +238,7 @@ const server = http.createServer(async (req, res) => {
                 if (body.parent_id !== undefined) { updates.push('parent_id = ?'); values.push(body.parent_id); }
                 if (body.icon !== undefined) { updates.push('icon = ?'); values.push(body.icon); }
                 if (body.tags !== undefined) { updates.push('tags = ?'); values.push(body.tags); }
+                if (body.color !== undefined) { updates.push('color = ?'); values.push(body.color); }
                 if (body.position !== undefined) { updates.push('position = ?'); values.push(body.position); }
                 if (body.is_expanded !== undefined) { updates.push('is_expanded = ?'); values.push(body.is_expanded ? 1 : 0); }
 

@@ -1,6 +1,7 @@
 // ==========================================================================
-// TreeKeep - Reactive Client Application with Real-Time Delta Sync
-// Full CherryTree Feature Set + GitHub Pages Hosting & Cloud Sync
+// TreeKeep - Ultimate Hierarchical Knowledge & Cloud Notes System
+// Direct In-Place WYSIWYG Document Editor (No Split Screen, No Preview Tab)
+// Windows Paint Studio, Handwritten Signatures, Tables, CodeBoxes & Cloud Sync
 // ==========================================================================
 
 const API_BASE = '';
@@ -16,26 +17,34 @@ const ICON_MAP = {
     'database': '🗄️',
     'server': '🖥️',
     'file-text': '📝',
-    'check-square': '✅'
+    'check-square': '✅',
+    'star': '⭐',
+    'rocket': '🚀',
+    'fire': '🔥',
+    'bulb': '💡'
 };
 
-// Global App State
+// Global State
 const state = {
     nodes: new Map(),
     activeNodeId: null,
     searchQuery: '',
-    viewMode: 'split', // 'split', 'write', 'preview'
     theme: localStorage.getItem('treekeep_theme') || 'dark',
     expandedNodes: new Set(JSON.parse(localStorage.getItem('treekeep_expanded') || '[]')),
     saveTimer: null,
     isSyncing: false,
     isReadOnly: false,
     isServerMode: true,
-    undoStack: [],
-    redoStack: [],
-    maxHistory: 50,
-    findMatches: [],
-    findCurrentIndex: -1
+    activeTableElement: null,
+    activeTableCell: null,
+    activeImageElement: null,
+    savedSelectionRange: null,
+    // Paint Studio State
+    paintTool: 'signature', // 'signature', 'brush', 'eraser'
+    paintColor: '#111111',
+    paintWidth: 3,
+    isPainting: false,
+    paintPoints: []
 };
 
 // --- DOM References ---
@@ -44,39 +53,33 @@ const noteView = document.getElementById('note-view');
 const noNoteSelected = document.getElementById('no-note-selected');
 const noteTitleInput = document.getElementById('note-title');
 const noteTagsInput = document.getElementById('note-tags');
-const noteTextarea = document.getElementById('note-content');
-const notePreview = document.getElementById('note-preview');
+const noteEditor = document.getElementById('note-editor');
 const breadcrumbs = document.getElementById('breadcrumbs');
 const iconPickerBtn = document.getElementById('btn-icon-picker');
+const titleColorDot = document.getElementById('title-color-dot');
 const syncStatusBadge = document.getElementById('sync-status');
 const footerSyncDetail = document.getElementById('footer-sync-detail');
 const footerTime = document.getElementById('footer-time');
 const footerStats = document.getElementById('footer-stats');
 const footerPath = document.getElementById('footer-path');
 
-// Undo/Redo Buttons
-const btnUndo = document.getElementById('btn-undo');
-const btnRedo = document.getElementById('btn-redo');
-
-// Find & Replace
+// Floating Toolbars
+const tableToolbar = document.getElementById('table-toolbar');
+const imageToolbar = document.getElementById('image-toolbar');
 const findReplaceBar = document.getElementById('find-replace-bar');
 const findInput = document.getElementById('find-input');
 const replaceInput = document.getElementById('replace-input');
 const findCount = document.getElementById('find-count');
-const btnFindNext = document.getElementById('btn-find-next');
-const btnFindReplace = document.getElementById('btn-find-replace');
-const btnFindReplaceAll = document.getElementById('btn-find-replace-all');
-const btnFindClose = document.getElementById('btn-find-close');
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
     applyTheme(state.theme);
     setupEventListeners();
+    setupPaintStudio();
     initApp();
 });
 
 async function initApp() {
-    // Check if backend API is reachable
     try {
         const testRes = await fetch(`${API_BASE}/api/nodes?full=1`, { method: 'GET' });
         if (testRes.ok) {
@@ -86,12 +89,11 @@ async function initApp() {
             return;
         }
     } catch (e) {
-        console.log('Local Node server not found, running in Static / GitHub Pages mode.');
+        console.log('Local Node server not found, operating in Static / GitHub Pages mode.');
     }
 
-    // Static / GitHub Pages fallback
     state.isServerMode = false;
-    setSyncStatus('live', 'GitHub Cloud Mode (Local Storage + GitHub Sync)');
+    setSyncStatus('live', 'GitHub Cloud Mode (Local Storage + Cloud Sync)');
     loadLocalNodes();
 }
 
@@ -108,7 +110,7 @@ function toggleTheme() {
     applyTheme(state.theme === 'light' ? 'dark' : 'light');
 }
 
-// --- Real-time Delta Sync (SSE) for Server Mode ---
+// --- Server-Sent Events (SSE) ---
 function setupSSE() {
     if (!state.isServerMode) return;
     try {
@@ -128,9 +130,11 @@ function setupSSE() {
                 if (state.activeNodeId === updated.id && !state.isSyncing) {
                     noteTitleInput.value = updated.title || '';
                     noteTagsInput.value = updated.tags || '';
-                    noteTextarea.value = updated.content || '';
-                    renderMarkdown(updated.content || '');
+                    if (document.activeElement !== noteEditor) {
+                        setEditorContent(updated.content || '');
+                    }
                     updateBreadcrumbs(updated.id);
+                    updateNodeColorDot(updated.color);
                 }
                 renderTree();
             }
@@ -145,9 +149,7 @@ function setupSSE() {
         evtSource.addEventListener('node_delete', (e) => {
             const { id } = JSON.parse(e.data);
             state.nodes.delete(id);
-            if (state.activeNodeId === id) {
-                selectNode(null);
-            }
+            if (state.activeNodeId === id) selectNode(null);
             renderTree();
         });
 
@@ -167,7 +169,6 @@ function setSyncStatus(status, text) {
     if (!syncStatusBadge) return;
     const dot = syncStatusBadge.querySelector('.sync-dot');
     const label = syncStatusBadge.querySelector('.sync-text');
-
     if (dot) dot.className = `sync-dot ${status}`;
     if (label) label.textContent = text;
 }
@@ -181,7 +182,6 @@ async function loadTree() {
         for (const n of data.nodes) {
             state.nodes.set(n.id, n);
         }
-        // Save backup to localStorage for offline
         saveLocalNodesBackup();
         renderTree();
 
@@ -216,7 +216,6 @@ function loadLocalNodes() {
         }
     }
 
-    // If still empty, seed welcome notes
     if (state.nodes.size === 0) {
         seedDefaultLocalNotes();
     }
@@ -238,9 +237,25 @@ function seedDefaultLocalNotes() {
         id: 'welcome-root',
         parent_id: null,
         title: 'Welcome to TreeKeep 🌲',
-        content: '# Welcome to TreeKeep 🌲\n\n**TreeKeep** is your all-in-one hierarchical cloud notebook, fully compatible with CherryTree features and deployable to GitHub Pages!\n\n### 🚀 Features Included:\n- **Hierarchical Node Tree:** Infinite nesting, sub-notes, ordering & duplication.\n- **Undo & Redo:** Full history tracking (`Ctrl+Z`, `Ctrl+Y`).\n- **CherryTree Rich Inserters:** CodeBox, Tables, Images, Timestamps, and Internal Node Links.\n- **Direct Screenshot Pasting:** Press `Ctrl+V` to paste screenshots directly into notes.\n- **Find & Replace:** Press `Ctrl+F` for fast in-note search and replace.\n- **GitHub Cloud Sync & Pages:** Host on GitHub Pages and sync notes directly with your private GitHub repository!\n\n```bash\n# Test code snippet\necho "Organize all your notes with TreeKeep!"\n```',
+        content: `<h1>Welcome to TreeKeep 🌲</h1>
+<p><b>TreeKeep</b> is your ultimate hierarchical cloud notebook featuring <b>direct in-place WYSIWYG editing</b>, Paint & handwritten signatures, tables, and micro-sync!</p>
+<div class="callout-box callout-tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-content" contenteditable="true"><b>No preview tab!</b> You type and format directly right here on this page, exactly like Microsoft Word or Notion.</div>
+</div>
+<h3>🚀 Highlights:</h3>
+<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Direct In-Place WYSIWYG editing (No markdown preview)</span></div>
+<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Windows Paint Studio & Smooth Handwritten Signatures</span></div>
+<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Draw & edit Tables with cell toolbar</span></div>
+<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Paste screenshots directly with Ctrl+V</span></div>
+<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Host on GitHub Pages for free worldwide access</span></div>
+<div class="code-box" contenteditable="false">
+    <div class="code-box-header"><span>BASH</span><button class="btn-copy-code" onclick="copySnippet(this)">📋 Copy Code</button></div>
+    <pre contenteditable="true"><code>echo "Organize all your cybersecurity, code, and personal notes!"</code></pre>
+</div>`,
         icon: 'book',
         tags: 'intro,welcome',
+        color: '#89b4fa',
         position: 0,
         is_expanded: 1,
         created_at: now,
@@ -250,7 +265,7 @@ function seedDefaultLocalNotes() {
     saveLocalNodesBackup();
 }
 
-// --- Tree Rendering ---
+// --- Tree Hierarchy Rendering ---
 function renderTree() {
     treeContainer.innerHTML = '';
 
@@ -270,7 +285,8 @@ function renderTree() {
         for (const node of children) {
             if (state.searchQuery) {
                 const match = node.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-                              (node.tags && node.tags.toLowerCase().includes(state.searchQuery.toLowerCase()));
+                              (node.tags && node.tags.toLowerCase().includes(state.searchQuery.toLowerCase())) ||
+                              (node.content && node.content.toLowerCase().includes(state.searchQuery.toLowerCase()));
                 if (!match && !hasMatchingDescendant(node.id)) continue;
             }
 
@@ -284,6 +300,7 @@ function renderTree() {
             item.className = `tree-node ${state.activeNodeId === node.id ? 'active' : ''}`;
             item.dataset.id = node.id;
 
+            // Expand arrow
             const arrow = document.createElement('span');
             arrow.className = `tree-arrow ${hasKids ? (isExpanded ? 'expanded' : '') : 'empty'}`;
             arrow.textContent = '▶';
@@ -292,14 +309,27 @@ function renderTree() {
                 if (hasKids) toggleNodeExpand(node.id);
             };
 
+            // Node Color Indicator Dot
+            const colorDot = document.createElement('span');
+            colorDot.className = 'tree-node-color-dot';
+            if (node.color) {
+                colorDot.style.backgroundColor = node.color;
+            } else {
+                colorDot.style.display = 'none';
+            }
+
+            // Icon
             const icon = document.createElement('span');
             icon.className = 'tree-icon';
             icon.textContent = ICON_MAP[node.icon] || '📁';
 
+            // Title Label
             const label = document.createElement('span');
             label.className = 'tree-label';
             label.textContent = node.title || 'Untitled Note';
+            if (node.color) label.style.color = node.color;
 
+            // Quick Actions
             const actions = document.createElement('div');
             actions.className = 'tree-actions';
             actions.innerHTML = `
@@ -308,6 +338,7 @@ function renderTree() {
             `;
 
             item.appendChild(arrow);
+            item.appendChild(colorDot);
             item.appendChild(icon);
             item.appendChild(label);
             item.appendChild(actions);
@@ -360,8 +391,10 @@ function collapseAll() {
     renderTree();
 }
 
-// --- Node Selection & Viewing ---
+// --- Node Selection & In-Place Loading ---
 function selectNode(id) {
+    hideFloatingToolbars();
+
     if (!id || !state.nodes.has(id)) {
         state.activeNodeId = null;
         noNoteSelected.style.display = 'flex';
@@ -378,24 +411,44 @@ function selectNode(id) {
     const node = state.nodes.get(id);
     noteTitleInput.value = node.title || '';
     noteTagsInput.value = node.tags || '';
-    noteTextarea.value = node.content || '';
     iconPickerBtn.textContent = ICON_MAP[node.icon] || '📁';
+    updateNodeColorDot(node.color);
 
-    // Reset history stack for new note
-    state.undoStack = [];
-    state.redoStack = [];
-    updateUndoRedoButtons();
+    // Set content in WYSIWYG editor
+    setEditorContent(node.content || '');
 
-    // Check read-only state
+    // Read-only state
     applyReadOnlyState(!!node.is_readonly);
 
     updateBreadcrumbs(id);
-    renderMarkdown(node.content || '');
-    updateWordStats(node.content || '');
+    updateWordStats();
     renderTree();
 
     footerPath.textContent = `Node: ${node.title}`;
     footerTime.textContent = `Last edited ${new Date(node.updated_at || Date.now()).toLocaleTimeString()}`;
+}
+
+function setEditorContent(content) {
+    if (!content) {
+        noteEditor.innerHTML = '';
+        return;
+    }
+
+    // If content looks like raw markdown from earlier ctb/ctd import, convert to clean HTML
+    if (content.includes('```') || content.includes('# ') || content.includes('- [ ]') || content.includes('| --- |')) {
+        noteEditor.innerHTML = convertMarkdownToHtml(content);
+    } else {
+        noteEditor.innerHTML = content;
+    }
+}
+
+function updateNodeColorDot(color) {
+    if (color) {
+        titleColorDot.style.display = 'inline-block';
+        titleColorDot.style.backgroundColor = color;
+    } else {
+        titleColorDot.style.display = 'none';
+    }
 }
 
 function updateBreadcrumbs(id) {
@@ -427,69 +480,13 @@ function updateBreadcrumbs(id) {
     });
 }
 
-// --- Undo / Redo System ---
-function recordHistory(content, start, end) {
-    if (state.undoStack.length >= state.maxHistory) {
-        state.undoStack.shift();
-    }
-    state.undoStack.push({
-        content: content !== undefined ? content : noteTextarea.value,
-        start: start !== undefined ? start : noteTextarea.selectionStart,
-        end: end !== undefined ? end : noteTextarea.selectionEnd
-    });
-    state.redoStack = [];
-    updateUndoRedoButtons();
-}
-
-function performUndo() {
-    if (state.undoStack.length === 0) return;
-    const current = {
-        content: noteTextarea.value,
-        start: noteTextarea.selectionStart,
-        end: noteTextarea.selectionEnd
-    };
-    state.redoStack.push(current);
-
-    const prev = state.undoStack.pop();
-    noteTextarea.value = prev.content;
-    noteTextarea.setSelectionRange(prev.start, prev.end);
-    renderMarkdown(prev.content);
-    updateWordStats(prev.content);
-    scheduleSave('content', prev.content);
-    updateUndoRedoButtons();
-}
-
-function performRedo() {
-    if (state.redoStack.length === 0) return;
-    const current = {
-        content: noteTextarea.value,
-        start: noteTextarea.selectionStart,
-        end: noteTextarea.selectionEnd
-    };
-    state.undoStack.push(current);
-
-    const next = state.redoStack.pop();
-    noteTextarea.value = next.content;
-    noteTextarea.setSelectionRange(next.start, next.end);
-    renderMarkdown(next.content);
-    updateWordStats(next.content);
-    scheduleSave('content', next.content);
-    updateUndoRedoButtons();
-}
-
-function updateUndoRedoButtons() {
-    if (btnUndo) btnUndo.disabled = state.undoStack.length === 0;
-    if (btnRedo) btnRedo.disabled = state.redoStack.length === 0;
-}
-
-// --- Delta Sync Logic (Micro-Payloads) ---
+// --- Delta Sync Logic ---
 async function sendDeltaPatch(nodeId, partialUpdate) {
     if (!nodeId) return;
 
     state.isSyncing = true;
     setSyncStatus('syncing', 'Saving delta...');
 
-    // Update local cache immediately
     if (state.nodes.has(nodeId)) {
         const existing = state.nodes.get(nodeId);
         Object.assign(existing, partialUpdate, { updated_at: Date.now() });
@@ -512,7 +509,7 @@ async function sendDeltaPatch(nodeId, partialUpdate) {
             }
             state.isSyncing = false;
             setSyncStatus('live', 'Live Delta-Sync Ready');
-            footerSyncDetail.textContent = `Delta transmitted: ~${byteSize} bytes`;
+            footerSyncDetail.textContent = `Delta saved: ~${byteSize} B`;
             footerTime.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
         } catch (err) {
             state.isSyncing = false;
@@ -520,7 +517,6 @@ async function sendDeltaPatch(nodeId, partialUpdate) {
             console.error('Delta sync error:', err);
         }
     } else {
-        // Static GitHub mode
         state.isSyncing = false;
         setSyncStatus('live', 'Saved locally');
         footerSyncDetail.textContent = `Local Storage (~${new Blob([JSON.stringify(partialUpdate)]).size} B)`;
@@ -535,7 +531,6 @@ function scheduleSave(field, value) {
     const node = state.nodes.get(state.activeNodeId);
     if (node) node[field] = value;
 
-    // Micro-delay save debounce (350ms)
     state.saveTimer = setTimeout(() => {
         sendDeltaPatch(state.activeNodeId, { [field]: value });
     }, 350);
@@ -552,6 +547,7 @@ async function createNewRootNode() {
         content: '',
         icon: 'file-text',
         tags: '',
+        color: '',
         position: state.nodes.size,
         is_expanded: 1,
         created_at: now,
@@ -593,6 +589,7 @@ async function createSubNode(parentId) {
         content: '',
         icon: 'file-text',
         tags: '',
+        color: '',
         position: 0,
         is_expanded: 1,
         created_at: now,
@@ -639,6 +636,7 @@ async function duplicateCurrentNode() {
         content: orig.content,
         icon: orig.icon,
         tags: orig.tags,
+        color: orig.color || '',
         position: orig.position + 1,
         is_expanded: 1,
         created_at: now,
@@ -668,7 +666,7 @@ async function duplicateCurrentNode() {
 }
 
 async function deleteNode(id) {
-    if (!confirm('Are you sure you want to delete this note and its sub-nodes?')) return;
+    if (!confirm('Are you sure you want to delete this note and its sub-notes?')) return;
 
     if (state.isServerMode) {
         try {
@@ -680,7 +678,6 @@ async function deleteNode(id) {
             console.error('Failed to delete node:', err);
         }
     } else {
-        // Recursive delete from map
         function removeBranch(nodeId) {
             state.nodes.delete(nodeId);
             for (const [k, n] of state.nodes.entries()) {
@@ -694,12 +691,11 @@ async function deleteNode(id) {
     }
 }
 
-// --- Node Position Reordering (Move Up / Move Down) ---
+// --- Node Position Reordering ---
 function moveActiveNode(direction) {
     if (!state.activeNodeId || !state.nodes.has(state.activeNodeId)) return;
     const current = state.nodes.get(state.activeNodeId);
 
-    // Get siblings
     const siblings = Array.from(state.nodes.values())
         .filter(n => n.parent_id === current.parent_id)
         .sort((a, b) => a.position - b.position);
@@ -720,7 +716,7 @@ function moveActiveNode(direction) {
     renderTree();
 }
 
-// --- Read-Only Mode Toggle ---
+// --- Read-Only Mode ---
 function toggleReadOnlyMode() {
     if (!state.activeNodeId || !state.nodes.has(state.activeNodeId)) return;
     const node = state.nodes.get(state.activeNodeId);
@@ -737,280 +733,150 @@ function applyReadOnlyState(isReadOnly) {
         btn.textContent = isReadOnly ? '🔒 Read Only' : '🔓 Read/Write';
         btn.className = `btn btn-sm ${isReadOnly ? 'btn-danger' : 'btn-secondary'}`;
     }
-    noteTextarea.readOnly = isReadOnly;
+    noteEditor.contentEditable = !isReadOnly;
     noteTitleInput.readOnly = isReadOnly;
     noteTagsInput.readOnly = isReadOnly;
 }
 
-// --- Markdown Rendering & Rich Content ---
-function renderMarkdown(md) {
-    if (!md) {
-        notePreview.innerHTML = '<p style="color:var(--text-muted);font-style:italic;">Empty note. Start typing to add notes...</p>';
-        return;
-    }
-
-    let html = escapeHtml(md);
-
-    // Code Blocks: ```lang ... ```
-    html = html.replace(/```([a-zA-Z0-9_\-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
-        const language = lang || 'code';
-        const cleanCode = code.trim();
-        return `
-            <div class="code-box">
-                <div class="code-box-header">
-                    <span>${language.toUpperCase()}</span>
-                    <button class="btn-copy-code" onclick="copyCodeSnippet(this)">Copy</button>
-                </div>
-                <pre><code>${cleanCode}</code></pre>
-            </div>
-        `;
-    });
-
-    // Inline code: `code`
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    // Headings
-    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-
-    // Bold / Italic / Strike / Underline / Sub / Sup
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
-    html = html.replace(/\*([^*]+)\*/g, '<i>$1</i>');
-    html = html.replace(/~~([^~]+)~~/g, '<s>$1</s>');
-    html = html.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, '<u>$1</u>');
-    html = html.replace(/&lt;sub&gt;(.*?)&lt;\/sub&gt;/gi, '<sub>$1</sub>');
-    html = html.replace(/&lt;sup&gt;(.*?)&lt;\/sup&gt;/gi, '<sup>$1</sup>');
-
-    // Style spans & marks (color / background)
-    html = html.replace(/&lt;span style=&quot;(.*?)&quot;&gt;(.*?)&lt;\/span&gt;/gi, '<span style="$1">$2</span>');
-    html = html.replace(/&lt;mark style=&quot;(.*?)&quot;&gt;(.*?)&lt;\/mark&gt;/gi, '<mark style="$1">$2</mark>');
-
-    // Images: ![alt](url)
-    html = html.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1">');
-
-    // Internal Node Anchor Links: [Title](#node-ID)
-    html = html.replace(/\[(.*?)\]\(#node-([a-zA-Z0-9_\-]+)\)/g, '<a href="javascript:void(0)" class="node-anchor-link" onclick="selectNode(\'$2\')">📌 $1</a>');
-
-    // External Links: [title](url)
-    html = html.replace(/\[(.*?)\]\((https?:\/\/[^\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-
-    // Interactive Checkboxes
-    html = html.replace(/^- \[x\] (.*$)/gim, '<div class="todo-item"><input type="checkbox" checked onchange="toggleTodo(this)"> <s>$1</s></div>');
-    html = html.replace(/^- \[ \] (.*$)/gim, '<div class="todo-item"><input type="checkbox" onchange="toggleTodo(this)"> $1</div>');
-
-    // Blockquotes
-    html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
-
-    // Horizontal Rule
-    html = html.replace(/^---$/gim, '<hr style="border:none;border-top:1px solid var(--border-color);margin:16px 0;">');
-
-    // Tables: | col1 | col2 |
-    html = renderMarkdownTables(html);
-
-    // Bullet lists
-    html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
-
-    // Paragraph breaks
-    html = html.replace(/\n\n/g, '<p></p>');
-    html = html.replace(/\n/g, '<br>');
-
-    notePreview.innerHTML = html;
+// --- WYSIWYG Formatting Actions (ExecCommand + In-place DOM) ---
+function execFormat(command, value = null) {
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    document.execCommand(command, false, value);
+    handleEditorInput();
 }
 
-function renderMarkdownTables(text) {
-    const tableRegex = /((?:\|.+?\|\r?\n)+)/g;
-    return text.replace(tableRegex, (match) => {
-        const lines = match.trim().split('\n');
-        if (lines.length < 2) return match;
-
-        let tableHtml = '<table><thead>';
-        const headers = lines[0].split('|').filter(c => c.trim().length > 0);
-        tableHtml += '<tr>' + headers.map(h => `<th>${h.trim()}</th>`).join('') + '</tr></thead><tbody>';
-
-        // Check if row 1 is divider
-        const startRow = lines[1].includes('---') ? 2 : 1;
-        for (let i = startRow; i < lines.length; i++) {
-            const cols = lines[i].split('|').filter(c => c.trim().length > 0);
-            if (cols.length > 0) {
-                tableHtml += '<tr>' + cols.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
-            }
-        }
-        tableHtml += '</tbody></table>';
-        return tableHtml;
-    });
-}
-
-function escapeHtml(text) {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-function copyCodeSnippet(btn) {
-    const pre = btn.closest('.code-box').querySelector('pre code');
-    if (!pre) return;
-    navigator.clipboard.writeText(pre.innerText).then(() => {
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-    });
-}
-
-function toggleTodo(checkbox) {
-    if (state.isReadOnly) {
-        checkbox.checked = !checkbox.checked;
-        return;
-    }
-    const parent = checkbox.closest('.todo-item');
-    const label = parent.textContent.trim();
-    const isChecked = checkbox.checked;
-
-    recordHistory();
-    let content = noteTextarea.value;
-    if (isChecked) {
-        content = content.replace(`- [ ] ${label}`, `- [x] ${label}`);
+function handleFontFamilyChange(font) {
+    if (state.isReadOnly) return;
+    if (font === 'inherit') {
+        document.execCommand('fontName', false, '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
     } else {
-        content = content.replace(`- [x] ${label}`, `- [ ] ${label}`);
+        document.execCommand('fontName', false, font);
     }
-    noteTextarea.value = content;
-    renderMarkdown(content);
-    scheduleSave('content', content);
+    handleEditorInput();
 }
 
-function updateWordStats(text) {
-    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-    const chars = text.length;
-    footerStats.textContent = `${words} words, ${chars} characters`;
-}
-
-// --- Format Button Inserters ---
-function applyFormat(type) {
+function handleFontSizeChange(size) {
     if (state.isReadOnly) return;
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const sel = ta.value.substring(start, end);
-    let before = ta.value.substring(0, start);
-    let after = ta.value.substring(end);
-    let inserted = '';
-
-    recordHistory();
-
-    switch (type) {
-        case 'h1': inserted = `# ${sel || 'Heading 1'}\n`; break;
-        case 'h2': inserted = `## ${sel || 'Heading 2'}\n`; break;
-        case 'h3': inserted = `### ${sel || 'Heading 3'}\n`; break;
-        case 'bold': inserted = `**${sel || 'bold text'}**`; break;
-        case 'italic': inserted = `*${sel || 'italic text'}*`; break;
-        case 'underline': inserted = `<u>${sel || 'underlined text'}</u>`; break;
-        case 'strike': inserted = `~~${sel || 'struck text'}~~`; break;
-        case 'sub': inserted = `<sub>${sel || 'sub'}</sub>`; break;
-        case 'sup': inserted = `<sup>${sel || 'sup'}</sup>`; break;
-        case 'code': inserted = `\`${sel || 'code'}\``; break;
-        case 'quote': inserted = `> ${sel || 'Quote'}\n`; break;
-        case 'hr': inserted = `\n---\n`; break;
-        case 'todo': inserted = `- [ ] ${sel || 'To-do item'}\n`; break;
-        case 'bullet': inserted = `- ${sel || 'List item'}\n`; break;
-        case 'numbered': inserted = `1. ${sel || 'Numbered item'}\n`; break;
-        case 'link': inserted = `[${sel || 'link title'}](https://example.com)`; break;
+    noteEditor.focus();
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const span = document.createElement('span');
+    span.style.fontSize = size;
+    try {
+        range.surroundContents(span);
+    } catch (e) {
+        document.execCommand('fontSize', false, '3');
     }
-
-    ta.value = before + inserted + after;
-    ta.focus();
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
+    handleEditorInput();
 }
 
-// --- Heading Selector Handler ---
-function handleHeadingSelect(val) {
+function handleHeadingChange(val) {
     if (state.isReadOnly) return;
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const text = ta.value;
-
-    // Find start of current line
-    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-    let lineEnd = text.indexOf('\n', end);
-    if (lineEnd === -1) lineEnd = text.length;
-
-    let line = text.substring(lineStart, lineEnd);
-    // Strip existing headings
-    line = line.replace(/^#{1,6}\s*/, '');
-
-    recordHistory();
-    if (val === 'h1') line = '# ' + line;
-    else if (val === 'h2') line = '## ' + line;
-    else if (val === 'h3') line = '### ' + line;
-
-    ta.value = text.substring(0, lineStart) + line + text.substring(lineEnd);
-    ta.focus();
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
+    noteEditor.focus();
+    if (val === 'p') {
+        document.execCommand('formatBlock', false, '<p>');
+    } else {
+        document.execCommand('formatBlock', false, `<${val}>`);
+    }
+    handleEditorInput();
 }
 
-// --- Color Pickers ---
-function applyTextColor(color) {
+function handleCalloutInsert(type) {
+    if (state.isReadOnly || !type) return;
+    const icons = { tip: '💡', warning: '⚠️', info: 'ℹ️', danger: '🚨' };
+    const html = `
+        <div class="callout-box callout-${type}" contenteditable="false">
+            <span class="callout-icon">${icons[type] || '💡'}</span>
+            <div class="callout-content" contenteditable="true">Callout note text here...</div>
+        </div><p><br></p>
+    `;
+    insertHtmlAtCursor(html);
+}
+
+function insertTodoItem() {
     if (state.isReadOnly) return;
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const sel = ta.value.substring(start, end) || 'colored text';
-
-    recordHistory();
-    const tag = `<span style="color:${color}">${sel}</span>`;
-    ta.value = ta.value.substring(0, start) + tag + ta.value.substring(end);
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
+    const html = `
+        <div class="todo-item" contenteditable="false">
+            <input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')">
+            <span contenteditable="true" class="todo-text">Checklist task</span>
+        </div><p><br></p>
+    `;
+    insertHtmlAtCursor(html);
 }
 
-function applyHighlightColor(color) {
-    if (state.isReadOnly) return;
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const sel = ta.value.substring(start, end) || 'highlighted text';
-
-    recordHistory();
-    const tag = `<mark style="background-color:${color};color:#000;">${sel}</mark>`;
-    ta.value = ta.value.substring(0, start) + tag + ta.value.substring(end);
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
-}
-
-// --- Timestamp Inserter ---
 function insertTimestamp() {
     if (state.isReadOnly) return;
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
-    const stamp = `[${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}]`;
-
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    recordHistory();
-    ta.value = ta.value.substring(0, start) + stamp + ta.value.substring(end);
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
+    const stamp = ` [${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}] `;
+    insertHtmlAtCursor(`<b>${stamp}</b>`);
 }
 
-// --- Table Inserter ---
-function insertTable() {
+function insertDivider() {
     if (state.isReadOnly) return;
-    const tableTemplate = `\n| Column 1 | Column 2 | Column 3 |\n| -------- | -------- | -------- |\n| Item 1   | Item 2   | Item 3   |\n| Item 4   | Item 5   | Item 6   |\n\n`;
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    recordHistory();
-    ta.value = ta.value.substring(0, start) + tableTemplate + ta.value.substring(start);
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
+    execFormat('insertHorizontalRule');
+}
+
+function insertHyperlink() {
+    if (state.isReadOnly) return;
+    const url = prompt('Enter Web Link URL (e.g. https://github.com):');
+    if (url) {
+        execFormat('createLink', url);
+    }
+}
+
+// --- Cursor-Safe HTML Insertion ---
+function insertHtmlAtCursor(html) {
+    noteEditor.focus();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) {
+        noteEditor.innerHTML += html;
+        handleEditorInput();
+        return;
+    }
+
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    const el = document.createElement('div');
+    el.innerHTML = html;
+    const frag = document.createDocumentFragment();
+    let node, lastNode;
+    while ((node = el.firstChild)) {
+        lastNode = frag.appendChild(node);
+    }
+    range.insertNode(frag);
+
+    if (lastNode) {
+        range.setStartAfter(lastNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    handleEditorInput();
+}
+
+function saveSelection() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+        state.savedSelectionRange = sel.getRangeAt(0).cloneRange();
+    }
+}
+
+function restoreSelection() {
+    if (state.savedSelectionRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(state.savedSelectionRange);
+    }
 }
 
 // --- CodeBox Modal & Insertion ---
 function openCodeBoxModal() {
+    saveSelection();
     document.getElementById('codebox-modal').style.display = 'flex';
     document.getElementById('codebox-text').focus();
 }
@@ -1023,22 +889,36 @@ function confirmInsertCodeBox() {
     if (state.isReadOnly) return;
     const lang = document.getElementById('codebox-lang').value || 'bash';
     const code = document.getElementById('codebox-text').value;
-    const formatted = `\n\`\`\`${lang}\n${code}\n\`\`\`\n`;
+    const cleanCode = escapeHtml(code);
 
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    recordHistory();
-    ta.value = ta.value.substring(0, start) + formatted + ta.value.substring(start);
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
-
+    restoreSelection();
+    const html = `
+        <div class="code-box" contenteditable="false">
+            <div class="code-box-header">
+                <span>${lang.toUpperCase()}</span>
+                <button class="btn-copy-code" onclick="copySnippet(this)">📋 Copy Code</button>
+            </div>
+            <pre contenteditable="true"><code>${cleanCode || 'code snippet here...'}</code></pre>
+        </div><p><br></p>
+    `;
+    insertHtmlAtCursor(html);
     document.getElementById('codebox-text').value = '';
     closeCodeBoxModal();
 }
 
-// --- Image Insertion & Screenshot Clipboard Paste ---
+function copySnippet(btn) {
+    const pre = btn.closest('.code-box').querySelector('pre code');
+    if (!pre) return;
+    navigator.clipboard.writeText(pre.innerText).then(() => {
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy Code'; }, 2000);
+    });
+}
+
+// --- Photos, Screenshots & Clipboard Paste ---
 function triggerImageUpload() {
     if (state.isReadOnly) return;
+    saveSelection();
     document.getElementById('image-file-input').click();
 }
 
@@ -1048,8 +928,8 @@ function handleImageFileSelected(e) {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-        const dataUrl = event.target.result;
-        insertImageDataUrl(dataUrl, file.name);
+        restoreSelection();
+        insertImageElement(event.target.result, file.name);
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -1057,37 +937,393 @@ function handleImageFileSelected(e) {
 
 function handleClipboardPaste(e) {
     if (state.isReadOnly) return;
-    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+    if (!items) return;
+
     for (const item of items) {
         if (item.type.indexOf('image') === 0) {
             e.preventDefault();
             const blob = item.getAsFile();
             const reader = new FileReader();
             reader.onload = (event) => {
-                insertImageDataUrl(event.target.result, 'Pasted Screenshot');
+                insertImageElement(event.target.result, 'Pasted Screenshot');
             };
             reader.readAsDataURL(blob);
-            break;
+            return;
         }
     }
 }
 
-function insertImageDataUrl(dataUrl, alt) {
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    const tag = `\n![${alt || 'Image'}](${dataUrl})\n`;
-    recordHistory();
-    ta.value = ta.value.substring(0, start) + tag + ta.value.substring(start);
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
+function insertImageElement(src, alt) {
+    const html = `<p><img src="${src}" alt="${alt || 'Image'}" style="max-width:100%;"><br></p>`;
+    insertHtmlAtCursor(html);
 }
 
-// --- Internal Node Link Inserter ---
+// Floating Image Controls
+function setupImageInteractions() {
+    noteEditor.addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+            selectImageElement(e.target);
+        } else {
+            hideImageToolbar();
+        }
+    });
+}
+
+function selectImageElement(img) {
+    state.activeImageElement = img;
+    document.querySelectorAll('.wysiwyg-canvas img').forEach(i => i.classList.remove('selected-img'));
+    img.classList.add('selected-img');
+    imageToolbar.style.display = 'flex';
+}
+
+function hideImageToolbar() {
+    if (state.activeImageElement) {
+        state.activeImageElement.classList.remove('selected-img');
+        state.activeImageElement = null;
+    }
+    imageToolbar.style.display = 'none';
+}
+
+function setImageSize(pct) {
+    if (!state.activeImageElement) return;
+    state.activeImageElement.style.width = pct;
+    handleEditorInput();
+}
+
+function setImageAlign(alignment) {
+    if (!state.activeImageElement) return;
+    const img = state.activeImageElement;
+    if (alignment === 'left') {
+        img.style.display = 'inline-block';
+        img.style.float = 'left';
+        img.style.margin = '0 16px 16px 0';
+    } else if (alignment === 'center') {
+        img.style.display = 'block';
+        img.style.float = 'none';
+        img.style.margin = '16px auto';
+    } else if (alignment === 'right') {
+        img.style.display = 'inline-block';
+        img.style.float = 'right';
+        img.style.margin = '0 0 16px 16px';
+    }
+    handleEditorInput();
+}
+
+function deleteActiveImage() {
+    if (!state.activeImageElement) return;
+    state.activeImageElement.remove();
+    hideImageToolbar();
+    handleEditorInput();
+}
+
+// --- Draw / Insert Table Studio ---
+function openTableModal() {
+    saveSelection();
+    document.getElementById('table-modal').style.display = 'flex';
+}
+
+function closeTableModal() {
+    document.getElementById('table-modal').style.display = 'none';
+}
+
+function confirmInsertTable() {
+    if (state.isReadOnly) return;
+    const rows = parseInt(document.getElementById('tbl-input-rows').value, 10) || 3;
+    const cols = parseInt(document.getElementById('tbl-input-cols').value, 10) || 3;
+
+    let html = '<table><thead><tr>';
+    for (let c = 0; c < cols; c++) {
+        html += `<th contenteditable="true">Header ${c + 1}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    for (let r = 0; r < rows - 1; r++) {
+        html += '<tr>';
+        for (let c = 0; c < cols; c++) {
+            html += `<td contenteditable="true">Item</td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table><p><br></p>';
+
+    restoreSelection();
+    insertHtmlAtCursor(html);
+    closeTableModal();
+}
+
+// Floating Table Actions
+function setupTableInteractions() {
+    noteEditor.addEventListener('focusin', (e) => {
+        const cell = e.target.closest('td, th');
+        if (cell) {
+            state.activeTableCell = cell;
+            state.activeTableElement = cell.closest('table');
+            tableToolbar.style.display = 'flex';
+        } else if (!e.target.closest('#table-toolbar')) {
+            tableToolbar.style.display = 'none';
+        }
+    });
+}
+
+function addTableRow(above = false) {
+    if (!state.activeTableCell || !state.activeTableElement) return;
+    const tr = state.activeTableCell.closest('tr');
+    const colsCount = tr.children.length;
+    const newTr = document.createElement('tr');
+    for (let i = 0; i < colsCount; i++) {
+        const td = document.createElement('td');
+        td.contentEditable = true;
+        td.textContent = 'Item';
+        newTr.appendChild(td);
+    }
+    if (above) {
+        tr.parentNode.insertBefore(newTr, tr);
+    } else {
+        tr.parentNode.insertBefore(newTr, tr.nextSibling);
+    }
+    handleEditorInput();
+}
+
+function addTableColumn(left = false) {
+    if (!state.activeTableCell || !state.activeTableElement) return;
+    const cellIdx = state.activeTableCell.cellIndex;
+    const table = state.activeTableElement;
+
+    for (const row of table.rows) {
+        const isHeader = row.parentNode.tagName === 'THEAD';
+        const cell = document.createElement(isHeader ? 'th' : 'td');
+        cell.contentEditable = true;
+        cell.textContent = isHeader ? 'Header' : 'Item';
+        if (left) {
+            row.insertBefore(cell, row.children[cellIdx]);
+        } else {
+            row.insertBefore(cell, row.children[cellIdx + 1] || null);
+        }
+    }
+    handleEditorInput();
+}
+
+function deleteTableRow() {
+    if (!state.activeTableCell || !state.activeTableElement) return;
+    const tr = state.activeTableCell.closest('tr');
+    tr.remove();
+    tableToolbar.style.display = 'none';
+    handleEditorInput();
+}
+
+function deleteTableColumn() {
+    if (!state.activeTableCell || !state.activeTableElement) return;
+    const cellIdx = state.activeTableCell.cellIndex;
+    const table = state.activeTableElement;
+    for (const row of table.rows) {
+        if (row.children[cellIdx]) row.children[cellIdx].remove();
+    }
+    tableToolbar.style.display = 'none';
+    handleEditorInput();
+}
+
+function deleteEntireTable() {
+    if (!state.activeTableElement) return;
+    state.activeTableElement.remove();
+    tableToolbar.style.display = 'none';
+    handleEditorInput();
+}
+
+function hideFloatingToolbars() {
+    if (tableToolbar) tableToolbar.style.display = 'none';
+    if (imageToolbar) imageToolbar.style.display = 'none';
+}
+
+// --- Windows Paint & Signature Studio ---
+function setupPaintStudio() {
+    const canvas = document.getElementById('paint-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Fill canvas initial background with clean white
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Tools
+    document.getElementById('btn-paint-tool-signature').onclick = () => setPaintTool('signature');
+    document.getElementById('btn-paint-tool-brush').onclick = () => setPaintTool('brush');
+    document.getElementById('btn-paint-tool-eraser').onclick = () => setPaintTool('eraser');
+
+    // Width slider
+    const widthSlider = document.getElementById('paint-width-slider');
+    const widthVal = document.getElementById('paint-width-val');
+    widthSlider.oninput = (e) => {
+        state.paintWidth = parseInt(e.target.value, 10);
+        widthVal.textContent = state.paintWidth + 'px';
+    };
+
+    // Color palette
+    document.querySelectorAll('.paint-color-opt').forEach(opt => {
+        opt.onclick = () => {
+            document.querySelectorAll('.paint-color-opt').forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            state.paintColor = opt.dataset.color;
+            if (state.paintTool === 'eraser') setPaintTool('brush');
+        };
+    });
+
+    const customColor = document.getElementById('paint-custom-color');
+    if (customColor) {
+        customColor.oninput = (e) => {
+            state.paintColor = e.target.value;
+            if (state.paintTool === 'eraser') setPaintTool('brush');
+        };
+    }
+
+    // Clear canvas
+    document.getElementById('btn-paint-clear').onclick = () => {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+
+    // Drawing Events
+    function getCanvasCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left) * (canvas.width / rect.width),
+            y: (e.clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        state.isPainting = true;
+        const pt = getCanvasCoords(e);
+        state.paintPoints = [pt];
+        ctx.beginPath();
+        ctx.moveTo(pt.x, pt.y);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!state.isPainting) return;
+        const pt = getCanvasCoords(e);
+        state.paintPoints.push(pt);
+
+        ctx.lineWidth = state.paintWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        if (state.paintTool === 'eraser') {
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineTo(pt.x, pt.y);
+            ctx.stroke();
+        } else if (state.paintTool === 'signature') {
+            // Smooth Bezier Curve interpolation for signature
+            ctx.strokeStyle = state.paintColor;
+            if (state.paintPoints.length >= 3) {
+                const p0 = state.paintPoints[state.paintPoints.length - 2];
+                const p1 = state.paintPoints[state.paintPoints.length - 1];
+                const midX = (p0.x + p1.x) / 2;
+                const midY = (p0.y + p1.y) / 2;
+                ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
+                ctx.stroke();
+            } else {
+                ctx.lineTo(pt.x, pt.y);
+                ctx.stroke();
+            }
+        } else {
+            // Regular paint brush
+            ctx.strokeStyle = state.paintColor;
+            ctx.lineTo(pt.x, pt.y);
+            ctx.stroke();
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (state.isPainting) {
+            state.isPainting = false;
+            state.paintPoints = [];
+        }
+    });
+
+    // Touch support for mobile/tablets
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            e.preventDefault();
+            state.isPainting = true;
+            const pt = getCanvasCoords(e.touches[0]);
+            state.paintPoints = [pt];
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y);
+        }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (!state.isPainting || e.touches.length !== 1) return;
+        e.preventDefault();
+        const pt = getCanvasCoords(e.touches[0]);
+        state.paintPoints.push(pt);
+
+        ctx.lineWidth = state.paintWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = state.paintTool === 'eraser' ? '#ffffff' : state.paintColor;
+        ctx.lineTo(pt.x, pt.y);
+        ctx.stroke();
+    });
+
+    canvas.addEventListener('touchend', () => {
+        state.isPainting = false;
+        state.paintPoints = [];
+    });
+
+    // Insert into note
+    document.getElementById('btn-paint-insert').onclick = () => {
+        const dataUrl = canvas.toDataURL('image/png');
+        closePaintModal();
+        restoreSelection();
+        insertImageElement(dataUrl, state.paintTool === 'signature' ? 'Handwritten Signature' : 'Paint Drawing');
+    };
+}
+
+function setPaintTool(tool) {
+    state.paintTool = tool;
+    document.getElementById('btn-paint-tool-signature').classList.toggle('active', tool === 'signature');
+    document.getElementById('btn-paint-tool-brush').classList.toggle('active', tool === 'brush');
+    document.getElementById('btn-paint-tool-eraser').classList.toggle('active', tool === 'eraser');
+}
+
+function openPaintModal() {
+    saveSelection();
+    document.getElementById('paint-modal').style.display = 'flex';
+}
+
+function closePaintModal() {
+    document.getElementById('paint-modal').style.display = 'none';
+}
+
+// --- Node Color Picker Modal ---
+function openNodeColorModal() {
+    if (state.isReadOnly || !state.activeNodeId) return;
+    document.getElementById('node-color-modal').style.display = 'flex';
+}
+
+function closeNodeColorModal() {
+    document.getElementById('node-color-modal').style.display = 'none';
+}
+
+function applyNodeColor(color) {
+    if (!state.activeNodeId) return;
+    const node = state.nodes.get(state.activeNodeId);
+    if (!node) return;
+
+    node.color = color;
+    updateNodeColorDot(color);
+    sendDeltaPatch(state.activeNodeId, { color });
+    renderTree();
+    closeNodeColorModal();
+}
+
+// --- Node Anchor Links ---
 function openNodeLinkModal() {
     if (state.isReadOnly) return;
-    const modal = document.getElementById('nodelink-modal');
-    const list = document.getElementById('nodelink-list');
-    modal.style.display = 'flex';
+    saveSelection();
+    document.getElementById('nodelink-modal').style.display = 'flex';
     renderNodeLinkList('');
 }
 
@@ -1106,11 +1342,9 @@ function renderNodeLinkList(search) {
 
         const div = document.createElement('div');
         div.className = 'nodelink-item';
-        div.style.padding = '8px 12px';
-        div.style.cursor = 'pointer';
-        div.style.borderBottom = '1px solid var(--border-color)';
-        div.innerHTML = `${ICON_MAP[node.icon] || '📝'} <b>${node.title}</b>`;
+        div.innerHTML = `${ICON_MAP[node.icon] || '📁'} <b>${node.title}</b>`;
         div.onclick = () => {
+            restoreSelection();
             insertNodeLink(node.id, node.title);
             closeNodeLinkModal();
         };
@@ -1119,16 +1353,11 @@ function renderNodeLinkList(search) {
 }
 
 function insertNodeLink(targetId, targetTitle) {
-    const ta = noteTextarea;
-    const start = ta.selectionStart;
-    const tag = `[${targetTitle}](#node-${targetId})`;
-    recordHistory();
-    ta.value = ta.value.substring(0, start) + tag + ta.value.substring(start);
-    renderMarkdown(ta.value);
-    scheduleSave('content', ta.value);
+    const html = `<a href="javascript:void(0)" class="node-anchor-link" data-node-id="${targetId}" onclick="selectNode('${targetId}')">📌 ${targetTitle}</a> `;
+    insertHtmlAtCursor(html);
 }
 
-// --- Find & Replace Bar ---
+// --- Find & Replace ---
 function toggleFindBar() {
     const isVisible = findReplaceBar.style.display === 'flex';
     if (isVisible) {
@@ -1137,84 +1366,51 @@ function toggleFindBar() {
         findReplaceBar.style.display = 'flex';
         findInput.focus();
         findInput.select();
-        performFind();
     }
 }
 
 function closeFindBar() {
     findReplaceBar.style.display = 'none';
-    state.findMatches = [];
-    state.findCurrentIndex = -1;
     findCount.textContent = '';
 }
 
 function performFind() {
-    const query = findInput.value;
+    const query = findInput.value.trim();
     if (!query) {
-        state.findMatches = [];
-        state.findCurrentIndex = -1;
         findCount.textContent = '';
         return;
     }
 
-    const text = noteTextarea.value.toLowerCase();
-    const q = query.toLowerCase();
-    const matches = [];
-    let pos = 0;
-    while ((pos = text.indexOf(q, pos)) !== -1) {
-        matches.push(pos);
-        pos += q.length;
-    }
-
-    state.findMatches = matches;
-    if (matches.length > 0) {
-        state.findCurrentIndex = 0;
-        highlightFindMatch(state.findCurrentIndex);
-        findCount.textContent = `1 of ${matches.length}`;
-    } else {
-        state.findCurrentIndex = -1;
-        findCount.textContent = '0 matches';
+    if (window.find) {
+        const found = window.find(query, false, false, true, false, false, false);
+        findCount.textContent = found ? 'Found match' : '0 matches';
     }
 }
 
-function findNextMatch() {
-    if (state.findMatches.length === 0) return;
-    state.findCurrentIndex = (state.findCurrentIndex + 1) % state.findMatches.length;
-    highlightFindMatch(state.findCurrentIndex);
-    findCount.textContent = `${state.findCurrentIndex + 1} of ${state.findMatches.length}`;
-}
-
-function highlightFindMatch(idx) {
-    const pos = state.findMatches[idx];
-    const len = findInput.value.length;
-    noteTextarea.focus();
-    noteTextarea.setSelectionRange(pos, pos + len);
-}
-
-function replaceCurrentMatch() {
-    if (state.findMatches.length === 0 || state.findCurrentIndex === -1) return;
-    const pos = state.findMatches[state.findCurrentIndex];
-    const len = findInput.value.length;
-    const rep = replaceInput.value;
-
-    recordHistory();
-    noteTextarea.value = noteTextarea.value.substring(0, pos) + rep + noteTextarea.value.substring(pos + len);
-    renderMarkdown(noteTextarea.value);
-    scheduleSave('content', noteTextarea.value);
-    performFind();
-}
-
-function replaceAllMatches() {
+function performReplace() {
     const query = findInput.value;
+    const replacement = replaceInput.value;
     if (!query) return;
-    const rep = replaceInput.value;
 
-    recordHistory();
+    const sel = window.getSelection();
+    if (sel && sel.toString().toLowerCase() === query.toLowerCase()) {
+        document.execCommand('insertText', false, replacement);
+        handleEditorInput();
+        performFind();
+    } else {
+        performFind();
+    }
+}
+
+function performReplaceAll() {
+    const query = findInput.value;
+    const replacement = replaceInput.value;
+    if (!query) return;
+
     const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    noteTextarea.value = noteTextarea.value.replace(regex, rep);
-    renderMarkdown(noteTextarea.value);
-    scheduleSave('content', noteTextarea.value);
-    performFind();
+    noteEditor.innerHTML = noteEditor.innerHTML.replace(regex, replacement);
+    handleEditorInput();
+    findCount.textContent = 'All replaced';
 }
 
 // --- Tree Info Modal ---
@@ -1225,7 +1421,7 @@ function openTreeInfoModal() {
     let totalWords = 0;
     let totalChars = 0;
     for (const n of state.nodes.values()) {
-        const text = n.content || '';
+        const text = (n.content || '').replace(/<[^>]*>/g, ' ');
         totalWords += text.trim() ? text.trim().split(/\s+/).length : 0;
         totalChars += text.length;
     }
@@ -1246,10 +1442,11 @@ function openTreeInfoModal() {
             <tr><td style="padding:6px; font-weight:600;">Total Notebook Words:</td><td>${totalWords.toLocaleString()}</td></tr>
             <tr><td style="padding:6px; font-weight:600;">Total Notebook Characters:</td><td>${totalChars.toLocaleString()}</td></tr>
             <tr><td colspan="2"><hr style="border:none; border-top:1px solid var(--border-color); margin:8px 0;"></td></tr>
-            <tr><td style="padding:6px; font-weight:600;">Selected Node:</td><td>${activeNode ? activeNode.title : 'None'}</td></tr>
-            <tr><td style="padding:6px; font-weight:600;">Node Depth Level:</td><td>${depth}</td></tr>
-            <tr><td style="padding:6px; font-weight:600;">Direct Sub-Nodes:</td><td>${subnodesCount}</td></tr>
+            <tr><td style="padding:6px; font-weight:600;">Selected Note:</td><td>${activeNode ? activeNode.title : 'None'}</td></tr>
+            <tr><td style="padding:6px; font-weight:600;">Node Depth:</td><td>Level ${depth}</td></tr>
+            <tr><td style="padding:6px; font-weight:600;">Sub-Notes Count:</td><td>${subnodesCount}</td></tr>
             <tr><td style="padding:6px; font-weight:600;">Node ID:</td><td><code>${activeNode ? activeNode.id : '-'}</code></td></tr>
+            <tr><td style="padding:6px; font-weight:600;">Node Color:</td><td><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${activeNode?.color || 'transparent'};border:1px solid var(--border-color);"></span> ${activeNode?.color || 'Default'}</td></tr>
             <tr><td style="padding:6px; font-weight:600;">Created:</td><td>${activeNode ? new Date(activeNode.created_at).toLocaleString() : '-'}</td></tr>
             <tr><td style="padding:6px; font-weight:600;">Last Modified:</td><td>${activeNode ? new Date(activeNode.updated_at).toLocaleString() : '-'}</td></tr>
         </table>
@@ -1261,12 +1458,10 @@ function closeTreeInfoModal() {
     document.getElementById('tree-info-modal').style.display = 'none';
 }
 
-// --- GitHub Pages & Cloud Sync Modal ---
+// --- GitHub Sync Modal ---
 function openGitHubModal() {
     const modal = document.getElementById('github-modal');
     modal.style.display = 'flex';
-
-    // Populate existing config
     const conf = JSON.parse(localStorage.getItem('treekeep_gh_config') || '{}');
     if (conf.username) document.getElementById('gh-username').value = conf.username;
     if (conf.repo) document.getElementById('gh-repo').value = conf.repo;
@@ -1292,7 +1487,6 @@ async function connectAndSyncGitHub() {
     statusDiv.innerHTML = 'Connecting to GitHub API...';
 
     try {
-        // Test repository access
         const testRes = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
             headers: {
                 'Authorization': `token ${token}`,
@@ -1301,16 +1495,14 @@ async function connectAndSyncGitHub() {
         });
 
         if (!testRes.ok) {
-            throw new Error(`GitHub responded with status ${testRes.status} (${testRes.statusText})`);
+            throw new Error(`GitHub returned status ${testRes.status}`);
         }
 
-        // Push current notes to repo: data/notes.json
-        statusDiv.innerHTML = 'Pushing notes backup to GitHub repository...';
+        statusDiv.innerHTML = 'Backing up notes to repository...';
         const allNodes = Array.from(state.nodes.values());
         const jsonContent = JSON.stringify(allNodes, null, 2);
         const encodedContent = btoa(unescape(encodeURIComponent(jsonContent)));
 
-        // Check if data/notes.json already exists to get its SHA
         let sha = null;
         try {
             const checkFile = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/data/notes.json`, {
@@ -1323,9 +1515,7 @@ async function connectAndSyncGitHub() {
                 const fileData = await checkFile.json();
                 sha = fileData.sha;
             }
-        } catch (e) {
-            // Not found, will create new
-        }
+        } catch (e) {}
 
         const putRes = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/data/notes.json`, {
             method: 'PUT',
@@ -1335,7 +1525,7 @@ async function connectAndSyncGitHub() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                message: `Update notes backup from TreeKeep [${new Date().toISOString()}]`,
+                message: `Update notes backup [${new Date().toISOString()}]`,
                 content: encodedContent,
                 sha: sha || undefined
             })
@@ -1344,58 +1534,20 @@ async function connectAndSyncGitHub() {
         if (putRes.ok) {
             statusDiv.innerHTML = `
                 <div style="color:var(--success); font-weight:600;">✓ Successfully connected & synced to GitHub!</div>
-                <div style="font-size:0.8rem; margin-top:4px;">Repository: <b>${username}/${repo}</b></div>
-                <div style="font-size:0.8rem;">Live on GitHub Pages: <code>https://${username}.github.io/${repo}/</code></div>
+                <div style="font-size:0.8rem; margin-top:4px;">Repo: <b>${username}/${repo}</b></div>
+                <div style="font-size:0.8rem;">Live URL: <code>https://${username}.github.io/${repo}/</code></div>
             `;
             setSyncStatus('live', `Synced to GitHub (${username}/${repo})`);
         } else {
             const errData = await putRes.json();
-            throw new Error(errData.message || 'Failed to commit notes to GitHub');
+            throw new Error(errData.message || 'Failed to sync');
         }
     } catch (err) {
         statusDiv.innerHTML = `<span style="color:var(--danger);">Error: ${err.message}</span>`;
     }
 }
 
-// --- View Modes ---
-function setViewMode(mode) {
-    state.viewMode = mode;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(`btn-mode-${mode}`).classList.add('active');
-
-    const editorCont = document.getElementById('editor-container');
-    const prevCont = document.getElementById('preview-container');
-
-    if (mode === 'split') {
-        editorCont.style.display = 'block';
-        prevCont.style.display = 'block';
-    } else if (mode === 'write') {
-        editorCont.style.display = 'block';
-        prevCont.style.display = 'none';
-    } else if (mode === 'preview') {
-        editorCont.style.display = 'none';
-        prevCont.style.display = 'block';
-    }
-}
-
-// --- Modals ---
-function openIconModal() {
-    if (state.isReadOnly) return;
-    document.getElementById('icon-modal').style.display = 'flex';
-}
-
-function closeIconModal() {
-    document.getElementById('icon-modal').style.display = 'none';
-}
-
-function selectIcon(iconName) {
-    if (!state.activeNodeId || state.isReadOnly) return;
-    iconPickerBtn.textContent = ICON_MAP[iconName] || '📁';
-    closeIconModal();
-    sendDeltaPatch(state.activeNodeId, { icon: iconName });
-    renderTree();
-}
-
+// --- Import / Export ---
 function openImportModal() {
     document.getElementById('import-modal').style.display = 'flex';
 }
@@ -1410,7 +1562,7 @@ async function doImportCherryTree() {
     statusDiv.textContent = 'Importing notes... please wait.';
 
     if (!state.isServerMode) {
-        statusDiv.innerHTML = '<span style="color:var(--warning);">Local server required to import .ctb files directly from disk. Running in static mode.</span>';
+        statusDiv.innerHTML = '<span style="color:var(--warning);">Local server required to import .ctb files directly from disk.</span>';
         return;
     }
 
@@ -1446,15 +1598,81 @@ function exportNotes() {
     URL.revokeObjectURL(url);
 }
 
-// --- Event Listeners Setup ---
+// --- Icon Picker ---
+function openIconModal() {
+    if (state.isReadOnly) return;
+    document.getElementById('icon-modal').style.display = 'flex';
+}
+
+function closeIconModal() {
+    document.getElementById('icon-modal').style.display = 'none';
+}
+
+function selectIcon(iconName) {
+    if (!state.activeNodeId || state.isReadOnly) return;
+    iconPickerBtn.textContent = ICON_MAP[iconName] || '📁';
+    closeIconModal();
+    sendDeltaPatch(state.activeNodeId, { icon: iconName });
+    renderTree();
+}
+
+// --- Word Stats & Editor Input ---
+function handleEditorInput() {
+    if (state.isReadOnly) return;
+    updateWordStats();
+    scheduleSave('content', noteEditor.innerHTML);
+}
+
+function updateWordStats() {
+    const text = noteEditor.innerText || '';
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const chars = text.length;
+    footerStats.textContent = `${words} words, ${chars} characters`;
+}
+
+// --- Markdown to HTML Converter for Legacy / Imported Notes ---
+function convertMarkdownToHtml(md) {
+    let html = escapeHtml(md);
+
+    // Code Blocks
+    html = html.replace(/```([a-zA-Z0-9_\-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        const language = lang || 'code';
+        return `
+            <div class="code-box" contenteditable="false">
+                <div class="code-box-header"><span>${language.toUpperCase()}</span><button class="btn-copy-code" onclick="copySnippet(this)">📋 Copy Code</button></div>
+                <pre contenteditable="true"><code>${code.trim()}</code></pre>
+            </div><p><br></p>
+        `;
+    });
+
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    html = html.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+    html = html.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+    html = html.replace(/^- \[x\] (.*$)/gim, '<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle(\'todo-done\')"><span contenteditable="true" class="todo-text todo-done">$1</span></div>');
+    html = html.replace(/^- \[ \] (.*$)/gim, '<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle(\'todo-done\')"><span contenteditable="true" class="todo-text">$1</span></div>');
+    html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
+    html = html.replace(/\n\n/g, '<p></p>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
+}
+
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// --- Setup All Event Listeners ---
 function setupEventListeners() {
     // Theme toggle
     document.getElementById('btn-theme').onclick = toggleTheme;
-
-    // View mode switch
-    document.getElementById('btn-mode-split').onclick = () => setViewMode('split');
-    document.getElementById('btn-mode-write').onclick = () => setViewMode('write');
-    document.getElementById('btn-mode-preview').onclick = () => setViewMode('preview');
 
     // Title editing
     noteTitleInput.addEventListener('input', (e) => {
@@ -1473,96 +1691,92 @@ function setupEventListeners() {
         scheduleSave('tags', e.target.value);
     });
 
-    // Content editing with history tracking
-    noteTextarea.addEventListener('beforeinput', (e) => {
-        if (!state.isReadOnly && (e.inputType === 'insertParagraph' || e.inputType === 'deleteContentBackward')) {
-            recordHistory();
-        }
-    });
+    // Editor content editing
+    noteEditor.addEventListener('input', handleEditorInput);
+    noteEditor.addEventListener('paste', handleClipboardPaste);
 
-    noteTextarea.addEventListener('input', (e) => {
-        if (state.isReadOnly) return;
-        renderMarkdown(e.target.value);
-        updateWordStats(e.target.value);
-        scheduleSave('content', e.target.value);
-    });
-
-    // Screenshot Clipboard Paste
-    noteTextarea.addEventListener('paste', handleClipboardPaste);
-
-    // Tab key in textarea
-    noteTextarea.addEventListener('keydown', (e) => {
+    // Tab key indent in editor
+    noteEditor.addEventListener('keydown', (e) => {
         if (state.isReadOnly) return;
         if (e.key === 'Tab') {
             e.preventDefault();
-            recordHistory();
-            const start = noteTextarea.selectionStart;
-            const end = noteTextarea.selectionEnd;
-            noteTextarea.value = noteTextarea.value.substring(0, start) + '    ' + noteTextarea.value.substring(end);
-            noteTextarea.selectionStart = noteTextarea.selectionEnd = start + 4;
-            renderMarkdown(noteTextarea.value);
-            scheduleSave('content', noteTextarea.value);
+            document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+            handleEditorInput();
         }
     });
 
-    // Format buttons (Row 1 & Row 2)
-    document.querySelectorAll('.tb-btn[data-format]').forEach(btn => {
-        btn.onclick = () => applyFormat(btn.dataset.format);
-    });
+    // Undo / Redo
+    document.getElementById('btn-undo').onclick = () => execFormat('undo');
+    document.getElementById('btn-redo').onclick = () => execFormat('redo');
 
-    // Heading select
-    const headingSelect = document.getElementById('select-heading');
-    if (headingSelect) {
-        headingSelect.onchange = (e) => {
-            handleHeadingSelect(e.target.value);
-            e.target.value = 'p';
-        };
-    }
+    // Font Family & Size
+    document.getElementById('select-font-family').onchange = (e) => handleFontFamilyChange(e.target.value);
+    document.getElementById('select-font-size').onchange = (e) => handleFontSizeChange(e.target.value);
+    document.getElementById('select-heading').onchange = (e) => {
+        handleHeadingChange(e.target.value);
+        e.target.value = 'p';
+    };
 
-    // Color pickers
-    const textColorPicker = document.getElementById('text-color-picker');
-    if (textColorPicker) {
-        textColorPicker.onchange = (e) => applyTextColor(e.target.value);
-    }
-    const bgColorPicker = document.getElementById('bg-color-picker');
-    if (bgColorPicker) {
-        bgColorPicker.onchange = (e) => applyHighlightColor(e.target.value);
-    }
+    // Text Styles
+    document.getElementById('btn-bold').onclick = () => execFormat('bold');
+    document.getElementById('btn-italic').onclick = () => execFormat('italic');
+    document.getElementById('btn-underline').onclick = () => execFormat('underline');
+    document.getElementById('btn-strike').onclick = () => execFormat('strikeThrough');
+    document.getElementById('btn-subscript').onclick = () => execFormat('subscript');
+    document.getElementById('btn-superscript').onclick = () => execFormat('superscript');
 
-    // Undo / Redo buttons
-    if (btnUndo) btnUndo.onclick = performUndo;
-    if (btnRedo) btnRedo.onclick = performRedo;
+    // Colors
+    document.getElementById('text-color-picker').onchange = (e) => execFormat('foreColor', e.target.value);
+    document.getElementById('bg-color-picker').onchange = (e) => execFormat('hiliteColor', e.target.value);
 
-    // CodeBox
-    document.getElementById('btn-insert-codebox').onclick = openCodeBoxModal;
-    document.getElementById('btn-insert-codebox-confirm').onclick = confirmInsertCodeBox;
+    // Alignments
+    document.getElementById('btn-align-left').onclick = () => execFormat('justifyLeft');
+    document.getElementById('btn-align-center').onclick = () => execFormat('justifyCenter');
+    document.getElementById('btn-align-right').onclick = () => execFormat('justifyRight');
+    document.getElementById('btn-align-justify').onclick = () => execFormat('justifyFull');
+    document.getElementById('btn-clear-format').onclick = () => execFormat('removeFormat');
 
-    // Image Upload
+    // Insertions (Row 2)
+    document.getElementById('btn-open-paint').onclick = openPaintModal;
     document.getElementById('btn-insert-image').onclick = triggerImageUpload;
     document.getElementById('image-file-input').onchange = handleImageFileSelected;
-
-    // Table & Timestamp & NodeLink
-    document.getElementById('btn-insert-table').onclick = insertTable;
+    document.getElementById('btn-open-table-modal').onclick = openTableModal;
+    document.getElementById('btn-insert-table-confirm').onclick = confirmInsertTable;
+    document.getElementById('btn-insert-codebox').onclick = openCodeBoxModal;
+    document.getElementById('btn-insert-codebox-confirm').onclick = confirmInsertCodeBox;
+    document.getElementById('btn-insert-todo').onclick = insertTodoItem;
+    document.getElementById('select-callout').onchange = (e) => {
+        handleCalloutInsert(e.target.value);
+        e.target.value = '';
+    };
+    document.getElementById('btn-bullet-list').onclick = () => execFormat('insertUnorderedList');
+    document.getElementById('btn-numbered-list').onclick = () => execFormat('insertOrderedList');
+    document.getElementById('btn-quote').onclick = () => execFormat('formatBlock', '<blockquote>');
+    document.getElementById('btn-hr').onclick = insertDivider;
     document.getElementById('btn-insert-timestamp').onclick = insertTimestamp;
+    document.getElementById('btn-insert-link').onclick = insertHyperlink;
     document.getElementById('btn-insert-nodelink').onclick = openNodeLinkModal;
     document.getElementById('nodelink-search').oninput = (e) => renderNodeLinkList(e.target.value);
 
-    // Find & Replace
-    document.getElementById('btn-toggle-find').onclick = toggleFindBar;
-    btnFindClose.onclick = closeFindBar;
-    findInput.oninput = performFind;
-    btnFindNext.onclick = findNextMatch;
-    btnFindReplace.onclick = replaceCurrentMatch;
-    btnFindReplaceAll.onclick = replaceAllMatches;
+    // Floating Image Toolbar Actions
+    document.getElementById('btn-img-size-25').onclick = () => setImageSize('25%');
+    document.getElementById('btn-img-size-50').onclick = () => setImageSize('50%');
+    document.getElementById('btn-img-size-100').onclick = () => setImageSize('100%');
+    document.getElementById('btn-img-align-left').onclick = () => setImageAlign('left');
+    document.getElementById('btn-img-align-center').onclick = () => setImageAlign('center');
+    document.getElementById('btn-img-align-right').onclick = () => setImageAlign('right');
+    document.getElementById('btn-img-delete').onclick = deleteActiveImage;
 
-    // Tree Info
-    document.getElementById('btn-tree-info').onclick = openTreeInfoModal;
+    // Floating Table Toolbar Actions
+    document.getElementById('btn-tbl-add-row-above').onclick = () => addTableRow(true);
+    document.getElementById('btn-tbl-add-row-below').onclick = () => addTableRow(false);
+    document.getElementById('btn-tbl-add-col-left').onclick = () => addTableColumn(true);
+    document.getElementById('btn-tbl-add-col-right').onclick = () => addTableColumn(false);
+    document.getElementById('btn-tbl-del-row').onclick = deleteTableRow;
+    document.getElementById('btn-tbl-del-col').onclick = deleteTableColumn;
+    document.getElementById('btn-tbl-del-table').onclick = deleteEntireTable;
 
-    // GitHub Sync
-    document.getElementById('btn-github-sync').onclick = openGitHubModal;
-    document.getElementById('btn-gh-save').onclick = connectAndSyncGitHub;
-
-    // Node Action buttons
+    // Node Actions
     document.getElementById('btn-new-root').onclick = createNewRootNode;
     document.getElementById('btn-add-subnode').onclick = () => {
         if (state.activeNodeId) createSubNode(state.activeNodeId);
@@ -1571,6 +1785,16 @@ function setupEventListeners() {
     document.getElementById('btn-toggle-readonly').onclick = toggleReadOnlyMode;
     document.getElementById('btn-delete-node').onclick = () => {
         if (state.activeNodeId) deleteNode(state.activeNodeId);
+    };
+
+    // Node Color
+    document.getElementById('btn-node-color').onclick = openNodeColorModal;
+    document.querySelectorAll('.node-color-choice').forEach(btn => {
+        btn.onclick = () => applyNodeColor(btn.dataset.color);
+    });
+    document.getElementById('btn-apply-custom-node-color').onclick = () => {
+        const hex = document.getElementById('node-custom-color-input').value;
+        applyNodeColor(hex);
     };
 
     // Node Move Up / Down
@@ -1587,7 +1811,17 @@ function setupEventListeners() {
         opt.onclick = () => selectIcon(opt.dataset.icon);
     });
 
-    // Import / Export
+    // Find & Replace
+    document.getElementById('btn-toggle-find').onclick = toggleFindBar;
+    document.getElementById('btn-find-close').onclick = closeFindBar;
+    document.getElementById('btn-find-next').onclick = performFind;
+    document.getElementById('btn-find-replace').onclick = performReplace;
+    document.getElementById('btn-find-replace-all').onclick = performReplaceAll;
+
+    // Tree Info & Modals
+    document.getElementById('btn-tree-info').onclick = openTreeInfoModal;
+    document.getElementById('btn-github-sync').onclick = openGitHubModal;
+    document.getElementById('btn-gh-save').onclick = connectAndSyncGitHub;
     document.getElementById('btn-import-ct').onclick = openImportModal;
     document.getElementById('btn-do-import').onclick = doImportCherryTree;
     document.getElementById('btn-export').onclick = exportNotes;
@@ -1603,31 +1837,14 @@ function setupEventListeners() {
     window.addEventListener('keydown', (e) => {
         const isCtrl = e.ctrlKey || e.metaKey;
 
-        // Undo: Ctrl+Z
-        if (isCtrl && !e.shiftKey && e.key.toLowerCase() === 'z') {
-            if (document.activeElement === noteTextarea) {
-                e.preventDefault();
-                performUndo();
-            }
-        }
-        // Redo: Ctrl+Y or Ctrl+Shift+Z
-        if ((isCtrl && e.key.toLowerCase() === 'y') || (isCtrl && e.shiftKey && e.key.toLowerCase() === 'z')) {
-            if (document.activeElement === noteTextarea) {
-                e.preventDefault();
-                performRedo();
-            }
-        }
-        // Find: Ctrl+F
         if (isCtrl && e.key.toLowerCase() === 'f') {
             e.preventDefault();
             toggleFindBar();
         }
-        // Global Search: Ctrl+K
         if (isCtrl && e.key.toLowerCase() === 'k') {
             e.preventDefault();
             searchInput.focus();
         }
-        // Reordering: Alt+Up / Alt+Down
         if (e.altKey && e.key === 'ArrowUp') {
             e.preventDefault();
             moveActiveNode('up');
@@ -1638,12 +1855,14 @@ function setupEventListeners() {
         }
     });
 
+    // Setup interactive image and table listeners
+    setupImageInteractions();
+    setupTableInteractions();
+
     // Mobile sidebar toggle
     const toggleSidebarBtn = document.getElementById('btn-toggle-sidebar');
     const sidebar = document.getElementById('sidebar');
     if (toggleSidebarBtn && sidebar) {
-        toggleSidebarBtn.onclick = () => {
-            sidebar.classList.toggle('open');
-        };
+        toggleSidebarBtn.onclick = () => sidebar.classList.toggle('open');
     }
 }
