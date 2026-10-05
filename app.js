@@ -268,8 +268,40 @@ function toggleTheme() {
 }
 
 // --- Google Authentication & Google Drive Integration ---
+function getEffectiveGoogleClientId() {
+    const saved = localStorage.getItem('cybernote_client_id');
+    if (saved && saved.trim()) return saved.trim();
+    const settingsVal = document.getElementById('settings-google-client-id')?.value?.trim();
+    if (settingsVal) return settingsVal;
+    const inputVal = document.getElementById('google-client-id-input')?.value?.trim();
+    if (inputVal) return inputVal;
+    return DEFAULT_GOOGLE_CLIENT_ID;
+}
+
+window.copyCurrentOrigin = function() {
+    const origin = window.location.origin;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(origin).then(() => {
+            showToast(`Copied origin: ${origin}`);
+        }).catch(() => {
+            prompt('Copy this Origin URL for Google Cloud Console:', origin);
+        });
+    } else {
+        prompt('Copy this Origin URL for Google Cloud Console:', origin);
+    }
+};
+
 function initGoogleAuth() {
     updateGoogleUserUI();
+
+    // Sync Origin and Client ID inputs in UI
+    const originEl = document.getElementById('settings-current-origin');
+    if (originEl) originEl.value = window.location.origin;
+    const effId = getEffectiveGoogleClientId();
+    const in1 = document.getElementById('google-client-id-input');
+    if (in1) in1.value = effId;
+    const in2 = document.getElementById('settings-google-client-id');
+    if (in2) in2.value = effId;
 
     // Check token expiry
     const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
@@ -280,7 +312,7 @@ function initGoogleAuth() {
     // Initialize GIS Client
     function tryInitGIS() {
         if (window.google?.accounts?.oauth2) {
-            const clientId = document.getElementById('google-client-id-input')?.value.trim() || DEFAULT_GOOGLE_CLIENT_ID;
+            const clientId = getEffectiveGoogleClientId();
             try {
                 if (window.google?.accounts?.id?.disableAutoSelect) {
                     window.google.accounts.id.disableAutoSelect();
@@ -341,7 +373,7 @@ function requestGoogleLogin() {
 
     // 2. Always recreate token client with prompt: 'select_account consent' to guarantee email chooser
     if (window.google?.accounts?.oauth2) {
-        const clientId = document.getElementById('google-client-id-input')?.value.trim() || DEFAULT_GOOGLE_CLIENT_ID;
+        const clientId = getEffectiveGoogleClientId();
         try {
             state.tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: clientId,
@@ -6025,13 +6057,21 @@ function setupEventListeners() {
     const settingsE2eePass = document.getElementById('settings-e2ee-password');
     if (settingsE2eePass) settingsE2eePass.oninput = (e) => handleE2eePassword(e.target.value);
 
+    const handleClientIdChange = (val) => {
+        const trimmed = val.trim();
+        localStorage.setItem('cybernote_client_id', trimmed);
+        const in1 = document.getElementById('google-client-id-input');
+        if (in1 && in1.value !== trimmed) in1.value = trimmed;
+        const in2 = document.getElementById('settings-google-client-id');
+        if (in2 && in2.value !== trimmed) in2.value = trimmed;
+        initGoogleAuth();
+        showToast('Google Client ID updated');
+    };
+
     const clientIdInput = document.getElementById('google-client-id-input');
-    if (clientIdInput) {
-        clientIdInput.onchange = (e) => {
-            localStorage.setItem('cybernote_client_id', e.target.value.trim());
-            initGoogleAuth();
-        };
-    }
+    if (clientIdInput) clientIdInput.onchange = (e) => handleClientIdChange(e.target.value);
+    const settingsClientIdInput = document.getElementById('settings-google-client-id');
+    if (settingsClientIdInput) settingsClientIdInput.onchange = (e) => handleClientIdChange(e.target.value);
 
     setupTagInteractions();
 
