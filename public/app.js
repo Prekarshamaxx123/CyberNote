@@ -2100,10 +2100,12 @@ function insertNodeLink(targetId, targetTitle) {
 // --- Find & Replace ---
 function toggleFindBar() {
     const isVisible = findReplaceBar.style.display === 'flex';
+    const btn = document.getElementById('btn-toggle-find');
     if (isVisible) {
         closeFindBar();
     } else {
         findReplaceBar.style.display = 'flex';
+        if (btn) btn.classList.add('active');
         findInput.focus();
         findInput.select();
     }
@@ -2112,6 +2114,8 @@ function toggleFindBar() {
 function closeFindBar() {
     findReplaceBar.style.display = 'none';
     findCount.textContent = '';
+    const btn = document.getElementById('btn-toggle-find');
+    if (btn) btn.classList.remove('active');
 }
 
 function performFind() {

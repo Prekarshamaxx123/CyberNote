@@ -803,48 +803,27 @@ body {
     font-weight: 600;
 }
 
-.note-meta-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
+.ribbon-cluster-find {
+    margin-left: 2px;
 }
 
-.btn-find-in-note {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 9px;
-    font-size: 0.76rem;
+.ribbon-cluster-find .ribbon-btn-compact {
+    padding: 3px 8px;
+    font-size: 0.78rem;
     font-weight: 500;
-    border-radius: 6px;
-    background-color: var(--bg-toolbar);
     color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: all var(--transition);
-    user-select: none;
+    gap: 5px;
 }
 
-.btn-find-in-note:hover {
+.ribbon-cluster-find .ribbon-btn-compact:hover {
     background-color: var(--bg-hover);
     color: var(--accent);
     border-color: var(--accent);
-    transform: translateY(-1px);
 }
 
-.btn-find-in-note:active {
-    transform: translateY(0);
-}
-
-.find-kbd-badge {
-    font-size: 0.68rem;
-    padding: 1px 5px;
-    border-radius: 4px;
-    background-color: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border-color);
-    color: var(--text-muted);
-    font-family: inherit;
+.ribbon-cluster-find .ribbon-btn-compact.active {
+    background-color: var(--accent);
+    color: #11111b;
 }
 
 .node-actions-bar {
