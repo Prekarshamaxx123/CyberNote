@@ -2710,12 +2710,7 @@ body {
 
 /* Node Color Indicators in Tree & Title */
 .tree-node-color-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 6px;
-    display: inline-block;
-    flex-shrink: 0;
+    display: none !important;
 }
 
 .node-color-indicator {
