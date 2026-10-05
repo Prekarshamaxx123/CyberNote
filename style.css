@@ -1302,6 +1302,12 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     gap: 8px;
     box-sizing: border-box;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.ribbon-tab-header::-webkit-scrollbar {
+    display: none;
 }
 
 .ribbon-tabs-list {
@@ -1309,7 +1315,10 @@ body {
     align-items: center;
     gap: 2px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 .ribbon-tabs-list::-webkit-scrollbar {
     display: none;
@@ -1331,6 +1340,7 @@ body {
     transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
     user-select: none;
+    flex-shrink: 0;
 }
 
 .ribbon-tab-nav-btn:hover {
@@ -1387,12 +1397,26 @@ body {
     width: 100%;
     box-sizing: border-box;
     min-height: 52px;
-    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(137, 180, 250, 0.25) transparent;
     animation: ribbonPaneFade 0.15s ease-out;
 }
 
 .ribbon-tab-pane::-webkit-scrollbar {
-    display: none;
+    height: 3px;
+    display: block;
+}
+
+.ribbon-tab-pane::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ribbon-tab-pane::-webkit-scrollbar-thumb {
+    background: rgba(137, 180, 250, 0.25);
+    border-radius: 3px;
 }
 
 .ribbon-tab-pane.active {
@@ -1789,9 +1813,27 @@ body {
 }
 
 @media (max-width: 680px) {
+    .ribbon-tab-header {
+        padding: 2px 4px 0 4px;
+        gap: 4px;
+    }
     .ribbon-tab-nav-btn {
-        padding: 4px 8px;
-        font-size: 0.75rem;
+        padding: 5px 8px;
+        font-size: 0.74rem;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    .ribbon-tab-quick-tools {
+        gap: 4px;
+    }
+    #ribbon-quick-word-count {
+        display: none;
+    }
+    #btn-quick-zen span {
+        display: none;
+    }
+    #btn-quick-zen {
+        padding: 3px 6px;
     }
     .ribbon-tab-pane {
         padding: 3px 4px;
@@ -1801,7 +1843,43 @@ body {
         padding: 1px 2px;
     }
     .ribbon-group-label {
-        font-size: 0.6rem;
+        font-size: 0.58rem;
+        margin-top: 1px;
+    }
+    .ribbon-heading-select {
+        min-width: 78px;
+        max-width: 88px;
+        font-size: 0.72rem;
+        padding: 2px 4px;
+    }
+    .ribbon-font-select {
+        min-width: 78px;
+        max-width: 88px;
+        font-size: 0.72rem;
+        padding: 2px 4px;
+    }
+    .ribbon-size-select {
+        min-width: 46px;
+        max-width: 52px;
+        font-size: 0.72rem;
+        padding: 2px 4px;
+    }
+    .ribbon-btn-icon,
+    .ribbon-color-btn {
+        width: 26px;
+        height: 26px;
+        font-size: 0.75rem;
+        padding: 0;
+    }
+    .ribbon-group-items {
+        gap: 2px;
+        min-height: 28px;
+    }
+    .ribbon-group-sep {
+        margin: 2px 3px;
+    }
+    .ribbon-swatches-mini {
+        display: none;
     }
     /* Sleek touch-friendly icon buttons on compact mobile screens */
     .ribbon-badge-action .badge-label,
@@ -1822,6 +1900,38 @@ body {
     }
 }
 
+@media (max-width: 480px) {
+    .ribbon-tab-header {
+        padding: 2px 2px 0 2px;
+        gap: 2px;
+    }
+    .ribbon-tab-nav-btn {
+        padding: 4px 6px;
+        font-size: 0.71rem;
+        gap: 3px;
+    }
+    .ribbon-heading-select {
+        min-width: 70px;
+        max-width: 78px;
+        font-size: 0.7rem;
+    }
+    .ribbon-font-select {
+        min-width: 70px;
+        max-width: 78px;
+        font-size: 0.7rem;
+    }
+    .ribbon-size-select {
+        min-width: 42px;
+        max-width: 48px;
+        font-size: 0.7rem;
+    }
+    .ribbon-btn-icon,
+    .ribbon-color-btn {
+        width: 25px;
+        height: 25px;
+    }
+}
+
 /* Floating Table & Image Toolbars */
 .table-toolbar, .image-toolbar {
     background: rgba(30, 30, 46, 0.95);
@@ -1834,6 +1944,13 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     z-index: 5;
     animation: fadeIn 0.2s ease;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.table-toolbar::-webkit-scrollbar,
+.image-toolbar::-webkit-scrollbar {
+    display: none;
 }
 
 .table-tb-title, .image-tb-title {
@@ -3297,6 +3414,26 @@ body {
     .header-center {
         display: none;
     }
+    .app-header {
+        padding: 4px 10px;
+        gap: 6px;
+    }
+    #sync-now-text {
+        display: none;
+    }
+    #btn-sync-now {
+        padding: 4px 7px;
+        margin-left: 0;
+    }
+    #btn-about span {
+        display: none;
+    }
+    #btn-install-pwa span {
+        display: none;
+    }
+    #btn-install-pwa {
+        padding: 4px 6px !important;
+    }
     .sidebar {
         position: absolute;
         top: 52px;
@@ -3315,6 +3452,155 @@ body {
     }
     .content-split-wrapper {
         flex-direction: column;
+    }
+}
+
+@media (max-width: 560px) {
+    /* Sleek, never-cut-off Mobile App Header */
+    .app-header {
+        padding: 4px 6px;
+        gap: 3px;
+        overflow-x: visible;
+    }
+    .header-left {
+        gap: 3px;
+    }
+    .logo {
+        margin-right: 0;
+        gap: 4px;
+    }
+    .logo-text {
+        display: none;
+    }
+    .header-left-tools {
+        padding: 2px 3px;
+        gap: 2px;
+    }
+    .btn-undo-target, .btn-redo-target {
+        padding: 3px 5px;
+        width: 26px;
+        height: 26px;
+    }
+    .header-right {
+        gap: 3px;
+    }
+    .sync-badge {
+        padding: 3px 6px;
+        gap: 0;
+    }
+    .sync-badge .sync-text {
+        display: none;
+    }
+    #user-profile-badge {
+        padding: 2px;
+    }
+    #user-profile-badge .user-name {
+        display: none;
+    }
+    .user-avatar {
+        width: 22px;
+        height: 22px;
+    }
+    .icon-btn-header {
+        width: 28px;
+        height: 28px;
+        padding: 4px;
+    }
+    .btn-about {
+        padding: 4px 6px;
+        min-width: 28px;
+        height: 28px;
+    }
+
+    /* Mobile Status Bar Footer */
+    .app-footer {
+        padding: 2px 8px;
+        font-size: 0.68rem;
+        min-height: 24px;
+        overflow-x: hidden;
+    }
+    #footer-sync-detail {
+        display: none;
+    }
+    .footer-right .footer-separator {
+        display: none;
+    }
+    #footer-path {
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    #footer-stats {
+        font-size: 0.66rem;
+    }
+
+    /* Mobile Note Header & Canvas */
+    .note-meta-bar {
+        padding: 4px 8px;
+        min-height: 36px;
+        gap: 6px;
+    }
+    .breadcrumbs {
+        font-size: 0.74rem;
+        max-width: calc(100% - 100px);
+    }
+    .note-lock-btn {
+        padding: 3px 6px;
+        font-size: 0.72rem;
+    }
+    .title-container {
+        padding: 4px 8px 2px 8px;
+        gap: 6px;
+        min-height: 38px;
+    }
+    .icon-selector {
+        width: 30px;
+        height: 30px;
+        font-size: 1.1rem;
+    }
+    .note-title-input {
+        font-size: 1.15rem;
+    }
+    .readonly-badge {
+        padding: 2px 5px;
+        font-size: 0.68rem;
+        margin-left: 4px;
+    }
+    .tags-container {
+        padding: 0 8px 4px 8px;
+        font-size: 0.78rem;
+    }
+    .editor-scroll-area {
+        padding: 8px 10px 60px 10px;
+    }
+    .wysiwyg-canvas {
+        font-size: 0.96rem;
+        line-height: 1.6;
+        padding: 4px 6px 100px 6px;
+    }
+
+    /* All Notes Keep Board on Mobile */
+    .all-notes-header {
+        padding: 10px 12px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .all-notes-header-left {
+        gap: 8px;
+    }
+    .all-notes-title {
+        font-size: 1.15rem;
+    }
+    .all-notes-subtitle {
+        font-size: 0.72rem;
+    }
+    .all-notes-scroll-area {
+        padding: 12px 10px 60px 10px;
+    }
+    .keep-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
     }
 }
 
