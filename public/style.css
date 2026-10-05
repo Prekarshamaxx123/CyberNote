@@ -1310,16 +1310,22 @@ body {
 /* Ribbon Tab Panes (Container for Word groups) */
 .ribbon-tab-pane {
     display: none;
-    align-items: stretch;
+    align-items: center;
     justify-content: flex-start;
-    gap: clamp(10px, 1.8vw, 28px);
-    padding: 6px clamp(12px, 2vw, 28px);
-    overflow: visible;
-    flex-wrap: wrap;
+    gap: 4px;
+    padding: 3px 8px;
+    overflow-x: auto;
+    overflow-y: visible;
+    flex-wrap: nowrap !important;
     width: 100%;
     box-sizing: border-box;
-    min-height: 58px;
+    min-height: 52px;
+    scrollbar-width: none;
     animation: ribbonPaneFade 0.15s ease-out;
+}
+
+.ribbon-tab-pane::-webkit-scrollbar {
+    display: none;
 }
 
 .ribbon-tab-pane.active {
@@ -1337,10 +1343,10 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 3px clamp(6px, 0.8vw, 14px) 2px clamp(6px, 0.8vw, 14px);
+    padding: 1px 3px;
     flex-shrink: 0;
     box-sizing: border-box;
-    border-radius: 8px;
+    border-radius: 6px;
     transition: background 0.15s ease, border-color 0.15s ease;
     border: 1px solid transparent;
 }
@@ -1353,18 +1359,18 @@ body {
 .ribbon-group-items {
     display: flex;
     align-items: center;
-    gap: clamp(4px, 0.6vw, 8px);
+    gap: 3px;
     flex-wrap: nowrap;
-    min-height: 34px;
+    min-height: 30px;
 }
 
 .ribbon-group-label {
-    font-size: 0.65rem;
+    font-size: 0.64rem;
     font-weight: 600;
     text-transform: capitalize;
     letter-spacing: 0.3px;
     color: var(--text-muted, #7c7f93);
-    margin-top: 3px;
+    margin-top: 2px;
     user-select: none;
     pointer-events: none;
     text-align: center;
@@ -1374,9 +1380,9 @@ body {
 /* Vertical separator line between Word groups */
 .ribbon-group-sep {
     width: 1px;
-    margin: 4px clamp(6px, 1vw, 14px);
+    margin: 3px 5px;
     align-self: stretch;
-    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.15) 15%, rgba(255, 255, 255, 0.15) 85%, transparent);
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.14) 15%, rgba(255, 255, 255, 0.14) 85%, transparent);
     flex-shrink: 0;
 }
 
@@ -1440,16 +1446,17 @@ body {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 5px clamp(7px, 0.8vw, 11px);
-    border-radius: 6px;
+    padding: 4px 7px;
+    border-radius: 5px;
     cursor: pointer;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 4px;
     transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .ribbon-btn:hover {
@@ -1463,14 +1470,16 @@ body {
 }
 
 .ribbon-btn-icon {
-    width: 29px;
-    height: 29px;
+    width: 27px;
+    height: 27px;
+    min-width: 27px;
     padding: 0;
 }
 
 .ribbon-btn-compact {
-    font-size: 0.8rem;
-    padding: 4px clamp(7px, 0.8vw, 10px);
+    font-size: 0.78rem;
+    padding: 3px 6px;
+    gap: 4px;
     font-weight: 500;
 }
 
@@ -1480,8 +1489,10 @@ body {
     border: 1px solid rgba(137, 180, 250, 0.45);
     color: #e0def4;
     font-weight: 600;
-    padding: 5px clamp(9px, 1.1vw, 14px);
-    border-radius: 6px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    gap: 4px;
 }
 
 .ribbon-badge-paint:hover {
@@ -1495,11 +1506,13 @@ body {
     background-color: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08);
     font-weight: 500;
-    padding: 5px clamp(8px, 1vw, 13px);
-    border-radius: 6px;
+    padding: 4px 7px;
+    border-radius: 5px;
+    font-size: 0.8rem;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    flex-shrink: 0;
 }
 
 .ribbon-badge-action:hover {
@@ -1522,9 +1535,9 @@ body {
     background-color: var(--bg-app);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    font-size: 0.8rem;
-    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 0.78rem;
+    padding: 3px 6px;
     outline: none;
     cursor: pointer;
     transition: border-color 0.15s ease;
@@ -1536,16 +1549,20 @@ body {
 
 .ribbon-heading-select {
     font-weight: 600;
-    min-width: 95px;
-    max-width: 115px;
-}
-
-.ribbon-font-select {
+    min-width: 90px;
     max-width: 110px;
 }
 
+.ribbon-font-select {
+    max-width: 100px;
+}
+
 .ribbon-size-select {
-    max-width: 70px;
+    max-width: 65px;
+}
+
+#select-callout {
+    max-width: 105px;
 }
 
 /* Segmented Text Case Buttons Group */
@@ -1603,11 +1620,12 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 29px;
-    height: 29px;
-    border-radius: 6px;
+    width: 27px;
+    height: 27px;
+    border-radius: 5px;
     cursor: pointer;
     transition: background 0.15s ease;
+    flex-shrink: 0;
 }
 
 .ribbon-color-btn:hover {
