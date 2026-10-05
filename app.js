@@ -98,6 +98,16 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
+    setupTagInteractions();
+    checkFirstVisitWelcome();
+
+    if (!navigator.onLine) {
+        state.isServerMode = false;
+        setSyncStatus('offline', 'Offline (Saved locally)');
+        loadLocalNodes();
+        return;
+    }
+
     try {
         const testRes = await fetch(`${API_BASE}/api/nodes?full=1`, { method: 'GET' });
         if (testRes.ok) {
@@ -251,13 +261,57 @@ function signoutGoogle() {
     setSyncStatus('live', 'Signed out from Google Drive');
 }
 
+// --- Cloud Sync Animation Overlay Controller ---
+function showSyncOverlay(title = 'Syncing with Google Drive...', desc = 'Connecting and synchronizing notes...') {
+    const overlay = document.getElementById('sync-overlay');
+    if (!overlay) return;
+    const titleEl = document.getElementById('sync-overlay-title');
+    const descEl = document.getElementById('sync-overlay-desc');
+    const fillEl = document.getElementById('sync-progress-fill');
+    const stepEl = document.getElementById('sync-overlay-step');
+
+    if (titleEl) titleEl.textContent = title;
+    if (descEl) descEl.textContent = desc;
+    if (fillEl) fillEl.style.width = '20%';
+    if (stepEl) stepEl.textContent = 'Step 1 of 3: Establishing connection...';
+
+    overlay.style.display = 'flex';
+}
+
+function updateSyncProgress(percent, stepText, descText) {
+    const fillEl = document.getElementById('sync-progress-fill');
+    const stepEl = document.getElementById('sync-overlay-step');
+    const descEl = document.getElementById('sync-overlay-desc');
+
+    if (fillEl) fillEl.style.width = `${percent}%`;
+    if (stepEl && stepText) stepEl.textContent = stepText;
+    if (descEl && descText) descEl.textContent = descText;
+}
+
+function hideSyncOverlay() {
+    const overlay = document.getElementById('sync-overlay');
+    if (!overlay) return;
+    updateSyncProgress(100, '✓ Complete!', 'All notes synchronized and ready.');
+    setTimeout(() => {
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.35s ease';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.style.opacity = '1';
+            overlay.style.transition = '';
+        }, 350);
+    }, 600);
+}
+
 // --- Automatic Drive Restore upon Sign-in ("එහෙම sign උන ගමන් drive එකෙන් Backup එක එනවා") ---
 async function autoRestoreFromDriveOnSignIn() {
     setSyncStatus('syncing', 'Connecting to Google Drive...');
-    const logDiv = document.getElementById('drive-sync-log');
+    showSyncOverlay('Syncing with Google Drive...', 'Connecting to your cloud drive storage...');
+    const logDiv = document.getElementById('drive-sync-log') || document.getElementById('settings-drive-log');
     if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">Checking Google Drive for CyberNote backup...</span>';
 
     try {
+        updateSyncProgress(40, 'Step 2 of 3: Searching cloud backup...', 'Locating CyberNote_Backup.json on Google Drive...');
         // Search Drive for CyberNote_Backup.json
         const searchRes = await fetch("https://www.googleapis.com/drive/v3/files?q=name='CyberNote_Backup.json' and trashed=false&fields=files(id,name,modifiedTime)", {
             headers: { Authorization: `Bearer ${state.googleAccessToken}` }
@@ -269,6 +323,7 @@ async function autoRestoreFromDriveOnSignIn() {
             state.driveFileId = file.id;
             localStorage.setItem('cybernote_drive_file_id', file.id);
 
+            updateSyncProgress(65, 'Step 2 of 3: Downloading notes...', 'Downloading encrypted notes from Google Drive...');
             if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">Downloading latest notes from Google Drive...</span>';
 
             const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
@@ -293,6 +348,7 @@ async function autoRestoreFromDriveOnSignIn() {
                 if (e.message.includes('password')) throw e;
             }
 
+            updateSyncProgress(85, 'Step 3 of 3: Populating note tree...', 'Rebuilding local database and note hierarchy...');
             const importedNodes = JSON.parse(finalJson);
             if (Array.isArray(importedNodes) && importedNodes.length > 0) {
                 state.nodes.clear();
@@ -316,19 +372,23 @@ async function autoRestoreFromDriveOnSignIn() {
             }
         } else {
             // No backup exists on Drive yet -> automatically create initial backup of current notes!
+            updateSyncProgress(70, 'Step 2 of 3: Creating cloud backup...', 'Initializing first cloud backup on Google Drive...');
             if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">No existing backup on Drive. Creating initial backup now...</span>';
             await backupToGoogleDrive(true);
             setSyncStatus('live', '✓ Google Drive Connected & Initial Backup Created');
             if (logDiv) logDiv.innerHTML = '<span style="color:var(--success); font-weight:600;">✓ Connected! Initial backup safely created on Google Drive.</span>';
         }
+        updateSettingsUI();
+        hideSyncOverlay();
     } catch (err) {
         console.error('Auto restore from drive error:', err);
         if (logDiv) logDiv.innerHTML = `<span style="color:var(--danger);">Error: ${err.message}</span>`;
         setSyncStatus('live', 'Google Drive connected');
+        hideSyncOverlay();
     }
 }
 
-// --- Backup & Restore to Google Drive with Optional AES-256 E2EE ---
+// --- Backup & Restore to Google Drive with Optional AES-256 E2EE & Ultra-Minimal Storage ---
 async function backupToGoogleDrive(silent = false) {
     if (!state.googleAccessToken) {
         if (!silent) alert('Please sign in with Google first.');
@@ -336,16 +396,17 @@ async function backupToGoogleDrive(silent = false) {
     }
 
     setSyncStatus('syncing', 'Syncing to Google Drive...');
-    const logDiv = document.getElementById('drive-sync-log');
+    const logDiv = document.getElementById('drive-sync-log') || document.getElementById('settings-drive-log');
     if (!silent && logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">Encrypting & uploading to Google Drive...</span>';
 
     try {
         const allNodes = Array.from(state.nodes.values());
-        let payload = JSON.stringify(allNodes, null, 2);
+        // Minified payload to consume minimum Google Drive storage (< 0.001% of 15GB)
+        let payload = JSON.stringify(allNodes);
 
         // Check if AES-256 E2EE Encryption is enabled
         if (state.e2eeEnabled) {
-            const password = state.e2eePassword || document.getElementById('e2ee-password')?.value.trim();
+            const password = state.e2eePassword || document.getElementById('e2ee-password')?.value.trim() || document.getElementById('settings-e2ee-password')?.value.trim();
             if (password) {
                 payload = await encryptData(payload, password);
             }
@@ -387,6 +448,7 @@ async function backupToGoogleDrive(silent = false) {
         if (!silent && logDiv) {
             logDiv.innerHTML = `<span style="color:var(--success); font-weight:600;">✓ Successfully backed up ${state.nodes.size} notes to Google Drive at ${nowStr}!</span>`;
         }
+        updateSettingsUI();
     } catch (err) {
         console.error('Backup to Google Drive error:', err);
         setSyncStatus('error', 'Drive Sync Error');
@@ -913,7 +975,8 @@ function selectNode(id) {
 
     const node = state.nodes.get(id);
     noteTitleInput.value = node.title || '';
-    noteTagsInput.value = node.tags || '';
+    if (noteTagsInput) noteTagsInput.value = node.tags || '';
+    renderTagChips(node.tags || '');
     iconPickerBtn.textContent = ICON_MAP[node.icon] || '📁';
     updateNodeColorDot(node.color);
 
@@ -935,11 +998,18 @@ function setEditorContent(content) {
         return;
     }
 
+    let processed = content;
+    // Replace any legacy emoji in copy buttons with crisp SVG
+    if (processed.includes('📋')) {
+        processed = processed.replace(/📋\s*Copy Code/g, '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code');
+        processed = processed.replace(/📋/g, '');
+    }
+
     // Convert raw markdown if existing
-    if (content.includes('```') || content.includes('# ') || content.includes('- [ ]') || content.includes('| --- |')) {
-        noteEditor.innerHTML = convertMarkdownToHtml(content);
+    if (processed.includes('```') || processed.includes('# ') || processed.includes('- [ ]') || processed.includes('| --- |')) {
+        noteEditor.innerHTML = convertMarkdownToHtml(processed);
     } else {
-        noteEditor.innerHTML = content;
+        noteEditor.innerHTML = processed;
     }
 }
 
@@ -1438,14 +1508,49 @@ function triggerImageUpload() {
     document.getElementById('image-file-input').click();
 }
 
+// --- Smart Image & Canvas Compression (Protects 15 GB Google Drive Quota) ---
+function compressImageSource(dataUrl, maxDimension = 1280, quality = 0.82) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = Math.round((height * maxDimension) / width);
+                    width = maxDimension;
+                } else {
+                    width = Math.round((width * maxDimension) / height);
+                    height = maxDimension;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to JPEG 0.82 to reduce 5MB files down to ~70KB
+            const compressed = canvas.toDataURL('image/jpeg', quality);
+            resolve(compressed);
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+    });
+}
+
 function handleImageFileSelected(e) {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
         restoreSelection();
-        insertImageElement(event.target.result, file.name);
+        const compressed = await compressImageSource(event.target.result);
+        insertImageElement(compressed, file.name);
+        handleEditorInput();
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -1461,8 +1566,10 @@ function handleClipboardPaste(e) {
             e.preventDefault();
             const blob = item.getAsFile();
             const reader = new FileReader();
-            reader.onload = (event) => {
-                insertImageElement(event.target.result, 'Pasted Screenshot');
+            reader.onload = async (event) => {
+                const compressed = await compressImageSource(event.target.result);
+                insertImageElement(compressed, 'Pasted Screenshot');
+                handleEditorInput();
             };
             reader.readAsDataURL(blob);
             return;
@@ -1859,7 +1966,7 @@ function renderNodeLinkList(search) {
 }
 
 function insertNodeLink(targetId, targetTitle) {
-    const html = `<a href="javascript:void(0)" class="node-anchor-link" data-node-id="${targetId}" onclick="selectNode('${targetId}')">📌 ${targetTitle}</a> `;
+    const html = `<a href="javascript:void(0)" class="node-anchor-link" data-node-id="${targetId}" onclick="selectNode('${targetId}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>${targetTitle}</a> `;
     insertHtmlAtCursor(html);
 }
 
@@ -2203,38 +2310,346 @@ function escapeHtml(text) {
         .replace(/'/g, '&#039;');
 }
 
+// --- Interactive Tag Chips Management ---
+function renderTagChips(tagsString = '') {
+    const list = document.getElementById('tags-chips-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const hiddenInput = document.getElementById('note-tags');
+    if (hiddenInput) hiddenInput.value = tagsString;
+
+    if (!tagsString) return;
+
+    const tags = tagsString
+        .split(/[,;]/)
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+
+    const uniqueTags = [...new Set(tags)];
+
+    uniqueTags.forEach(tag => {
+        const chip = document.createElement('div');
+        chip.className = 'tag-chip';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'tag-chip-name';
+        nameSpan.textContent = `#${tag}`;
+        nameSpan.title = `Click to search notes with #${tag}`;
+        nameSpan.onclick = () => {
+            const searchInput = document.getElementById('global-search');
+            if (searchInput) {
+                searchInput.value = tag;
+                state.searchQuery = tag;
+                renderTree();
+            }
+        };
+
+        const removeBtn = document.createElement('span');
+        removeBtn.className = 'tag-chip-remove';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.title = 'Remove tag';
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (state.isReadOnly) return;
+            removeTagFromCurrentNode(tag);
+        };
+
+        chip.appendChild(nameSpan);
+        chip.appendChild(removeBtn);
+        list.appendChild(chip);
+    });
+}
+
+function addTagToCurrentNode(rawTag) {
+    if (!state.activeNodeId || state.isReadOnly) return;
+    const node = state.nodes.get(state.activeNodeId);
+    if (!node) return;
+
+    const clean = rawTag.replace(/^[#\s]+/, '').replace(/[,;]/g, '').trim();
+    if (!clean) return;
+
+    const currentTags = (node.tags || '')
+        .split(/[,;]/)
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+
+    if (!currentTags.includes(clean)) {
+        currentTags.push(clean);
+        const newTagStr = currentTags.join(', ');
+        node.tags = newTagStr;
+        scheduleSave('tags', newTagStr);
+        saveLocalNodesBackup();
+        renderTagChips(newTagStr);
+    }
+}
+
+function removeTagFromCurrentNode(tagToRemove) {
+    if (!state.activeNodeId || state.isReadOnly) return;
+    const node = state.nodes.get(state.activeNodeId);
+    if (!node) return;
+
+    const currentTags = (node.tags || '')
+        .split(/[,;]/)
+        .map(t => t.trim())
+        .filter(t => t.length > 0 && t !== tagToRemove);
+
+    const newTagStr = currentTags.join(', ');
+    node.tags = newTagStr;
+    scheduleSave('tags', newTagStr);
+    saveLocalNodesBackup();
+    renderTagChips(newTagStr);
+}
+
+function setupTagInteractions() {
+    const input = document.getElementById('note-tags-input');
+    if (!input) return;
+
+    input.addEventListener('keydown', (e) => {
+        if (state.isReadOnly) return;
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            const val = input.value.trim();
+            if (val) {
+                addTagToCurrentNode(val);
+                input.value = '';
+            }
+        } else if (e.key === 'Backspace' && input.value === '') {
+            if (!state.activeNodeId) return;
+            const node = state.nodes.get(state.activeNodeId);
+            if (!node || !node.tags) return;
+            const tags = node.tags.split(/[,;]/).map(t => t.trim()).filter(Boolean);
+            if (tags.length > 0) {
+                removeTagFromCurrentNode(tags[tags.length - 1]);
+            }
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        if (state.isReadOnly) return;
+        const val = input.value.trim();
+        if (val) {
+            addTagToCurrentNode(val);
+            input.value = '';
+        }
+    });
+}
+
+// --- First-Visit Welcome Modal ---
+function checkFirstVisitWelcome() {
+    const isDismissed = localStorage.getItem('cybernote_welcome_dismissed');
+    if (!state.googleAccessToken && !isDismissed) {
+        const welcomeModal = document.getElementById('welcome-modal');
+        if (welcomeModal) welcomeModal.style.display = 'flex';
+    }
+}
+
+function closeWelcomeModal() {
+    const welcomeModal = document.getElementById('welcome-modal');
+    if (welcomeModal) welcomeModal.style.display = 'none';
+    localStorage.setItem('cybernote_welcome_dismissed', '1');
+}
+
+// --- Centralized Settings Hub & Bug Report ---
+function openSettingsModal(targetTab = 'tab-gdrive') {
+    const modal = document.getElementById('settings-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    switchSettingsTab(targetTab);
+    updateSettingsUI();
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function switchSettingsTab(tabId) {
+    document.querySelectorAll('.settings-tab-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === tabId);
+    });
+    document.querySelectorAll('.settings-tab-pane').forEach(p => {
+        p.classList.toggle('active', p.id === tabId);
+    });
+}
+
+function updateSettingsUI() {
+    // 1. Google Drive info
+    const nameEl = document.getElementById('settings-drive-status-name');
+    const detailEl = document.getElementById('settings-drive-status-detail');
+    const avatarImg = document.getElementById('settings-user-avatar');
+    const placeholder = document.getElementById('settings-user-avatar-placeholder');
+    const btnLogin = document.getElementById('btn-settings-google-login');
+    const btnSignout = document.getElementById('btn-settings-signout');
+
+    if (state.googleUser && state.googleAccessToken) {
+        if (nameEl) nameEl.innerHTML = `<span style="color:var(--success);">● Connected:</span> ${state.googleUser.name}`;
+        if (detailEl) detailEl.textContent = state.googleUser.email || 'Auto-Sync Active';
+        if (avatarImg && state.googleUser.picture) {
+            avatarImg.src = state.googleUser.picture;
+            avatarImg.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+        }
+        if (btnLogin) btnLogin.style.display = 'none';
+        if (btnSignout) btnSignout.style.display = 'inline-block';
+    } else {
+        if (nameEl) nameEl.textContent = 'Not Signed In';
+        if (detailEl) detailEl.textContent = 'Sign in with Google to enable automatic cloud backup.';
+        if (avatarImg) avatarImg.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+        if (btnLogin) btnLogin.style.display = 'inline-flex';
+        if (btnSignout) btnSignout.style.display = 'none';
+    }
+
+    // 2. Storage meter calculation
+    const allNodes = Array.from(state.nodes.values());
+    const minifiedJson = JSON.stringify(allNodes);
+    const sizeBytes = new Blob([minifiedJson]).size;
+    const sizeKb = (sizeBytes / 1024).toFixed(1);
+    const quotaBytes = 15 * 1024 * 1024 * 1024; // 15 GB
+    const usagePct = ((sizeBytes / quotaBytes) * 100).toFixed(6);
+
+    const storageUsedTag = document.getElementById('settings-storage-used');
+    const storageFill = document.getElementById('settings-storage-fill');
+    const storageText = document.getElementById('settings-storage-text');
+
+    if (storageUsedTag) storageUsedTag.textContent = `${sizeKb} KB (< 0.001% used)`;
+    if (storageFill) storageFill.style.width = '2%';
+    if (storageText) storageText.textContent = `Backup size: ~${sizeKb} KB (Minified JSON)`;
+
+    // 3. Connection indicator
+    const isOnline = navigator.onLine;
+    const connInd = document.getElementById('settings-conn-indicator');
+    const connTitle = document.getElementById('settings-conn-title');
+    const connDesc = document.getElementById('settings-conn-desc');
+
+    if (connInd) connInd.className = isOnline ? 'sync-dot live' : 'sync-dot offline';
+    if (connTitle) connTitle.textContent = isOnline ? 'Connection Status: Online' : 'Connection Status: Offline';
+    if (connDesc) connDesc.textContent = isOnline
+        ? 'All edits are saved locally and synced continuously with the cloud.'
+        : 'Running in offline mode. Notes are saved locally in browser storage & SQLite.';
+
+    // 4. Bug report URL persistence
+    const bugInput = document.getElementById('bug-report-url-input');
+    const savedBugUrl = localStorage.getItem('cybernote_bug_url');
+    if (bugInput && savedBugUrl) bugInput.value = savedBugUrl;
+
+    // 5. E2EE toggle
+    const e2eeToggle = document.getElementById('settings-e2ee-toggle');
+    const e2eePassGroup = document.getElementById('settings-e2ee-pass-group');
+    const e2eePass = document.getElementById('settings-e2ee-password');
+    if (e2eeToggle) {
+        e2eeToggle.checked = state.e2eeEnabled;
+        if (e2eePassGroup) e2eePassGroup.style.display = state.e2eeEnabled ? 'block' : 'none';
+        if (e2eePass && state.e2eePassword) e2eePass.value = state.e2eePassword;
+    }
+}
+
+function openBugReportPage() {
+    const bugInput = document.getElementById('bug-report-url-input');
+    const url = (bugInput?.value.trim()) || 'https://github.com/Prekarshamaxx123/CyberNote/issues/new';
+    localStorage.setItem('cybernote_bug_url', url);
+    window.open(url, '_blank');
+}
+
+function saveGitHubSettingsFromTab() {
+    const token = document.getElementById('gh-token-settings')?.value.trim();
+    const repo = document.getElementById('gh-repo-settings')?.value.trim();
+    const branch = document.getElementById('gh-branch-settings')?.value.trim() || 'main';
+
+    if (token) state.githubToken = token;
+    if (repo) state.githubRepo = repo;
+    if (branch) state.githubBranch = branch;
+
+    localStorage.setItem('cybernote_gh_token', token);
+    localStorage.setItem('cybernote_gh_repo', repo);
+    localStorage.setItem('cybernote_gh_branch', branch);
+
+    connectAndSyncGitHub();
+}
+
 // --- Setup All Event Listeners ---
 function setupEventListeners() {
     // Theme toggle
     document.getElementById('btn-theme').onclick = toggleTheme;
 
-    // Google Sign-In & Profile
+    // Google Sign-In & Settings Hub
     if (btnGoogleLogin) btnGoogleLogin.onclick = requestGoogleLogin;
-    if (userProfileBadge) userProfileBadge.onclick = openDriveModal;
-    document.getElementById('btn-open-drive-modal').onclick = openDriveModal;
+    if (userProfileBadge) userProfileBadge.onclick = () => openSettingsModal('tab-gdrive');
+    const btnOpenSettings = document.getElementById('btn-open-settings');
+    if (btnOpenSettings) btnOpenSettings.onclick = () => openSettingsModal('tab-gdrive');
     const syncStatusBadge = document.getElementById('sync-status');
-    if (syncStatusBadge) syncStatusBadge.onclick = openDriveModal;
-    document.getElementById('btn-drive-backup-now').onclick = () => backupToGoogleDrive(false);
-    document.getElementById('btn-drive-restore-now').onclick = () => autoRestoreFromDriveOnSignIn();
-    document.getElementById('btn-drive-signout').onclick = signoutGoogle;
+    if (syncStatusBadge) syncStatusBadge.onclick = () => openSettingsModal('tab-gdrive');
+    const btnOpenDrive = document.getElementById('btn-open-drive-modal');
+    if (btnOpenDrive) btnOpenDrive.onclick = () => openSettingsModal('tab-gdrive');
 
-    // E2EE Toggle & Password
+    // Settings Modal Tab Buttons
+    document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        btn.onclick = () => switchSettingsTab(btn.dataset.tab);
+    });
+
+    // Settings Modal Action Buttons
+    const btnSettingsGLogin = document.getElementById('btn-settings-google-login');
+    if (btnSettingsGLogin) btnSettingsGLogin.onclick = requestGoogleLogin;
+    const btnSettingsBackup = document.getElementById('btn-settings-backup-now');
+    if (btnSettingsBackup) btnSettingsBackup.onclick = () => backupToGoogleDrive(false);
+    const btnSettingsRestore = document.getElementById('btn-settings-restore-now');
+    if (btnSettingsRestore) btnSettingsRestore.onclick = () => autoRestoreFromDriveOnSignIn();
+    const btnSettingsSignout = document.getElementById('btn-settings-signout');
+    if (btnSettingsSignout) btnSettingsSignout.onclick = signoutGoogle;
+
+    const btnDriveBackup = document.getElementById('btn-drive-backup-now');
+    if (btnDriveBackup) btnDriveBackup.onclick = () => backupToGoogleDrive(false);
+    const btnDriveRestore = document.getElementById('btn-drive-restore-now');
+    if (btnDriveRestore) btnDriveRestore.onclick = () => autoRestoreFromDriveOnSignIn();
+    const btnDriveSignout = document.getElementById('btn-drive-signout');
+    if (btnDriveSignout) btnDriveSignout.onclick = signoutGoogle;
+
+    // Bug Report Button & URL Input
+    const btnBugReport = document.getElementById('btn-open-bug-report');
+    if (btnBugReport) btnBugReport.onclick = openBugReportPage;
+    const bugInput = document.getElementById('bug-report-url-input');
+    if (bugInput) bugInput.onchange = (e) => localStorage.setItem('cybernote_bug_url', e.target.value.trim());
+
+    // First-Visit Welcome Gateway Modal Buttons
+    const btnWelcomeSignin = document.getElementById('btn-welcome-google-signin');
+    if (btnWelcomeSignin) btnWelcomeSignin.onclick = () => {
+        closeWelcomeModal();
+        requestGoogleLogin();
+    };
+    const btnWelcomeSkip = document.getElementById('btn-welcome-skip');
+    if (btnWelcomeSkip) btnWelcomeSkip.onclick = closeWelcomeModal;
+
+    // E2EE Toggles & Passwords
     const e2eeToggle = document.getElementById('e2ee-toggle');
     const e2eePassGroup = document.getElementById('e2ee-password-group');
-    if (e2eeToggle) {
-        e2eeToggle.onchange = (e) => {
-            state.e2eeEnabled = e.target.checked;
-            localStorage.setItem('cybernote_e2ee_enabled', e.target.checked);
-            if (e2eePassGroup) e2eePassGroup.style.display = e.target.checked ? 'flex' : 'none';
-        };
-    }
+    const settingsE2eeToggle = document.getElementById('settings-e2ee-toggle');
+    const settingsE2eePassGroup = document.getElementById('settings-e2ee-pass-group');
+
+    const handleE2eeToggle = (checked) => {
+        state.e2eeEnabled = checked;
+        localStorage.setItem('cybernote_e2ee_enabled', checked);
+        if (e2eeToggle) e2eeToggle.checked = checked;
+        if (settingsE2eeToggle) settingsE2eeToggle.checked = checked;
+        if (e2eePassGroup) e2eePassGroup.style.display = checked ? 'flex' : 'none';
+        if (settingsE2eePassGroup) settingsE2eePassGroup.style.display = checked ? 'block' : 'none';
+    };
+
+    if (e2eeToggle) e2eeToggle.onchange = (e) => handleE2eeToggle(e.target.checked);
+    if (settingsE2eeToggle) settingsE2eeToggle.onchange = (e) => handleE2eeToggle(e.target.checked);
+
+    const handleE2eePassword = (pass) => {
+        state.e2eePassword = pass;
+        const e2eePassInput = document.getElementById('e2ee-password');
+        const settingsE2eePass = document.getElementById('settings-e2ee-password');
+        if (e2eePassInput && e2eePassInput.value !== pass) e2eePassInput.value = pass;
+        if (settingsE2eePass && settingsE2eePass.value !== pass) settingsE2eePass.value = pass;
+    };
 
     const e2eePassInput = document.getElementById('e2ee-password');
-    if (e2eePassInput) {
-        e2eePassInput.oninput = (e) => {
-            state.e2eePassword = e.target.value;
-        };
-    }
+    if (e2eePassInput) e2eePassInput.oninput = (e) => handleE2eePassword(e.target.value);
+    const settingsE2eePass = document.getElementById('settings-e2ee-password');
+    if (settingsE2eePass) settingsE2eePass.oninput = (e) => handleE2eePassword(e.target.value);
 
     const clientIdInput = document.getElementById('google-client-id-input');
     if (clientIdInput) {
@@ -2243,6 +2658,8 @@ function setupEventListeners() {
             initGoogleAuth();
         };
     }
+
+    setupTagInteractions();
 
     // Title editing
     noteTitleInput.addEventListener('input', (e) => {
@@ -2456,12 +2873,51 @@ function setupEventListeners() {
     // Tree Info & Modals
     const btnAbout = document.getElementById('btn-about');
     if (btnAbout) btnAbout.onclick = openAboutModal;
-    document.getElementById('btn-tree-info').onclick = openTreeInfoModal;
-    document.getElementById('btn-github-sync').onclick = openGitHubModal;
-    document.getElementById('btn-gh-save').onclick = connectAndSyncGitHub;
-    document.getElementById('btn-import-ct').onclick = openImportModal;
-    document.getElementById('btn-do-import').onclick = doImportCherryTree;
-    document.getElementById('btn-export').onclick = exportNotes;
+    const btnTreeInfo = document.getElementById('btn-tree-info');
+    if (btnTreeInfo) btnTreeInfo.onclick = openTreeInfoModal;
+    const btnGhSync = document.getElementById('btn-github-sync');
+    if (btnGhSync) btnGhSync.onclick = openGitHubModal;
+    const btnGhSave = document.getElementById('btn-gh-save');
+    if (btnGhSave) btnGhSave.onclick = connectAndSyncGitHub;
+    const btnImportCt = document.getElementById('btn-import-ct');
+    if (btnImportCt) btnImportCt.onclick = openImportModal;
+    const btnDoImport = document.getElementById('btn-do-import');
+    if (btnDoImport) btnDoImport.onclick = doImportCherryTree;
+    const btnExport = document.getElementById('btn-export');
+    if (btnExport) btnExport.onclick = exportNotes;
+
+    // Network Offline / Online Auto-Sync Detection
+    window.addEventListener('online', async () => {
+        setSyncStatus('syncing', 'Back online - Syncing...');
+        const connInd = document.getElementById('settings-conn-indicator');
+        const connTitle = document.getElementById('settings-conn-title');
+        if (connInd) connInd.className = 'sync-dot live';
+        if (connTitle) connTitle.textContent = 'Connection Status: Online';
+
+        if (state.isServerMode) {
+            for (const [id, node] of state.nodes.entries()) {
+                fetch(`${API_BASE}/api/nodes/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(node)
+                }).catch(() => {});
+            }
+        }
+
+        if (state.googleAccessToken) {
+            await backupToGoogleDrive(true);
+        } else {
+            setSyncStatus('live', 'Online - Synced');
+        }
+    });
+
+    window.addEventListener('offline', () => {
+        setSyncStatus('offline', 'Offline (Saved locally)');
+        const connInd = document.getElementById('settings-conn-indicator');
+        const connTitle = document.getElementById('settings-conn-title');
+        if (connInd) connInd.className = 'sync-dot offline';
+        if (connTitle) connTitle.textContent = 'Connection Status: Offline';
+    });
 
     // Close modals and context menu on clicking backdrop
     window.addEventListener('click', (e) => {

@@ -58,29 +58,11 @@
                 <span>+ New Note</span>
             </button>
 
-            <!-- Google Sign-In / User Profile Button -->
-            <button id="btn-google-login" class="btn btn-google" title="Sign in with Google to Auto-Sync with Google Drive">
-                <svg class="google-svg" viewBox="0 0 24 24" width="15" height="15">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <span>Sign in with Google</span>
-            </button>
-
-            <div id="user-profile-badge" class="user-profile-badge" style="display: none;" title="Google Drive Auto-Sync Active">
+            <!-- User Profile Badge (Click to open Settings) -->
+            <div id="user-profile-badge" class="user-profile-badge" style="display: none;" title="Google Account & Drive Settings">
                 <img id="user-avatar" class="user-avatar" src="" alt="Google User">
                 <span id="user-name" class="user-name">User</span>
-                <span class="drive-sync-indicator" title="Connected to Google Drive">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-                </span>
             </div>
-
-            <button id="btn-open-drive-modal" class="btn btn-drive" title="Google Drive Auto-Backup & Security">
-                <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-                <span>Drive</span>
-            </button>
 
             <!-- About / Follow Prekarsha Button -->
             <button id="btn-about" class="btn btn-about" title="About CyberNote & Follow Prekarsha on GitHub">
@@ -88,27 +70,18 @@
                 <span>About</span>
             </button>
 
-            <!-- Utility Action Group -->
-            <div class="header-utility-group">
-                <button id="btn-import-ct" class="btn btn-sm btn-secondary" title="Import CherryTree .ctb/.ctd">
-                    <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    <span>Import</span>
-                </button>
-                <button id="btn-export" class="btn btn-sm btn-secondary" title="Export Notes">
-                    <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <span>Export</span>
-                </button>
-                <button id="btn-github-sync" class="btn btn-sm btn-github" title="Configure GitHub Hosting & Cloud Sync">
-                    <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-                    <span>GitHub</span>
-                </button>
-                <button id="btn-tree-info" class="icon-btn-header" title="Tree & Node Info">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                </button>
-                <button id="btn-theme" class="icon-btn-header" title="Toggle Light/Dark Theme">
-                    <svg id="theme-icon-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                </button>
-            </div>
+            <!-- Theme Toggle -->
+            <button id="btn-theme" class="icon-btn-header" title="Toggle Light/Dark Theme">
+                <svg id="theme-icon-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+
+            <!-- Centralized Settings Button (Gear Icon) -->
+            <button id="btn-open-settings" class="icon-btn-header" title="Settings (Google Drive, Offline, Import/Export, GitHub, Bug Report)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
         </div>
     </header>
 
@@ -192,12 +165,16 @@
                     <input type="text" id="note-title" class="note-title-input" placeholder="Note Title...">
                 </div>
 
-                <div class="tags-container">
+                <div class="tags-container" id="tags-container">
                     <span class="tags-label">
                         <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                         <span>Tags:</span>
                     </span>
-                    <input type="text" id="note-tags" class="note-tags-input" placeholder="e.g. overthewire, linux, cybersecurity">
+                    <div class="tags-chip-wrapper" id="tags-chip-wrapper">
+                        <div id="tags-chips-list" class="tags-chips-list"></div>
+                        <input type="text" id="note-tags-input" class="note-tags-input" placeholder="+ Add tag (press Enter or comma)...">
+                    </div>
+                    <input type="hidden" id="note-tags">
                 </div>
 
                 <!-- CyberNote Categorized Studio Ribbon -->
@@ -906,6 +883,299 @@
             <div class="modal-actions" style="margin-top: 14px;">
                 <button class="btn btn-primary" onclick="closeAboutModal()">Close</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Centralized Settings Modal -->
+    <div id="settings-modal" class="modal" style="display: none;">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header-row">
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    CyberNote Settings & Cloud Hub
+                </h3>
+                <button class="icon-btn-header" onclick="closeSettingsModal()" title="Close Settings">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <!-- Settings Tabs Navigation -->
+            <div class="settings-tabs-nav">
+                <button class="settings-tab-btn active" data-tab="tab-gdrive">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                    <span>Google Drive</span>
+                </button>
+                <button class="settings-tab-btn" data-tab="tab-offline">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                    <span>Offline & Storage</span>
+                </button>
+                <button class="settings-tab-btn" data-tab="tab-migration">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Import / Export</span>
+                </button>
+                <button class="settings-tab-btn" data-tab="tab-github">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                    <span>GitHub Sync</span>
+                </button>
+                <button class="settings-tab-btn" data-tab="tab-security">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>Security & E2EE</span>
+                </button>
+                <button class="settings-tab-btn" data-tab="tab-bug">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="7" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="17"/><line x1="7" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="17" y2="12"/><path d="m19 19-3.5-3.5"/><path d="m5 5 3.5 3.5"/><path d="m19 5-3.5 3.5"/><path d="m5 19 3.5-3.5"/></svg>
+                    <span>Bug Report</span>
+                </button>
+            </div>
+
+            <!-- Tab 1: Google Drive -->
+            <div id="tab-gdrive" class="settings-tab-pane active">
+                <div class="drive-status-box" id="settings-drive-user-status">
+                    <img id="settings-user-avatar" class="user-avatar" style="display:none; width:44px; height:44px;" src="" alt="Google User">
+                    <div id="settings-user-avatar-placeholder" style="font-size:1.6rem; display:flex; align-items:center;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div>
+                        <div id="settings-drive-status-name" style="font-weight:600; font-size:1rem;">Not Signed In</div>
+                        <div id="settings-drive-status-detail" style="font-size:0.8rem; color:var(--text-muted);">Sign in with Google to enable automatic cloud backup.</div>
+                    </div>
+                </div>
+
+                <div class="storage-meter-box">
+                    <div class="storage-meter-header">
+                        <span style="font-weight:600; display:flex; align-items:center; gap:6px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                            Google Drive Storage Footprint (15 GB Quota)
+                        </span>
+                        <span id="settings-storage-used" class="storage-used-tag">0.0002% Used</span>
+                    </div>
+                    <div class="storage-meter-bar">
+                        <div id="settings-storage-fill" class="storage-meter-fill" style="width: 1%;"></div>
+                    </div>
+                    <div class="storage-meter-footer">
+                        <span id="settings-storage-text">Backup size: ~32 KB</span>
+                        <span style="color:var(--success);">✓ 14.9999 GB Free Space Remaining</span>
+                    </div>
+                </div>
+
+                <div class="drive-actions-group" style="margin-top:12px;">
+                    <button id="btn-settings-google-login" class="btn btn-google" style="flex:1;">
+                        <svg class="google-svg" viewBox="0 0 24 24" width="16" height="16">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                        <span>Sign in with Google</span>
+                    </button>
+                    <button id="btn-settings-backup-now" class="btn btn-primary" style="flex:1;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                        <span>Backup to Drive Now</span>
+                    </button>
+                    <button id="btn-settings-restore-now" class="btn btn-secondary" style="flex:1;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>Restore from Drive</span>
+                    </button>
+                    <button id="btn-settings-signout" class="btn btn-danger" style="display:none;">Sign Out</button>
+                </div>
+                <div id="settings-drive-log" class="import-status"></div>
+            </div>
+
+            <!-- Tab 2: Offline & Storage -->
+            <div id="tab-offline" class="settings-tab-pane">
+                <div class="offline-info-card">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span id="settings-conn-indicator" class="sync-dot live" style="width:12px; height:12px;"></span>
+                        <div>
+                            <h4 id="settings-conn-title" style="margin:0;">Connection Status: Online</h4>
+                            <p id="settings-conn-desc" style="margin:2px 0 0; font-size:0.8rem; color:var(--text-muted);">All edits are instantly saved locally and queued for cloud sync.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:14px; background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+                    <h5 style="margin:0 0 6px 0; font-size:0.88rem;">Seamless Offline Experience</h5>
+                    <p style="margin:0; font-size:0.8rem; color:var(--text-secondary); line-height:1.4;">
+                        CyberNote keeps a persistent high-performance cache in your browser LocalStorage and SQLite database. 
+                        When you lose internet connection, you can continue typing, creating notes, drawing diagrams, and reorganizing branches with zero interruptions. 
+                        The moment your internet reconnects, all pending changes auto-sync to Google Drive and the server.
+                    </p>
+                </div>
+
+                <div style="margin-top:12px; background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+                    <h5 style="margin:0 0 6px 0; font-size:0.88rem;">Ultra-Lightweight Storage Architecture</h5>
+                    <p style="margin:0; font-size:0.8rem; color:var(--text-secondary); line-height:1.4;">
+                        To protect your 15 GB Google Drive quota, CyberNote compresses uploaded screenshots and canvas drawings into optimized lightweight formats and minifies note metadata so your entire notebook consumes under 0.001% of your storage.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tab 3: Import / Export -->
+            <div id="tab-migration" class="settings-tab-pane">
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-weight:600; font-size:0.88rem;">Import CherryTree Database (.ctb / .ctd)</div>
+                            <div style="font-size:0.78rem; color:var(--text-muted);">Import SQLite databases or XML CherryTree files preserving full hierarchy.</div>
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="openImportModal(); closeSettingsModal();">Import...</button>
+                    </div>
+
+                    <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-weight:600; font-size:0.88rem;">Export Notes (JSON / HTML / MD)</div>
+                            <div style="font-size:0.78rem; color:var(--text-muted);">Download your entire notebook or current branch as a standalone package.</div>
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="exportNotes()">Export Now</button>
+                    </div>
+
+                    <div style="background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-weight:600; font-size:0.88rem;">Hierarchy Tree & Node Statistics</div>
+                            <div style="font-size:0.78rem; color:var(--text-muted);">View total word counts, node depths, storage bytes, and branch counts.</div>
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="openTreeInfoModal(); closeSettingsModal();">View Info</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: GitHub Sync -->
+            <div id="tab-github" class="settings-tab-pane">
+                <p style="font-size:0.82rem; color:var(--text-muted); margin-top:0;">
+                    Sync notes to a private GitHub repository for developer-grade revision history and automated deployment.
+                </p>
+                <div class="form-group">
+                    <label>GitHub Personal Access Token (repo scope):</label>
+                    <input type="password" id="gh-token-settings" class="text-input" placeholder="ghp_xxxxxxxxxxxx">
+                </div>
+                <div class="form-group">
+                    <label>Repository (owner/repo):</label>
+                    <input type="text" id="gh-repo-settings" class="text-input" placeholder="e.g. username/notes-repo">
+                </div>
+                <div class="form-group">
+                    <label>Branch Name:</label>
+                    <input type="text" id="gh-branch-settings" class="text-input" value="main">
+                </div>
+                <button class="btn btn-primary" onclick="saveGitHubSettingsFromTab()">Save & Sync to GitHub</button>
+            </div>
+
+            <!-- Tab 5: Encryption -->
+            <div id="tab-security" class="settings-tab-pane">
+                <h4 style="margin:0 0 6px 0; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    End-to-End Encryption (AES-256-GCM)
+                </h4>
+                <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.4;">
+                    Optionally encrypt notes with AES-256-GCM with PBKDF2 before uploading to Google Drive so not even Google or anyone in the cloud can decipher your knowledge.
+                </p>
+                <div class="form-group">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.88rem;">
+                        <input type="checkbox" id="settings-e2ee-toggle">
+                        <b>Enable Client-Side AES-256-GCM Encryption</b>
+                    </label>
+                </div>
+                <div class="form-group" id="settings-e2ee-pass-group" style="display:none;">
+                    <label style="font-size:0.82rem;">Master Encryption Passphrase:</label>
+                    <input type="password" id="settings-e2ee-password" class="text-input" placeholder="Enter passphrase...">
+                    <small style="color:var(--text-muted);">Passphrase is never stored remotely.</small>
+                </div>
+            </div>
+
+            <!-- Tab 6: Bug Report -->
+            <div id="tab-bug" class="settings-tab-pane">
+                <div class="settings-card bug-report-card">
+                    <div style="display:flex; align-items:flex-start; gap:12px;">
+                        <span style="color:var(--danger); display:flex; align-items:center;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="7" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="17"/><line x1="7" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="17" y2="12"/><path d="m19 19-3.5-3.5"/><path d="m5 5 3.5 3.5"/><path d="m19 5-3.5 3.5"/><path d="m5 19 3.5-3.5"/></svg>
+                        </span>
+                        <div>
+                            <h4 style="margin:0 0 4px 0;">Bug Report & Feature Requests</h4>
+                            <p style="margin:0; font-size:0.82rem; color:var(--text-muted); line-height:1.4;">
+                                Found an issue, visual bug, or have a suggestion for CyberNote? Open a GitHub issue directly to report it to the maintainer.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top:14px;">
+                        <label style="font-size:0.82rem; font-weight:600;">GitHub Issue Submission URL:</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="bug-report-url-input" class="text-input" value="https://github.com/Prekarshamaxx123/CyberNote/issues/new" style="flex:1;">
+                            <button id="btn-open-bug-report" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; white-space:nowrap;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                <span>Report Bug</span>
+                            </button>
+                        </div>
+                        <small style="color:var(--text-muted); margin-top:4px; display:block;">You can customize this issue URL at any time.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 14px;">
+                <button class="btn btn-primary" onclick="closeSettingsModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- First-Visit Welcome & Google Sign-In Gateway Modal -->
+    <div id="welcome-modal" class="modal" style="display: none;">
+        <div class="modal-content welcome-modal-content">
+            <div class="welcome-header">
+                <div class="welcome-logo-badge">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </div>
+                <h2>Welcome to CyberNote</h2>
+                <p class="welcome-subtitle">Ultra-secure hierarchical notebook with automated Google Drive backup & seamless offline capability.</p>
+            </div>
+            
+            <div class="welcome-features-list">
+                <div class="welcome-feat">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg> 
+                    <span><b>Google Drive Cloud Sync:</b> Automatically backs up your notes (~0.0003% of 15 GB storage used).</span>
+                </div>
+                <div class="welcome-feat">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg> 
+                    <span><b>100% Offline Capable:</b> Write and organize notes offline; auto-syncs the moment you reconnect.</span>
+                </div>
+                <div class="welcome-feat">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 
+                    <span><b>Military-Grade Security:</b> Optional client-side AES-256-GCM End-to-End Encryption.</span>
+                </div>
+            </div>
+
+            <div class="welcome-actions">
+                <button id="btn-welcome-google-signin" class="btn btn-google btn-welcome-signin">
+                    <svg class="google-svg" viewBox="0 0 24 24" width="18" height="18">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                    </svg>
+                    <span>Sign in with Google Account</span>
+                </button>
+                <button id="btn-welcome-skip" class="btn btn-secondary btn-welcome-skip">
+                    Continue Offline / As Guest
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full-Screen Cloud Sync Animation Overlay -->
+    <div id="sync-overlay" class="sync-overlay" style="display: none;">
+        <div class="sync-overlay-card">
+            <div class="sync-pulse-container">
+                <div class="sync-orbit-ring"></div>
+                <div class="sync-cloud-icon">
+                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                </div>
+            </div>
+            <h3 id="sync-overlay-title">Syncing with Google Drive...</h3>
+            <p id="sync-overlay-desc">Connecting to Google Drive and synchronizing notes...</p>
+            <div class="sync-progress-bar">
+                <div id="sync-progress-fill" class="sync-progress-fill" style="width: 25%;"></div>
+            </div>
+            <span id="sync-overlay-step" class="sync-overlay-step">Step 1 of 3: Establishing connection</span>
         </div>
     </div>
 
