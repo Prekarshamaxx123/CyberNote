@@ -100,6 +100,8 @@
             <div class="sidebar-header">
                 <span class="sidebar-title">HIERARCHY TREE</span>
                 <div class="sidebar-actions">
+                    <button id="btn-sidebar-new-note" class="icon-btn-small" title="Create New Note (📄)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+                    <button id="btn-sidebar-new-folder" class="icon-btn-small" title="Create New Folder (📁)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></button>
                     <button id="btn-move-up" class="icon-btn-small" title="Move Selected Node Up (Alt+Up)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg></button>
                     <button id="btn-move-down" class="icon-btn-small" title="Move Selected Node Down (Alt+Down)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
                     <button id="btn-expand-all" class="icon-btn-small" title="Expand All"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
@@ -155,10 +157,14 @@
                             <p class="all-notes-subtitle" id="all-notes-stats-subtitle">Overview of your notes, favorites & sub-nodes</p>
                         </div>
                     </div>
-                    <div class="all-notes-header-right">
-                        <button class="btn btn-primary" onclick="createNewRootNode()">
+                    <div class="all-notes-header-right" style="display:flex; gap:8px;">
+                        <button class="btn btn-secondary" onclick="createNewRootNode('folder')" title="Create Folder">
+                            <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                            <span>+ Folder</span>
+                        </button>
+                        <button class="btn btn-primary" onclick="createNewRootNode('note')" title="Create Note">
                             <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                            <span>+ New Note</span>
+                            <span>New Note</span>
                         </button>
                     </div>
                 </div>
@@ -283,6 +289,83 @@
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                                 <span>Date</span>
                             </button>
+                        </div>
+
+                        <div class="ribbon-divider"></div>
+
+                        <!-- Creative & Aesthetic Group: Neon, Animation, Arrows & Shapes -->
+                        <div class="ribbon-cluster ribbon-cluster-creative">
+                            <!-- Neon Glow Effects -->
+                            <div class="ribbon-dropdown-wrap">
+                                <button id="btn-neon-effects" class="ribbon-btn ribbon-badge-action" title="Neon Glowing Text Effects">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+                                    </span>
+                                    <span class="badge-label">Neon ✨</span>
+                                </button>
+                                <div id="neon-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
+                                    <div class="popover-item" onclick="applyNeonEffect('cyan')"><span class="popover-color-dot" style="background:#00ffff; box-shadow:0 0 8px #00ffff;"></span>Neon Cyan</div>
+                                    <div class="popover-item" onclick="applyNeonEffect('pink')"><span class="popover-color-dot" style="background:#ff2e93; box-shadow:0 0 8px #ff2e93;"></span>Neon Pink</div>
+                                    <div class="popover-item" onclick="applyNeonEffect('green')"><span class="popover-color-dot" style="background:#00ff66; box-shadow:0 0 8px #00ff66;"></span>Neon Green</div>
+                                    <div class="popover-item" onclick="applyNeonEffect('purple')"><span class="popover-color-dot" style="background:#c724ff; box-shadow:0 0 8px #c724ff;"></span>Neon Purple</div>
+                                    <div class="popover-item" onclick="applyNeonEffect('gold')"><span class="popover-color-dot" style="background:#ffaa00; box-shadow:0 0 8px #ffaa00;"></span>Neon Gold</div>
+                                </div>
+                            </div>
+
+                            <!-- Animated Text Effects -->
+                            <div class="ribbon-dropdown-wrap">
+                                <button id="btn-anim-effects" class="ribbon-btn ribbon-badge-action" title="Animated Text Effects">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                                    </span>
+                                    <span class="badge-label">Anim ⚡</span>
+                                </button>
+                                <div id="anim-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
+                                    <div class="popover-item" onclick="applyAnimatedText('rainbow')">🌈 Rainbow Flow</div>
+                                    <div class="popover-item" onclick="applyAnimatedText('pulse')">💫 Pulse Glow</div>
+                                    <div class="popover-item" onclick="applyAnimatedText('float')">🌊 Floating Wave</div>
+                                </div>
+                            </div>
+
+                            <!-- Arrows & Flow Elements -->
+                            <div class="ribbon-dropdown-wrap">
+                                <button id="btn-arrows-menu" class="ribbon-btn ribbon-badge-action" title="Insert Arrows & Flow Diagrams">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                    </span>
+                                    <span class="badge-label">Arrows ➔</span>
+                                </button>
+                                <div id="arrows-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
+                                    <div class="popover-item" onclick="insertSymbol('➔')">➔ Right Arrow</div>
+                                    <div class="popover-item" onclick="insertSymbol('➜')">➜ Modern Pointer</div>
+                                    <div class="popover-item" onclick="insertSymbol('⮞')">⮞ Thick Pointer</div>
+                                    <div class="popover-item" onclick="insertSymbol('⇄')">⇄ Bi-directional</div>
+                                    <div class="popover-item" onclick="insertSymbol('⚡')">⚡ Lightning Trigger</div>
+                                    <div class="popover-item" onclick="insertSymbol('⤴')">⤴ Return Flow</div>
+                                    <div class="popover-item" onclick="insertSymbol('⤵')">⤵ Downward Flow</div>
+                                    <div class="popover-divider"></div>
+                                    <div class="popover-item" onclick="insertFlowSteps()">🔄 Step 1 ➔ Step 2 Flow</div>
+                                    <div class="popover-item" onclick="insertArrowDivider()">──➔ Section Divider</div>
+                                </div>
+                            </div>
+
+                            <!-- Shapes, Badges & Cards -->
+                            <div class="ribbon-dropdown-wrap">
+                                <button id="btn-shapes-menu" class="ribbon-btn ribbon-badge-action" title="Insert Shapes, Cards & Status Badges">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                                    </span>
+                                    <span class="badge-label">Shapes 🏷️</span>
+                                </button>
+                                <div id="shapes-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
+                                    <div class="popover-item" onclick="insertNeonBanner()">🪧 Glowing Gradient Card</div>
+                                    <div class="popover-item" onclick="insertPillBadge('success')">🟢 [DONE] Success Badge</div>
+                                    <div class="popover-item" onclick="insertPillBadge('priority')">🔴 [HIGH] Priority Badge</div>
+                                    <div class="popover-item" onclick="insertPillBadge('cyber')">🛡️ [SECURE] Cyber Badge</div>
+                                    <div class="popover-item" onclick="insertPillBadge('pending')">🟡 [PENDING] Status Badge</div>
+                                    <div class="popover-item" onclick="insertMetricTile()">📊 2-Column Metric Card</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -533,6 +616,10 @@
                     <button id="btn-paint-tool-brush" class="paint-btn" title="Paint Brush">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
                         <span>Brush</span>
+                    </button>
+                    <button id="btn-paint-tool-arrow" class="paint-btn" title="Draw Arrow (Straight Line & Head)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                        <span>Arrow</span>
                     </button>
                     <button id="btn-paint-tool-eraser" class="paint-btn" title="Eraser">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><line x1="22" y1="21" x2="11" y2="21"/></svg>
@@ -1261,12 +1348,20 @@
     <!-- Tree Node Custom Right-Click Context Menu -->
     <div id="tree-context-menu" class="tree-context-menu" style="display: none;">
         <div class="context-menu-item" id="ctx-new-root">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span>New Root Note</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            <span>New Note</span>
+        </div>
+        <div class="context-menu-item" id="ctx-new-folder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+            <span>New Folder</span>
         </div>
         <div class="context-menu-item" id="ctx-subnode">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"/><circle cx="6" cy="18" r="3"/><path d="M6 9h9a3 3 0 0 1 3 3v6"/><circle cx="18" cy="18" r="3"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <span>Add Sub-Note</span>
+        </div>
+        <div class="context-menu-item" id="ctx-subfolder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>Add Sub-Folder</span>
         </div>
         <div class="context-menu-divider" id="ctx-divider-1"></div>
         <div class="context-menu-item" id="ctx-pin">
