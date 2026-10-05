@@ -2447,6 +2447,14 @@ function toggleRibbonPopover(menuId, buttonEl, e) {
     closeAllRibbonPopovers();
     if (!isShowing) {
         targetMenu.style.display = targetMenu.classList.contains('emoji-grid-popover') ? 'grid' : 'flex';
+        // Auto-reposition if popover extends beyond the right edge of viewport
+        targetMenu.style.left = '0';
+        targetMenu.style.right = 'auto';
+        const rect = targetMenu.getBoundingClientRect();
+        if (rect.right > window.innerWidth - 10) {
+            targetMenu.style.left = 'auto';
+            targetMenu.style.right = '0';
+        }
     }
 }
 
