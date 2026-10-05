@@ -54,6 +54,12 @@ try {
     // Column already exists
 }
 
+try {
+    db.exec("ALTER TABLE nodes ADD COLUMN is_readonly INTEGER DEFAULT 0");
+} catch (e) {
+    // Column already exists
+}
+
 // Seed welcome note if empty
 const countStmt = db.prepare('SELECT COUNT(*) as cnt FROM nodes WHERE deleted = 0');
 const countRow = countStmt.get();
@@ -212,7 +218,7 @@ const server = http.createServer(async (req, res) => {
             const full = parsedUrl.searchParams.get('full') === '1';
             const sql = full
                 ? 'SELECT * FROM nodes WHERE deleted = 0 ORDER BY is_pinned DESC, position ASC, created_at ASC'
-                : 'SELECT id, parent_id, title, icon, tags, color, position, is_expanded, is_pinned, updated_at FROM nodes WHERE deleted = 0 ORDER BY is_pinned DESC, position ASC, created_at ASC';
+                : 'SELECT id, parent_id, title, icon, tags, color, position, is_expanded, is_pinned, is_readonly, updated_at FROM nodes WHERE deleted = 0 ORDER BY is_pinned DESC, position ASC, created_at ASC';
             const rows = db.prepare(sql).all();
             return sendJson(res, 200, { nodes: rows });
         }
@@ -229,16 +235,17 @@ const server = http.createServer(async (req, res) => {
                 const tags = body.tags || '';
                 const color = body.color || '';
                 const is_pinned = body.is_pinned ? 1 : 0;
+                const is_readonly = body.is_readonly ? 1 : 0;
 
                 // Get max position for siblings
                 const posRow = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM nodes WHERE parent_id IS ? AND deleted = 0').get(parent_id);
                 const position = body.position !== undefined ? body.position : posRow.next_pos;
 
                 const stmt = db.prepare(`
-                    INSERT INTO nodes (id, parent_id, title, content, icon, tags, color, position, is_expanded, is_pinned, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+                    INSERT INTO nodes (id, parent_id, title, content, icon, tags, color, position, is_expanded, is_pinned, is_readonly, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
                 `);
-                stmt.run(id, parent_id, title, content, icon, tags, color, position, is_pinned, now, now);
+                stmt.run(id, parent_id, title, content, icon, tags, color, position, is_pinned, is_readonly, now, now);
 
                 const created = db.prepare('SELECT * FROM nodes WHERE id = ?').get(id);
                 broadcastEvent('node_create', created);
@@ -276,6 +283,7 @@ const server = http.createServer(async (req, res) => {
                 if (body.position !== undefined) { updates.push('position = ?'); values.push(body.position); }
                 if (body.is_expanded !== undefined) { updates.push('is_expanded = ?'); values.push(body.is_expanded ? 1 : 0); }
                 if (body.is_pinned !== undefined) { updates.push('is_pinned = ?'); values.push(body.is_pinned ? 1 : 0); }
+                if (body.is_readonly !== undefined) { updates.push('is_readonly = ?'); values.push(body.is_readonly ? 1 : 0); }
 
                 if (updates.length === 0) {
                     return sendJson(res, 200, { status: 'no changes' });
