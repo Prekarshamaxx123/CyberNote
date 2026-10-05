@@ -1,5 +1,5 @@
 // CyberNote 🛡️ - Service Worker for Offline Execution & WebAPK / PWA Installation
-const CACHE_NAME = 'cybernote-v3-cache';
+const CACHE_NAME = 'cybernote-v5-cache';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -39,33 +39,24 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Network-first for code assets (app.js, style.css, index.html) so updates apply instantly
     event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
-            if (cachedResponse) {
-                // Fetch in background to update cache
-                fetch(event.request).then((networkResponse) => {
-                    if (networkResponse && networkResponse.status === 200) {
-                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-                    }
-                }).catch(() => {});
-                return cachedResponse;
-            }
-
-            return fetch(event.request).then((networkResponse) => {
-                if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-                    return networkResponse;
+        fetch(event.request)
+            .then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                    const responseToCache = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
                 }
-                const responseToCache = networkResponse.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, responseToCache);
-                });
                 return networkResponse;
-            }).catch(() => {
-                // If offline and requesting navigation, return index.html
-                if (event.request.mode === 'navigate') {
-                    return caches.match('/index.html') || caches.match('/');
-                }
-            });
-        })
+            })
+            .catch(() => {
+                // If network fails (offline), serve from cache
+                return caches.match(event.request).then((cachedResponse) => {
+                    if (cachedResponse) return cachedResponse;
+                    if (event.request.mode === 'navigate') {
+                        return caches.match('/index.html') || caches.match('/');
+                    }
+                });
+            })
     );
 });

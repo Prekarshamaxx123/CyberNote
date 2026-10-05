@@ -282,10 +282,13 @@ function initGoogleAuth() {
         if (window.google?.accounts?.oauth2) {
             const clientId = document.getElementById('google-client-id-input')?.value.trim() || DEFAULT_GOOGLE_CLIENT_ID;
             try {
+                if (window.google?.accounts?.id?.disableAutoSelect) {
+                    window.google.accounts.id.disableAutoSelect();
+                }
                 state.tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: clientId,
                     scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-                    prompt: 'select_account',
+                    prompt: 'select_account consent',
                     callback: handleGoogleTokenResponse
                 });
             } catch (err) {
@@ -329,9 +332,31 @@ function updateDriveModalStatus(isSignedIn) {
 }
 
 function requestGoogleLogin() {
+    // 1. Disable automatic sign-in cookie in GIS
+    if (window.google?.accounts?.id?.disableAutoSelect) {
+        try {
+            window.google.accounts.id.disableAutoSelect();
+        } catch (e) {}
+    }
+
+    // 2. Always recreate token client with prompt: 'select_account consent' to guarantee email chooser
+    if (window.google?.accounts?.oauth2) {
+        const clientId = document.getElementById('google-client-id-input')?.value.trim() || DEFAULT_GOOGLE_CLIENT_ID;
+        try {
+            state.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                prompt: 'select_account consent',
+                callback: handleGoogleTokenResponse
+            });
+        } catch (err) {
+            console.warn('GIS Token client re-init:', err);
+        }
+    }
+
     if (state.tokenClient) {
-        // 'select_account' ensures Google always shows the account picker / email selector
-        state.tokenClient.requestAccessToken({ prompt: 'select_account' });
+        // Explicitly pass prompt: 'select_account consent' to force the Google Account Chooser popup
+        state.tokenClient.requestAccessToken({ prompt: 'select_account consent' });
     } else {
         alert('Google authentication service is loading... please click again in a moment.');
         initGoogleAuth();
@@ -371,6 +396,7 @@ async function fetchGoogleUserProfile() {
             };
             localStorage.setItem('cybernote_user', JSON.stringify(state.googleUser));
             updateGoogleUserUI();
+            if (typeof updateSettingsUI === 'function') updateSettingsUI();
         }
     } catch (err) {
         console.error('Failed to fetch user profile:', err);
@@ -388,14 +414,21 @@ function signoutGoogle() {
             console.warn('Revoke token error:', e);
         }
     }
+    if (window.google?.accounts?.id?.disableAutoSelect) {
+        try {
+            window.google.accounts.id.disableAutoSelect();
+        } catch (e) {}
+    }
     state.googleAccessToken = null;
     state.googleUser = null;
     localStorage.removeItem('cybernote_google_token');
     localStorage.removeItem('cybernote_google_token_expiry');
     localStorage.removeItem('cybernote_user');
     updateGoogleUserUI();
+    if (typeof updateSettingsUI === 'function') updateSettingsUI();
     closeDriveModal();
     setSyncStatus('live', 'Signed out from Google Drive');
+    showToast('Signed out from Google. You can now select any account.', 'info');
 }
 
 // --- Cloud Sync Animation Overlay Controller ---
