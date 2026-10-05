@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberNote 🛡️ - Secure Hierarchical Cloud Notes</title>
+    <title>CyberNote - Secure Hierarchical Cloud Notes</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e1e2e">
@@ -13,9 +13,13 @@
     <!-- Header -->
     <header class="app-header">
         <div class="header-left">
-            <button id="btn-toggle-sidebar" class="icon-btn" title="Toggle Sidebar (Ctrl+\)">☰</button>
+            <button id="btn-toggle-sidebar" class="icon-btn" title="Toggle Sidebar (Ctrl+\)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
             <div class="logo">
-                <span class="logo-icon">🛡️</span>
+                <span class="logo-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </span>
                 <span class="logo-text">CyberNote</span>
             </div>
             <div class="sync-badge" id="sync-status">
@@ -26,16 +30,24 @@
 
         <div class="header-center">
             <div class="search-box">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </span>
                 <input type="text" id="global-search" placeholder="Search all notes & content (Ctrl+K)...">
                 <span class="search-shortcut">Ctrl K</span>
             </div>
         </div>
 
         <div class="header-right">
+            <!-- New Note Button -->
+            <button id="btn-new-root" class="btn btn-primary" title="Create Root Note">
+                <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>+ New Note</span>
+            </button>
+
             <!-- Google Sign-In / User Profile Button -->
             <button id="btn-google-login" class="btn btn-google" title="Sign in with Google to Auto-Sync with Google Drive">
-                <svg class="google-svg" viewBox="0 0 24 24" width="16" height="16">
+                <svg class="google-svg" viewBox="0 0 24 24" width="15" height="15">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
@@ -47,16 +59,43 @@
             <div id="user-profile-badge" class="user-profile-badge" style="display: none;" title="Google Drive Auto-Sync Active">
                 <img id="user-avatar" class="user-avatar" src="" alt="Google User">
                 <span id="user-name" class="user-name">User</span>
-                <span class="drive-sync-indicator" title="Connected to Google Drive">☁️</span>
+                <span class="drive-sync-indicator" title="Connected to Google Drive">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                </span>
             </div>
 
-            <button id="btn-open-drive-modal" class="btn btn-drive" title="Google Drive Auto-Backup & Security">☁️ Drive</button>
-            <button id="btn-new-root" class="btn btn-primary" title="Create Root Node">+ New Note</button>
-            <button id="btn-import-ct" class="btn btn-secondary" title="Import CherryTree .ctb/.ctd">📥 Import</button>
-            <button id="btn-export" class="btn btn-secondary" title="Export Notes">📤 Export</button>
-            <button id="btn-github-sync" class="btn btn-github" title="Configure GitHub Hosting & Cloud Sync">🐙 GitHub</button>
-            <button id="btn-tree-info" class="icon-btn" title="Tree & Node Info">ℹ️</button>
-            <button id="btn-theme" class="icon-btn" title="Toggle Light/Dark Theme">🌙</button>
+            <button id="btn-open-drive-modal" class="btn btn-drive" title="Google Drive Auto-Backup & Security">
+                <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                <span>Drive</span>
+            </button>
+
+            <!-- About / Follow Prekarsha Button -->
+            <button id="btn-about" class="btn btn-about" title="About CyberNote & Follow Prekarsha on GitHub">
+                <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span>About</span>
+            </button>
+
+            <!-- Utility Action Group -->
+            <div class="header-utility-group">
+                <button id="btn-import-ct" class="btn btn-sm btn-secondary" title="Import CherryTree .ctb/.ctd">
+                    <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Import</span>
+                </button>
+                <button id="btn-export" class="btn btn-sm btn-secondary" title="Export Notes">
+                    <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span>Export</span>
+                </button>
+                <button id="btn-github-sync" class="btn btn-sm btn-github" title="Configure GitHub Hosting & Cloud Sync">
+                    <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                    <span>GitHub</span>
+                </button>
+                <button id="btn-tree-info" class="icon-btn-header" title="Tree & Node Info">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                </button>
+                <button id="btn-theme" class="icon-btn-header" title="Toggle Light/Dark Theme">
+                    <svg id="theme-icon-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </button>
+            </div>
         </div>
     </header>
 
@@ -67,10 +106,10 @@
             <div class="sidebar-header">
                 <span class="sidebar-title">HIERARCHY TREE</span>
                 <div class="sidebar-actions">
-                    <button id="btn-move-up" class="icon-btn-small" title="Move Selected Node Up (Alt+Up)">▲</button>
-                    <button id="btn-move-down" class="icon-btn-small" title="Move Selected Node Down (Alt+Down)">▼</button>
-                    <button id="btn-expand-all" class="icon-btn-small" title="Expand All">⤢</button>
-                    <button id="btn-collapse-all" class="icon-btn-small" title="Collapse All">⤡</button>
+                    <button id="btn-move-up" class="icon-btn-small" title="Move Selected Node Up (Alt+Up)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg></button>
+                    <button id="btn-move-down" class="icon-btn-small" title="Move Selected Node Down (Alt+Down)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <button id="btn-expand-all" class="icon-btn-small" title="Expand All"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                    <button id="btn-collapse-all" class="icon-btn-small" title="Collapse All"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                 </div>
             </div>
 
@@ -86,7 +125,7 @@
         <!-- Note Content & In-Place WYSIWYG Editor Area (No Split, No Preview Tab) -->
         <main class="editor-pane" id="editor-pane">
             <div id="no-note-selected" class="empty-state" style="display: none;">
-                <div class="empty-icon">🌲</div>
+                <div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
                 <h2>No Note Selected</h2>
                 <p>Select a note from the tree hierarchy or create a new note to start writing.</p>
                 <button class="btn btn-primary" onclick="createNewRootNode()">+ Create Root Note</button>
@@ -99,11 +138,26 @@
                         <span>Root</span>
                     </div>
                     <div class="node-actions-bar">
-                        <button id="btn-add-subnode" class="btn btn-sm btn-outline">+ Sub-Note</button>
-                        <button id="btn-node-color" class="btn btn-sm btn-secondary" title="Set Node Color">🎨 Node Color</button>
-                        <button id="btn-duplicate-node" class="btn btn-sm btn-secondary" title="Duplicate this node and branch">📄 Duplicate</button>
-                        <button id="btn-toggle-readonly" class="btn btn-sm btn-secondary" title="Toggle Read-Only mode">🔓 Read/Write</button>
-                        <button id="btn-delete-node" class="btn btn-sm btn-danger">Delete</button>
+                        <button id="btn-add-subnode" class="btn btn-sm btn-outline">
+                            <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 3v12"/><circle cx="6" cy="18" r="3"/><path d="M6 9h9a3 3 0 0 1 3 3v6"/><circle cx="18" cy="18" r="3"/></svg>
+                            <span>+ Sub-Note</span>
+                        </button>
+                        <button id="btn-node-color" class="btn btn-sm btn-secondary" title="Set Node Color">
+                            <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg>
+                            <span>Color</span>
+                        </button>
+                        <button id="btn-duplicate-node" class="btn btn-sm btn-secondary" title="Duplicate this node and branch">
+                            <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            <span>Duplicate</span>
+                        </button>
+                        <button id="btn-toggle-readonly" class="btn btn-sm btn-secondary" title="Toggle Read-Only mode">
+                            <svg id="readonly-icon-svg" class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                            <span id="readonly-label">Read/Write</span>
+                        </button>
+                        <button id="btn-delete-node" class="btn btn-sm btn-danger">
+                            <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            <span>Delete</span>
+                        </button>
                     </div>
                 </div>
 
@@ -114,7 +168,10 @@
                 </div>
 
                 <div class="tags-container">
-                    <span class="tags-label">🏷️ Tags:</span>
+                    <span class="tags-label">
+                        <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                        <span>Tags:</span>
+                    </span>
                     <input type="text" id="note-tags" class="note-tags-input" placeholder="e.g. overthewire, linux, cybersecurity">
                 </div>
 
@@ -143,48 +200,61 @@
                         <!-- Creative & Blocks Studio Badges -->
                         <div class="ribbon-cluster ribbon-cluster-studio">
                             <button id="btn-open-paint" class="ribbon-btn ribbon-badge-paint" title="Paint Studio & Handwritten Signature">
-                                <span class="badge-icon">🎨</span>
+                                <span class="badge-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="11" cy="11" r="2"/></svg>
+                                </span>
                                 <span class="badge-label">Paint / Sign</span>
                             </button>
                             <button id="btn-insert-image" class="ribbon-btn ribbon-badge-action" title="Insert Photo or Screenshot (Ctrl+V)">
-                                <span class="badge-icon">🖼️</span>
+                                <span class="badge-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                </span>
                                 <span class="badge-label">Photo</span>
                             </button>
                             <input type="file" id="image-file-input" accept="image/*" style="display:none;">
 
                             <button id="btn-open-table-modal" class="ribbon-btn ribbon-badge-action" title="Insert Table (Rows × Columns)">
-                                <span class="badge-icon">▦</span>
+                                <span class="badge-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                                </span>
                                 <span class="badge-label">Table</span>
                             </button>
 
                             <button id="btn-insert-codebox" class="ribbon-btn ribbon-badge-action" title="Insert Code Box with 1-Click Copy">
-                                <span class="badge-icon">💻</span>
+                                <span class="badge-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                                </span>
                                 <span class="badge-label">CodeBox</span>
                             </button>
 
                             <button id="btn-insert-todo" class="ribbon-btn ribbon-badge-action" title="Interactive Checklist (To-Do)">
-                                <span class="badge-icon">☑</span>
+                                <span class="badge-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                </span>
                                 <span class="badge-label">To-Do</span>
                             </button>
 
                             <div class="ribbon-select-wrap">
                                 <select id="select-callout" class="ribbon-select" title="Insert Callout Box">
-                                    <option value="">💡 Callouts...</option>
-                                    <option value="tip">💡 Tip Box</option>
-                                    <option value="warning">⚠️ Warning Box</option>
-                                    <option value="info">ℹ️ Info Note</option>
-                                    <option value="danger">🚨 Danger / Alert</option>
+                                    <option value="">Callout Box...</option>
+                                    <option value="tip">Tip Box</option>
+                                    <option value="warning">Warning Box</option>
+                                    <option value="info">Info Note</option>
+                                    <option value="danger">Alert Box</option>
                                 </select>
                             </div>
 
                             <button id="btn-insert-link" class="ribbon-btn ribbon-btn-compact" title="Insert Hyperlink (Ctrl+K)">
-                                <span>🔗 Link</span>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                <span>Link</span>
                             </button>
                             <button id="btn-insert-nodelink" class="ribbon-btn ribbon-btn-compact" title="Internal Link to another Node">
-                                <span>📌 Node Link</span>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+                                <span>Node Link</span>
                             </button>
                             <button id="btn-insert-timestamp" class="ribbon-btn ribbon-btn-compact" title="Insert Date & Time">
-                                <span>📅 Date</span>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                <span>Date</span>
                             </button>
                         </div>
                     </div>
@@ -242,12 +312,14 @@
                                 <input type="color" id="text-color-picker" value="#f38ba8">
                             </label>
                             <label class="ribbon-color-btn" title="Highlight / Marker Color">
-                                <span class="color-icon-char">🖍</span>
+                                <span class="color-icon-char">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+                                </span>
                                 <span class="color-indicator-bar" id="bg-color-indicator"></span>
                                 <input type="color" id="bg-color-picker" value="#f5c211">
                             </label>
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-clear-format" title="Clear Formatting (Tₓ)">
-                                <span style="font-size:0.85rem; font-weight:700;">Tₓ</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><line x1="22" y1="21" x2="11" y2="21"/></svg>
                             </button>
                         </div>
 
@@ -273,10 +345,18 @@
 
                         <!-- Paragraph Elements -->
                         <div class="ribbon-cluster">
-                            <button class="ribbon-btn ribbon-btn-icon" id="btn-bullet-list" title="Bullet List">• List</button>
-                            <button class="ribbon-btn ribbon-btn-icon" id="btn-numbered-list" title="Numbered List">1. List</button>
-                            <button class="ribbon-btn ribbon-btn-icon" id="btn-quote" title="Quote Block">❝ Quote</button>
-                            <button class="ribbon-btn ribbon-btn-icon" id="btn-hr" title="Horizontal Divider">― Divider</button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-bullet-list" title="Bullet List">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.5" fill="currentColor"/><circle cx="3.5" cy="12" r="1.5" fill="currentColor"/><circle cx="3.5" cy="18" r="1.5" fill="currentColor"/></svg>
+                            </button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-numbered-list" title="Numbered List">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h2v4"/><path d="M4 10h4"/></svg>
+                            </button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-quote" title="Quote Block">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .01-1 1V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2h-4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .01-1 1V20c0 1 0 1 1 1z"/></svg>
+                            </button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-hr" title="Horizontal Divider">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"/></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -291,23 +371,32 @@
                     <span class="bubble-sep"></span>
                     <button class="bubble-btn" id="bubble-h1" title="Heading 1"><b>H1</b></button>
                     <button class="bubble-btn" id="bubble-h2" title="Heading 2"><b>H2</b></button>
-                    <button class="bubble-btn" id="bubble-quote" title="Quote">❝</button>
+                    <button class="bubble-btn" id="bubble-quote" title="Quote">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .01-1 1V20c0 1 0 1 1 1z"/></svg>
+                    </button>
                     <span class="bubble-sep"></span>
                     <label class="bubble-color-label" title="Text Color">
                         <span class="bubble-color-glyph">A</span>
                         <input type="color" id="bubble-text-color" value="#f38ba8">
                     </label>
                     <label class="bubble-color-label" title="Highlight Color">
-                        <span class="bubble-color-glyph">🖍</span>
+                        <span class="bubble-color-glyph">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+                        </span>
                         <input type="color" id="bubble-bg-color" value="#f5c211">
                     </label>
-                    <button class="bubble-btn" id="bubble-link" title="Insert Link">🔗</button>
+                    <button class="bubble-btn" id="bubble-link" title="Insert Link">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    </button>
                 </div>
 
                 <!-- Slash Command Palette (Notion / RemNote style) -->
                 <div id="slash-menu" class="slash-menu" style="display: none;">
                     <div class="slash-menu-header">
-                        <span class="slash-title">⚡ QUICK ACTIONS</span>
+                        <span class="slash-title">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            QUICK ACTIONS
+                        </span>
                         <span class="slash-hint">Type to filter • ↑↓ to navigate • ↵ to select</span>
                     </div>
                     <div class="slash-items-list" id="slash-items-list">
@@ -325,33 +414,41 @@
                         <button id="btn-find-next" class="btn btn-sm btn-secondary">Next</button>
                         <button id="btn-find-replace" class="btn btn-sm btn-secondary">Replace</button>
                         <button id="btn-find-replace-all" class="btn btn-sm btn-secondary">Replace All</button>
-                        <button id="btn-find-close" class="icon-btn-small" title="Close Find">✕</button>
+                        <button id="btn-find-close" class="icon-btn-small" title="Close Find"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                     </div>
                     <span id="find-count" class="find-count"></span>
                 </div>
 
                 <!-- Floating Table Management Toolbar (appears when inside a table cell) -->
                 <div id="table-toolbar" class="table-toolbar" style="display: none;">
-                    <span class="table-tb-title">▦ Table:</span>
-                    <button id="btn-tbl-add-row-above" class="tb-btn-small" title="Add Row Above">+ Row ▲</button>
-                    <button id="btn-tbl-add-row-below" class="tb-btn-small" title="Add Row Below">+ Row ▼</button>
-                    <button id="btn-tbl-add-col-left" class="tb-btn-small" title="Add Column Left">+ Col ◀</button>
-                    <button id="btn-tbl-add-col-right" class="tb-btn-small" title="Add Column Right">+ Col ▶</button>
-                    <button id="btn-tbl-del-row" class="tb-btn-small btn-tb-danger" title="Delete Row">✕ Row</button>
-                    <button id="btn-tbl-del-col" class="tb-btn-small btn-tb-danger" title="Delete Column">✕ Col</button>
-                    <button id="btn-tbl-del-table" class="tb-btn-small btn-tb-danger" title="Delete Entire Table">🗑️ Table</button>
+                    <span class="table-tb-title">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>Table:
+                    </span>
+                    <button id="btn-tbl-add-row-above" class="tb-btn-small" title="Add Row Above">+ Row Above</button>
+                    <button id="btn-tbl-add-row-below" class="tb-btn-small" title="Add Row Below">+ Row Below</button>
+                    <button id="btn-tbl-add-col-left" class="tb-btn-small" title="Add Column Left">+ Col Left</button>
+                    <button id="btn-tbl-add-col-right" class="tb-btn-small" title="Add Column Right">+ Col Right</button>
+                    <button id="btn-tbl-del-row" class="tb-btn-small btn-tb-danger" title="Delete Row">Delete Row</button>
+                    <button id="btn-tbl-del-col" class="tb-btn-small btn-tb-danger" title="Delete Column">Delete Col</button>
+                    <button id="btn-tbl-del-table" class="tb-btn-small btn-tb-danger" title="Delete Entire Table">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete Table
+                    </button>
                 </div>
 
                 <!-- Floating Image Management Toolbar (appears when clicking an image) -->
                 <div id="image-toolbar" class="image-toolbar" style="display: none;">
-                    <span class="image-tb-title">🖼️ Image:</span>
+                    <span class="image-tb-title">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Image:
+                    </span>
                     <button id="btn-img-size-25" class="tb-btn-small">25%</button>
                     <button id="btn-img-size-50" class="tb-btn-small">50%</button>
                     <button id="btn-img-size-100" class="tb-btn-small">100%</button>
-                    <button id="btn-img-align-left" class="tb-btn-small">◀ Left</button>
-                    <button id="btn-img-align-center" class="tb-btn-small">■ Center</button>
-                    <button id="btn-img-align-right" class="tb-btn-small">Right ▶</button>
-                    <button id="btn-img-delete" class="tb-btn-small btn-tb-danger">🗑️ Delete</button>
+                    <button id="btn-img-align-left" class="tb-btn-small">Left</button>
+                    <button id="btn-img-align-center" class="tb-btn-small">Center</button>
+                    <button id="btn-img-align-right" class="tb-btn-small">Right</button>
+                    <button id="btn-img-delete" class="tb-btn-small btn-tb-danger">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete
+                    </button>
                 </div>
 
                 <!-- DIRECT IN-PLACE WYSIWYG DOCUMENT CANVAS (NO PREVIEW TAB) -->
@@ -382,16 +479,28 @@
     <div id="paint-modal" class="modal" style="display: none;">
         <div class="modal-content paint-modal-content">
             <div class="paint-header">
-                <h3>🎨 Paint & Signature Studio</h3>
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="11" cy="11" r="2"/></svg>
+                    Paint & Signature Studio
+                </h3>
                 <span class="modal-subtext">Draw diagrams, freehand notes, or sign with smooth handwritten ink:</span>
             </div>
 
             <!-- Paint Toolbar -->
             <div class="paint-toolbar">
                 <div class="paint-tool-group">
-                    <button id="btn-paint-tool-signature" class="paint-btn active" title="Handwritten Signature (Smooth Ink)">🖋️ Signature</button>
-                    <button id="btn-paint-tool-brush" class="paint-btn" title="Paint Brush">🖌️ Brush</button>
-                    <button id="btn-paint-tool-eraser" class="paint-btn" title="Eraser">🧹 Eraser</button>
+                    <button id="btn-paint-tool-signature" class="paint-btn active" title="Handwritten Signature (Smooth Ink)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                        <span>Signature</span>
+                    </button>
+                    <button id="btn-paint-tool-brush" class="paint-btn" title="Paint Brush">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
+                        <span>Brush</span>
+                    </button>
+                    <button id="btn-paint-tool-eraser" class="paint-btn" title="Eraser">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><line x1="22" y1="21" x2="11" y2="21"/></svg>
+                        <span>Eraser</span>
+                    </button>
                 </div>
 
                 <div class="paint-tool-group">
@@ -414,7 +523,10 @@
                 </div>
 
                 <div class="paint-tool-group">
-                    <button id="btn-paint-clear" class="btn btn-sm btn-secondary" title="Clear Canvas">🗑️ Clear</button>
+                    <button id="btn-paint-clear" class="btn btn-sm btn-secondary" title="Clear Canvas">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        <span>Clear</span>
+                    </button>
                 </div>
             </div>
 
@@ -424,7 +536,7 @@
             </div>
 
             <div class="modal-actions paint-actions">
-                <button id="btn-paint-insert" class="btn btn-primary">✓ Insert into Note</button>
+                <button id="btn-paint-insert" class="btn btn-primary"><svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>Insert into Note</span></button>
                 <button class="btn btn-secondary" onclick="closePaintModal()">Cancel</button>
             </div>
         </div>
@@ -433,7 +545,10 @@
     <!-- Draw / Insert Table Modal -->
     <div id="table-modal" class="modal" style="display: none;">
         <div class="modal-content" style="width: 380px;">
-            <h3>▦ Insert Table</h3>
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                Insert Table
+            </h3>
             <p>Specify the grid dimensions for your new table:</p>
             <div class="form-group" style="display: flex; gap: 12px;">
                 <div style="flex:1;">
@@ -455,7 +570,10 @@
     <!-- Node Color Picker Modal -->
     <div id="node-color-modal" class="modal" style="display: none;">
         <div class="modal-content" style="width: 380px;">
-            <h3>🎨 Set Node Color</h3>
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg>
+                Set Node Color
+            </h3>
             <p>Pick a custom badge color for this note in the hierarchy tree:</p>
             <div class="node-color-grid">
                 <button class="node-color-choice" data-color="" style="background:transparent; border:2px dashed var(--border-color);" title="None / Default">Default</button>
@@ -482,7 +600,10 @@
     <!-- CodeBox Modal -->
     <div id="codebox-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <h3>💻 Insert CodeBox</h3>
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                Insert CodeBox
+            </h3>
             <div class="form-group">
                 <label>Programming Language:</label>
                 <select id="codebox-lang" class="text-input">
@@ -512,7 +633,10 @@
     <!-- Node Link Modal -->
     <div id="nodelink-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <h3>📌 Link to Node</h3>
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+                Link to Node
+            </h3>
             <p>Select another node in the tree to create an internal anchor link:</p>
             <div class="form-group">
                 <input type="text" id="nodelink-search" class="text-input" placeholder="Search target node...">
@@ -524,7 +648,7 @@
         </div>
     </div>
 
-    <!-- Icon Picker Modal -->
+    <!-- Icon Picker Modal (Tree Node Emojis) -->
     <div id="icon-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3>Choose Node Icon</h3>
@@ -553,7 +677,10 @@
     <!-- Tree Info Modal -->
     <div id="tree-info-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <h3>ℹ️ Tree & Node Properties</h3>
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                Tree & Node Properties
+            </h3>
             <div id="tree-info-content" class="info-table-container"></div>
             <div class="modal-actions">
                 <button class="btn btn-primary" onclick="closeTreeInfoModal()">Close</button>
@@ -564,7 +691,10 @@
     <!-- GitHub Sync & Hosting Modal -->
     <div id="github-modal" class="modal" style="display: none;">
         <div class="modal-content" style="width: 500px;">
-            <h3>🐙 GitHub Hosting & Cloud Sync</h3>
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                GitHub Hosting & Cloud Sync
+            </h3>
             <p>Host TreeKeep directly on <b>GitHub Pages</b> and sync notes to your private GitHub repository:</p>
             <div class="form-group">
                 <label>GitHub Username:</label>
@@ -590,7 +720,10 @@
     <!-- Import CherryTree Modal -->
     <div id="import-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <h3>📥 Import CherryTree Notes</h3>
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Import CherryTree Notes
+            </h3>
             <p>Directly load existing CherryTree notes (<code>.ctb</code> or <code>.ctd</code>) into TreeKeep:</p>
             <div class="form-group">
                 <label>CherryTree File Path on system:</label>
@@ -608,12 +741,20 @@
     <div id="drive-modal" class="modal" style="display: none;">
         <div class="modal-content" style="width: 520px;">
             <div class="modal-header-row">
-                <h3>☁️ Google Drive Auto-Backup & Security</h3>
-                <span class="security-badge">🔒 AES-256 E2EE Ready</span>
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                    Google Drive Auto-Backup & Security
+                </h3>
+                <span class="security-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle; margin-right: 3px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    AES-256 E2EE Ready
+                </span>
             </div>
             
             <div id="drive-user-status" class="drive-status-box">
-                <span style="font-size:1.5rem;">👤</span>
+                <span style="font-size:1.5rem; display:flex; align-items:center;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
                 <div>
                     <div id="drive-status-name" style="font-weight:600;">Not Signed In</div>
                     <div id="drive-status-detail" style="font-size:0.8rem; color:var(--text-muted);">Sign in with Google to enable automatic cloud backup.</div>
@@ -621,15 +762,24 @@
             </div>
 
             <div class="drive-actions-group">
-                <button id="btn-drive-backup-now" class="btn btn-primary" style="flex:1;">☁️ Backup to Drive Now</button>
-                <button id="btn-drive-restore-now" class="btn btn-secondary" style="flex:1;">📥 Restore from Drive</button>
+                <button id="btn-drive-backup-now" class="btn btn-primary" style="flex:1;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                    <span>Backup to Drive Now</span>
+                </button>
+                <button id="btn-drive-restore-now" class="btn btn-secondary" style="flex:1;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Restore from Drive</span>
+                </button>
             </div>
             
             <div id="drive-sync-log" class="import-status"></div>
 
             <hr style="border:none; border-top:1px solid var(--border-color); margin:4px 0;">
 
-            <h4 style="margin-top:4px; font-size:0.95rem;">🛡️ End-to-End Encryption (E2EE)</h4>
+            <h4 style="margin-top:4px; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                End-to-End Encryption (E2EE)
+            </h4>
             <p style="font-size:0.8rem; color:var(--text-muted);">
                 CyberNote uses <code>drive.file</code> scope (sandbox access only). 
                 Optionally encrypt your notes with AES-256-GCM before uploading to Google Drive so that not even Google can read your data.
@@ -656,6 +806,90 @@
             <div class="modal-actions" style="margin-top:8px;">
                 <button id="btn-drive-signout" class="btn btn-danger" style="display:none;">Sign Out</button>
                 <button class="btn btn-secondary" onclick="closeDriveModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About CyberNote & Developer Modal (Prekarshamaxx123 Support) -->
+    <div id="about-modal" class="modal" style="display: none;">
+        <div class="modal-content about-modal-content">
+            <div class="about-hero">
+                <div class="about-logo-wrapper">
+                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="m9 12 2 2 4-4"/>
+                    </svg>
+                </div>
+                <h2>CyberNote</h2>
+                <span class="about-version">v2.5.0 Modern Edition</span>
+                <p class="about-tagline">Advanced Hierarchical Tree Notes with AES-256 E2EE & Instant Google Drive Delta Sync</p>
+            </div>
+
+            <!-- Creator Profile & Support Call to Action -->
+            <div class="about-card creator-card">
+                <div class="creator-badge">CREATOR & MAINTAINER</div>
+                <div class="creator-header">
+                    <div class="creator-avatar">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                    </div>
+                    <div class="creator-meta">
+                        <div class="creator-name">Prekarsha</div>
+                        <div class="creator-sub">Developer of CyberNote</div>
+                    </div>
+                </div>
+
+                <div class="support-message">
+                    <p><b>Support the Project:</b> If you find CyberNote helpful, please follow me on GitHub and leave a star ⭐!</p>
+                    <p style="color:var(--accent); font-weight:500;">ඔබ CyberNote වලට කැමති නම්, මාව GitHub එකේ follow කරලා project එකට support එකක් ලබා දෙන්න!</p>
+                </div>
+
+                <div class="creator-cta">
+                    <a href="https://github.com/Prekarshamaxx123" target="_blank" rel="noopener noreferrer" class="btn btn-github-follow">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        <span>Follow @Prekarshamaxx123 on GitHub</span>
+                        <span class="follow-pill">⭐ Follow & Star</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Features Quick Summary -->
+            <div class="about-feature-grid">
+                <div class="about-feature-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <div>
+                        <b>AES-256-GCM E2EE</b>
+                        <span>Full client encryption with PBKDF2</span>
+                    </div>
+                </div>
+                <div class="about-feature-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                    <div>
+                        <b>Google Drive Delta-Sync</b>
+                        <span>Instant micro-sync on every keystroke</span>
+                    </div>
+                </div>
+                <div class="about-feature-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                    <div>
+                        <b>Paint & Signature Studio</b>
+                        <span>Smooth handwritten ink and sketches</span>
+                    </div>
+                </div>
+                <div class="about-feature-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <div>
+                        <b>Notion Slash Commands (/)</b>
+                        <span>Quick-insert palette & hover formatting</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 14px;">
+                <button class="btn btn-primary" onclick="closeAboutModal()">Close</button>
             </div>
         </div>
     </div>
