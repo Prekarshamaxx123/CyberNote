@@ -644,17 +644,43 @@
                         <!-- Group 2: Document Layout Cards -->
                         <div class="ribbon-word-group" title="Rich Cards & Visual Elements">
                             <div class="ribbon-group-items">
-                                <button class="ribbon-btn ribbon-btn-compact" onclick="insertNeonBanner()" title="Insert Glowing Banner Card">
-                                    <span>🎴 Banner</span>
+                                <button class="ribbon-btn ribbon-badge-action" onclick="insertNeonBanner()" title="Insert Glowing Banner Card">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="2" y="4" width="20" height="16" rx="3"/>
+                                            <line x1="2" y1="10" x2="22" y2="10"/>
+                                            <line x1="6" y1="15" x2="14" y2="15"/>
+                                        </svg>
+                                    </span>
+                                    <span class="badge-label">Banner</span>
                                 </button>
-                                <button class="ribbon-btn ribbon-btn-compact" onclick="insertTimeline()" title="Insert Timeline Step Tracker">
-                                    <span>⏳ Timeline</span>
+                                <button class="ribbon-btn ribbon-badge-action" onclick="insertTimeline()" title="Insert Timeline Step Tracker">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="9"/>
+                                            <polyline points="12 7 12 12 15 15"/>
+                                        </svg>
+                                    </span>
+                                    <span class="badge-label">Timeline</span>
                                 </button>
-                                <button class="ribbon-btn ribbon-btn-compact" onclick="insertQuoteCard()" title="Insert Quote Block">
-                                    <span>💬 Quote</span>
+                                <button class="ribbon-btn ribbon-badge-action" onclick="insertQuoteCard()" title="Insert Styled Quote Block">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .01-1 1V20c0 1 0 1 1 1z"/>
+                                            <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2h-4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .01-1 1V20c0 1 0 1 1 1z"/>
+                                        </svg>
+                                    </span>
+                                    <span class="badge-label">Quote</span>
                                 </button>
-                                <button class="ribbon-btn ribbon-btn-compact" onclick="insertMetricTile()" title="Insert 2-Col Metric Tile">
-                                    <span>📊 Metrics</span>
+                                <button class="ribbon-btn ribbon-badge-action" onclick="insertMetricTile()" title="Insert 2-Col Metric Tile">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="18" y1="20" x2="18" y2="10"/>
+                                            <line x1="12" y1="20" x2="12" y2="4"/>
+                                            <line x1="6" y1="20" x2="6" y2="14"/>
+                                        </svg>
+                                    </span>
+                                    <span class="badge-label">Metrics</span>
                                 </button>
                             </div>
                             <span class="ribbon-group-label">Smart Cards</span>
@@ -662,12 +688,50 @@
 
                         <div class="ribbon-group-sep"></div>
 
-                        <!-- Group 3: Focus Mode -->
+                        <!-- Group 3: Creative Accents -->
+                        <div class="ribbon-word-group" title="Styling Accents & Badges">
+                            <div class="ribbon-group-items">
+                                <button class="ribbon-btn ribbon-badge-action" onclick="insertFancyDivider()" title="Insert Cyber Glowing Divider">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="2" y1="12" x2="8" y2="12"/>
+                                            <polygon points="12 8 16 12 12 16 8 12" fill="currentColor"/>
+                                            <line x1="16" y1="12" x2="22" y2="12"/>
+                                        </svg>
+                                    </span>
+                                    <span class="badge-label">Divider</span>
+                                </button>
+
+                                <div class="ribbon-dropdown-wrap">
+                                    <button id="btn-studio-badges" class="ribbon-btn ribbon-badge-action" onclick="toggleRibbonPopover('studio-badges-menu', this, event)" title="Insert Status Badges">
+                                        <span class="badge-icon">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                            </svg>
+                                        </span>
+                                        <span class="badge-label">Badges</span>
+                                    </button>
+                                    <div id="studio-badges-menu" class="ribbon-popover-menu" style="display: none;">
+                                        <div class="popover-item" onclick="insertPillBadge('success')"><span class="badge-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#a6e3a1;margin-right:6px;"></span>[DONE] Success Badge</div>
+                                        <div class="popover-item" onclick="insertPillBadge('priority')"><span class="badge-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f38ba8;margin-right:6px;"></span>[HIGH] Priority Badge</div>
+                                        <div class="popover-item" onclick="insertPillBadge('cyber')"><span class="badge-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#89b4fa;margin-right:6px;"></span>[SECURE] Cyber Badge</div>
+                                        <div class="popover-item" onclick="insertPillBadge('pending')"><span class="badge-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f9e2af;margin-right:6px;"></span>[PENDING] Status Badge</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="ribbon-group-label">Accents</span>
+                        </div>
+
+                        <div class="ribbon-group-sep"></div>
+
+                        <!-- Group 4: Focus Mode -->
                         <div class="ribbon-word-group" title="Full Screen Writing">
                             <div class="ribbon-group-items">
-                                <button id="btn-zen-mode" class="ribbon-btn ribbon-btn-compact" title="Focus Mode (Full Screen Distraction-Free Writing)">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-                                    <span>Focus Mode</span>
+                                <button id="btn-zen-mode" class="ribbon-btn ribbon-badge-action" title="Focus Mode (Full Screen Distraction-Free Writing)">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                                    </span>
+                                    <span class="badge-label">Focus Mode</span>
                                 </button>
                             </div>
                             <span class="ribbon-group-label">Zen Canvas</span>
@@ -680,9 +744,11 @@
                         <div class="ribbon-word-group" title="Export & Print Note">
                             <div class="ribbon-group-items">
                                 <div class="ribbon-dropdown-wrap">
-                                    <button id="btn-export-menu" class="ribbon-btn ribbon-btn-compact" title="Export Note File (.md, .html, .txt, .json)">
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        <span>Export Note</span>
+                                    <button id="btn-export-menu" class="ribbon-btn ribbon-badge-action" title="Export Note File (.md, .html, .txt, .json)">
+                                        <span class="badge-icon">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        </span>
+                                        <span class="badge-label">Export Note</span>
                                     </button>
                                     <div id="export-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
                                         <div class="popover-item" onclick="exportNoteAs('md')">📄 Markdown (.md)</div>
@@ -692,9 +758,11 @@
                                     </div>
                                 </div>
 
-                                <button class="ribbon-btn ribbon-btn-compact" id="btn-print-note" title="Print Note / Export PDF">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                                    <span>Print / PDF</span>
+                                <button class="ribbon-btn ribbon-badge-action" id="btn-print-note" title="Print Note / Export PDF">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                    </span>
+                                    <span class="badge-label">Print / PDF</span>
                                 </button>
                             </div>
                             <span class="ribbon-group-label">Publish</span>
@@ -702,7 +770,28 @@
 
                         <div class="ribbon-group-sep"></div>
 
-                        <!-- Group 2: Document Statistics -->
+                        <!-- Group 2: Document Navigation & Focus -->
+                        <div class="ribbon-word-group" title="Navigation & Focus">
+                            <div class="ribbon-group-items">
+                                <button class="ribbon-btn ribbon-badge-action" onclick="document.getElementById('btn-toggle-find')?.click()" title="Find & Replace in Document (Ctrl+F)">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                                    </span>
+                                    <span class="badge-label">Find in Note</span>
+                                </button>
+                                <button class="ribbon-btn ribbon-badge-action" onclick="toggleZenMode()" title="Focus Mode (Full Screen)">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                                    </span>
+                                    <span class="badge-label">Focus Canvas</span>
+                                </button>
+                            </div>
+                            <span class="ribbon-group-label">Navigation</span>
+                        </div>
+
+                        <div class="ribbon-group-sep"></div>
+
+                        <!-- Group 3: Document Statistics -->
                         <div class="ribbon-word-group" title="Word & Character Statistics">
                             <div class="ribbon-group-items">
                                 <span id="ribbon-word-count" class="ribbon-word-badge" title="Live Document Word Count & Reading Time">0 words</span>
