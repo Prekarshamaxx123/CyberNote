@@ -1279,8 +1279,9 @@ body {
 .ribbon-tab-pane {
     display: none;
     align-items: stretch;
-    gap: 2px;
-    padding: 4px 10px 4px 10px;
+    justify-content: flex-start;
+    gap: clamp(10px, 1.8vw, 28px);
+    padding: 6px clamp(12px, 2vw, 28px);
     overflow: visible;
     flex-wrap: wrap;
     width: 100%;
@@ -1304,25 +1305,25 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 2px 4px 1px 4px;
+    padding: 3px clamp(6px, 0.8vw, 14px) 2px clamp(6px, 0.8vw, 14px);
     flex-shrink: 0;
     box-sizing: border-box;
-    border-radius: 6px;
+    border-radius: 8px;
     transition: background 0.15s ease, border-color 0.15s ease;
     border: 1px solid transparent;
 }
 
 .ribbon-word-group:hover {
-    background: rgba(255, 255, 255, 0.02);
-    border-color: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06);
 }
 
 .ribbon-group-items {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: clamp(4px, 0.6vw, 8px);
     flex-wrap: nowrap;
-    min-height: 32px;
+    min-height: 34px;
 }
 
 .ribbon-group-label {
@@ -1341,9 +1342,9 @@ body {
 /* Vertical separator line between Word groups */
 .ribbon-group-sep {
     width: 1px;
-    margin: 4px 4px;
+    margin: 4px clamp(6px, 1vw, 14px);
     align-self: stretch;
-    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.12) 20%, rgba(255, 255, 255, 0.12) 80%, transparent);
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.15) 15%, rgba(255, 255, 255, 0.15) 85%, transparent);
     flex-shrink: 0;
 }
 
@@ -1407,14 +1408,14 @@ body {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 5px 8px;
+    padding: 5px clamp(7px, 0.8vw, 11px);
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.82rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 6px;
     transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
 }
@@ -1437,7 +1438,7 @@ body {
 
 .ribbon-btn-compact {
     font-size: 0.8rem;
-    padding: 4px 8px;
+    padding: 4px clamp(7px, 0.8vw, 10px);
     font-weight: 500;
 }
 
@@ -1447,7 +1448,7 @@ body {
     border: 1px solid rgba(137, 180, 250, 0.45);
     color: #e0def4;
     font-weight: 600;
-    padding: 4px 10px;
+    padding: 5px clamp(9px, 1.1vw, 14px);
     border-radius: 6px;
 }
 
@@ -1462,8 +1463,11 @@ body {
     background-color: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08);
     font-weight: 500;
-    padding: 4px 9px;
+    padding: 5px clamp(8px, 1vw, 13px);
     border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .ribbon-badge-action:hover {
@@ -2436,9 +2440,9 @@ body {
 /* Document Drop Indicator Line during Drag-to-Move */
 .editor-drop-line {
     position: absolute;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, #00ffff, var(--accent), transparent);
-    box-shadow: 0 0 12px rgba(0, 255, 255, 0.9), 0 0 3px #fff;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent, #00ffff) 20%, var(--accent, #00ffff) 80%, transparent);
+    box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
     border-radius: 2px;
     z-index: 1000;
     pointer-events: none;
@@ -2449,13 +2453,13 @@ body {
 }
 
 .editor-drop-badge {
-    background: #00ffff;
+    background: var(--accent, #00ffff);
     color: #11111b;
-    font-size: 0.72rem;
-    font-weight: 800;
-    padding: 2px 10px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 255, 255, 0.6);
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 255, 255, 0.35);
     pointer-events: none;
     transform: translateY(-50%);
     white-space: nowrap;
