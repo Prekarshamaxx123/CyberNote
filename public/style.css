@@ -1177,10 +1177,13 @@ body {
     border-bottom: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
     padding: 6px 14px;
     user-select: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    box-sizing: border-box;
+    overflow: visible;
 }
 
 .editor-container {
@@ -1194,25 +1197,20 @@ body {
 .ribbon-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: visible;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.ribbon-row::-webkit-scrollbar {
-    display: none;
+    gap: 6px 8px;
+    flex-wrap: wrap;
+    overflow: visible;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .ribbon-row-studio {
-    padding-bottom: 3px;
+    padding-bottom: 4px;
 }
 
 .ribbon-row-format {
-    padding-top: 4px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Paint-Studio-Style Capsules & Clusters */
@@ -1226,6 +1224,8 @@ body {
     padding: 2px 5px;
     gap: 3px;
     flex-shrink: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1366,15 +1366,16 @@ body {
 
 .ribbon-heading-select {
     font-weight: 600;
-    min-width: 105px;
+    min-width: 95px;
+    max-width: 115px;
 }
 
 .ribbon-font-select {
-    max-width: 120px;
+    max-width: 110px;
 }
 
 .ribbon-size-select {
-    max-width: 75px;
+    max-width: 70px;
 }
 
 /* Segmented Text Case Buttons Group */
@@ -1467,6 +1468,100 @@ body {
     width: 0;
     height: 0;
     pointer-events: none;
+}
+
+/* ==========================================================================
+   RESPONSIVE STUDIO RIBBON TOOLBAR (Auto Fluid Re-flow, Never Cuts Off)
+   ========================================================================== */
+@media (max-width: 1200px) {
+    .editor-ribbon {
+        padding: 5px 12px;
+        gap: 5px;
+    }
+    .ribbon-row {
+        gap: 5px 6px;
+    }
+    .ribbon-btn {
+        padding: 4px 6px;
+        font-size: 0.8rem;
+    }
+    .ribbon-heading-select {
+        min-width: 90px;
+        max-width: 105px;
+    }
+    .ribbon-font-select {
+        max-width: 95px;
+    }
+    .ribbon-size-select {
+        max-width: 65px;
+    }
+    .badge-label {
+        font-size: 0.78rem;
+    }
+}
+
+@media (max-width: 880px) {
+    .editor-ribbon {
+        padding: 4px 8px;
+        gap: 4px;
+    }
+    .ribbon-row {
+        gap: 4px 5px;
+    }
+    .ribbon-capsule,
+    .ribbon-cluster {
+        padding: 2px 4px;
+        gap: 2px;
+    }
+    .ribbon-btn-icon {
+        width: 27px;
+        height: 27px;
+    }
+    .ribbon-color-btn {
+        width: 27px;
+        height: 27px;
+    }
+    .ribbon-btn-compact {
+        font-size: 0.75rem;
+        padding: 3px 6px;
+    }
+    .ribbon-select {
+        font-size: 0.76rem;
+        padding: 3px 5px;
+    }
+}
+
+@media (max-width: 680px) {
+    .editor-ribbon {
+        padding: 4px 6px;
+        gap: 4px;
+    }
+    .ribbon-row {
+        gap: 4px;
+    }
+    .ribbon-capsule,
+    .ribbon-cluster {
+        padding: 2px 3px;
+        gap: 2px;
+        flex-wrap: wrap;
+    }
+    /* Sleek touch-friendly icon buttons on compact mobile screens */
+    .ribbon-badge-action .badge-label,
+    .ribbon-badge-paint .badge-label,
+    .ribbon-btn-compact span {
+        display: none;
+    }
+    .ribbon-badge-action,
+    .ribbon-badge-paint,
+    .ribbon-btn-compact {
+        padding: 4px 6px !important;
+        min-height: 27px;
+    }
+    .ribbon-word-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        margin-left: 0;
+    }
 }
 
 /* Floating Table & Image Toolbars */
