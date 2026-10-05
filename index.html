@@ -46,7 +46,7 @@
         <!-- Sidebar: Hierarchical Tree -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <span class="sidebar-title">CHERRYTREE HIERARCHY</span>
+                <span class="sidebar-title">HIERARCHY TREE</span>
                 <div class="sidebar-actions">
                     <button id="btn-move-up" class="icon-btn-small" title="Move Selected Node Up (Alt+Up)">▲</button>
                     <button id="btn-move-down" class="icon-btn-small" title="Move Selected Node Down (Alt+Down)">▼</button>
@@ -57,14 +57,14 @@
 
             <!-- Tree View Container -->
             <div class="tree-container" id="tree-container">
-                <!-- Dynamically populated hierarchical nodes -->
+                <!-- Dynamically populated hierarchical nodes with colored dots -->
             </div>
         </aside>
 
         <!-- Resizer Handle -->
         <div class="resizer" id="resizer"></div>
 
-        <!-- Note Content & Editor Area -->
+        <!-- Note Content & In-Place WYSIWYG Editor Area (No Split, No Preview Tab) -->
         <main class="editor-pane" id="editor-pane">
             <div id="no-note-selected" class="empty-state" style="display: none;">
                 <div class="empty-icon">🌲</div>
@@ -81,6 +81,7 @@
                     </div>
                     <div class="node-actions-bar">
                         <button id="btn-add-subnode" class="btn btn-sm btn-outline">+ Sub-Note</button>
+                        <button id="btn-node-color" class="btn btn-sm btn-secondary" title="Set Node Color">🎨 Node Color</button>
                         <button id="btn-duplicate-node" class="btn btn-sm btn-secondary" title="Duplicate this node and branch">📄 Duplicate</button>
                         <button id="btn-toggle-readonly" class="btn btn-sm btn-secondary" title="Toggle Read-Only mode">🔓 Read/Write</button>
                         <button id="btn-delete-node" class="btn btn-sm btn-danger">Delete</button>
@@ -89,6 +90,7 @@
 
                 <div class="title-container">
                     <button id="btn-icon-picker" class="icon-selector" title="Change Node Icon">📁</button>
+                    <span id="title-color-dot" class="node-color-indicator" title="Node Color"></span>
                     <input type="text" id="note-title" class="note-title-input" placeholder="Note Title...">
                 </div>
 
@@ -97,62 +99,109 @@
                     <input type="text" id="note-tags" class="note-tags-input" placeholder="e.g. overthewire, linux, cybersecurity">
                 </div>
 
-                <!-- Rich CherryTree Formatting Toolbar (Row 1) -->
+                <!-- Rich Formatting Toolbar (Row 1: Fonts, Sizes, Styles & Colors) -->
                 <div class="editor-toolbar toolbar-row1">
                     <div class="tb-group">
-                        <button id="btn-undo" class="tb-btn" title="Undo (Ctrl+Z)">↶ Undo</button>
-                        <button id="btn-redo" class="tb-btn" title="Redo (Ctrl+Y)">↷ Redo</button>
+                        <button id="btn-undo" class="tb-btn" title="Undo (Ctrl+Z)">↶</button>
+                        <button id="btn-redo" class="tb-btn" title="Redo (Ctrl+Y)">↷</button>
                         <span class="tb-divider"></span>
-                        <button id="btn-toggle-find" class="tb-btn" title="Find & Replace in note (Ctrl+F)">🔍 Find</button>
                     </div>
 
                     <div class="tb-group">
+                        <!-- Font Family -->
+                        <select id="select-font-family" class="tb-select" title="Font Family">
+                            <option value="inherit">Sans-Serif (Default)</option>
+                            <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                            <option value="'Fira Code', monospace">Fira Code</option>
+                            <option value="Georgia, serif">Georgia (Serif)</option>
+                            <option value="'Times New Roman', serif">Times New Roman</option>
+                            <option value="'Segoe UI', Roboto, sans-serif">Segoe UI / Roboto</option>
+                            <option value="'Comic Sans MS', cursive">Comic Sans</option>
+                        </select>
+
+                        <!-- Font Size -->
+                        <select id="select-font-size" class="tb-select" title="Font Size">
+                            <option value="12px">12px (Small)</option>
+                            <option value="14px">14px (Normal)</option>
+                            <option value="16px" selected>16px (Medium)</option>
+                            <option value="20px">20px (Large)</option>
+                            <option value="26px">26px (Heading)</option>
+                            <option value="34px">34px (Huge)</option>
+                        </select>
+
+                        <!-- Heading -->
                         <select id="select-heading" class="tb-select" title="Text Style">
                             <option value="p">Paragraph</option>
                             <option value="h1">Heading 1</option>
                             <option value="h2">Heading 2</option>
                             <option value="h3">Heading 3</option>
+                            <option value="h4">Heading 4</option>
                         </select>
-                        <button class="tb-btn" data-format="bold" title="Bold (Ctrl+B)"><b>B</b></button>
-                        <button class="tb-btn" data-format="italic" title="Italic (Ctrl+I)"><i>I</i></button>
-                        <button class="tb-btn" data-format="underline" title="Underline (Ctrl+U)"><u>U</u></button>
-                        <button class="tb-btn" data-format="strike" title="Strikethrough"><s>S</s></button>
-                        <button class="tb-btn" data-format="sub" title="Subscript">X<sub>2</sub></button>
-                        <button class="tb-btn" data-format="sup" title="Superscript">X<sup>2</sup></button>
                     </div>
 
                     <div class="tb-group">
-                        <label class="color-picker-label" title="Text Color">
+                        <button class="tb-btn" id="btn-bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                        <button class="tb-btn" id="btn-italic" title="Italic (Ctrl+I)"><i>I</i></button>
+                        <button class="tb-btn" id="btn-underline" title="Underline (Ctrl+U)"><u>U</u></button>
+                        <button class="tb-btn" id="btn-strike" title="Strikethrough"><s>S</s></button>
+                        <button class="tb-btn" id="btn-subscript" title="Subscript">X<sub>2</sub></button>
+                        <button class="tb-btn" id="btn-superscript" title="Superscript">X<sup>2</sup></button>
+                    </div>
+
+                    <div class="tb-group">
+                        <!-- Text Color Picker -->
+                        <label class="color-picker-label" title="Text Foreground Color">
                             🎨 <input type="color" id="text-color-picker" value="#f38ba8">
                         </label>
-                        <label class="color-picker-label" title="Highlight Background Color">
+                        <!-- Background Highlight Color Picker -->
+                        <label class="color-picker-label" title="Highlight / Marker Color">
                             🖍 <input type="color" id="bg-color-picker" value="#f5c211">
                         </label>
                     </div>
 
-                    <div class="view-mode-tabs">
-                        <button id="btn-mode-split" class="tab-btn active" title="Split Screen">Split</button>
-                        <button id="btn-mode-write" class="tab-btn" title="Editor Only">Write</button>
-                        <button id="btn-mode-preview" class="tab-btn" title="Preview Only">Preview</button>
+                    <div class="tb-group">
+                        <button class="tb-btn" id="btn-align-left" title="Align Left">⫷</button>
+                        <button class="tb-btn" id="btn-align-center" title="Align Center">⫸⫷</button>
+                        <button class="tb-btn" id="btn-align-right" title="Align Right">⫸</button>
+                        <button class="tb-btn" id="btn-align-justify" title="Justify">☰</button>
+                        <button class="tb-btn" id="btn-clear-format" title="Clear Formatting">Tₓ</button>
                     </div>
                 </div>
 
-                <!-- Rich CherryTree Insertion Toolbar (Row 2) -->
+                <!-- Rich Insertion Toolbar (Row 2: Paint, Photos, Tables, Code, RemNote Blocks) -->
                 <div class="editor-toolbar toolbar-row2">
                     <div class="tb-group">
-                        <button class="tb-btn" data-format="code" title="Inline Code">`code`</button>
-                        <button id="btn-insert-codebox" class="tb-btn" title="Insert CherryTree CodeBox">💻 CodeBox</button>
-                        <button id="btn-insert-image" class="tb-btn" title="Insert Image / Screenshot">🖼️ Image</button>
+                        <!-- Paint & Signature Studio -->
+                        <button id="btn-open-paint" class="tb-btn tb-highlight-btn" title="Paint Studio & Handwritten Signature">🎨 Paint / Signature</button>
+                        <!-- Photo Insertion -->
+                        <button id="btn-insert-image" class="tb-btn" title="Insert Photo / Screenshot (or paste with Ctrl+V)">🖼️ Photo</button>
                         <input type="file" id="image-file-input" accept="image/*" style="display:none;">
-                        <button id="btn-insert-table" class="tb-btn" title="Insert Table">▦ Table</button>
-                        <button class="tb-btn" data-format="todo" title="Interactive Checklist">☑ To-Do</button>
-                        <button class="tb-btn" data-format="bullet" title="Bullet List">• List</button>
-                        <button class="tb-btn" data-format="numbered" title="Numbered List">1. List</button>
-                        <button class="tb-btn" data-format="quote" title="Quote">❝ Quote</button>
-                        <button class="tb-btn" data-format="hr" title="Horizontal Divider">― Line</button>
+                        <!-- Table Insertion -->
+                        <button id="btn-open-table-modal" class="tb-btn" title="Draw / Insert Table">▦ Table</button>
+                        <!-- CodeBox with Copy Button -->
+                        <button id="btn-insert-codebox" class="tb-btn" title="Insert Code Box with 1-Click Copy">💻 CodeBox</button>
+                        <!-- Interactive Checklist -->
+                        <button id="btn-insert-todo" class="tb-btn" title="Interactive Checklist (To-Do)">☑ To-Do</button>
+                    </div>
+
+                    <div class="tb-group">
+                        <!-- Callout / RemNote Blocks -->
+                        <select id="select-callout" class="tb-select" title="Insert Callout Box">
+                            <option value="">💡 Callouts...</option>
+                            <option value="tip">💡 Tip Box</option>
+                            <option value="warning">⚠️ Warning Box</option>
+                            <option value="info">ℹ️ Info Note</option>
+                            <option value="danger">🚨 Danger / Alert</option>
+                        </select>
+                        <button class="tb-btn" id="btn-bullet-list" title="Bullet List">• List</button>
+                        <button class="tb-btn" id="btn-numbered-list" title="Numbered List">1. List</button>
+                        <button class="tb-btn" id="btn-quote" title="Quote Block">❝ Quote</button>
+                        <button class="tb-btn" id="btn-hr" title="Horizontal Divider">― Divider</button>
                         <button id="btn-insert-timestamp" class="tb-btn" title="Insert Current Date & Time">📅 Timestamp</button>
-                        <button class="tb-btn" data-format="link" title="Web Link">🔗 Link</button>
-                        <button id="btn-insert-nodelink" class="tb-btn" title="Link to another Node">📌 Node Link</button>
+                        <button class="tb-btn" id="btn-insert-link" title="Hyperlink">🔗 Link</button>
+                        <button id="btn-insert-nodelink" class="tb-btn" title="Internal Link to another Node">📌 Node Link</button>
+                        <span class="tb-divider"></span>
+                        <button id="btn-toggle-find" class="tb-btn" title="Find & Replace in note (Ctrl+F)">🔍 Find</button>
                     </div>
                 </div>
 
@@ -171,14 +220,33 @@
                     <span id="find-count" class="find-count"></span>
                 </div>
 
-                <!-- Main Content Split (Textarea + Live Render) -->
-                <div class="content-split-wrapper" id="content-split-wrapper">
-                    <div class="editor-container" id="editor-container">
-                        <textarea id="note-content" class="note-textarea" placeholder="Start typing in Markdown, or paste screenshots directly (Ctrl+V)..."></textarea>
-                    </div>
-                    <div class="preview-container" id="preview-container">
-                        <div id="note-preview" class="markdown-body"></div>
-                    </div>
+                <!-- Floating Table Management Toolbar (appears when inside a table cell) -->
+                <div id="table-toolbar" class="table-toolbar" style="display: none;">
+                    <span class="table-tb-title">▦ Table:</span>
+                    <button id="btn-tbl-add-row-above" class="tb-btn-small" title="Add Row Above">+ Row ▲</button>
+                    <button id="btn-tbl-add-row-below" class="tb-btn-small" title="Add Row Below">+ Row ▼</button>
+                    <button id="btn-tbl-add-col-left" class="tb-btn-small" title="Add Column Left">+ Col ◀</button>
+                    <button id="btn-tbl-add-col-right" class="tb-btn-small" title="Add Column Right">+ Col ▶</button>
+                    <button id="btn-tbl-del-row" class="tb-btn-small btn-tb-danger" title="Delete Row">✕ Row</button>
+                    <button id="btn-tbl-del-col" class="tb-btn-small btn-tb-danger" title="Delete Column">✕ Col</button>
+                    <button id="btn-tbl-del-table" class="tb-btn-small btn-tb-danger" title="Delete Entire Table">🗑️ Table</button>
+                </div>
+
+                <!-- Floating Image Management Toolbar (appears when clicking an image) -->
+                <div id="image-toolbar" class="image-toolbar" style="display: none;">
+                    <span class="image-tb-title">🖼️ Image:</span>
+                    <button id="btn-img-size-25" class="tb-btn-small">25%</button>
+                    <button id="btn-img-size-50" class="tb-btn-small">50%</button>
+                    <button id="btn-img-size-100" class="tb-btn-small">100%</button>
+                    <button id="btn-img-align-left" class="tb-btn-small">◀ Left</button>
+                    <button id="btn-img-align-center" class="tb-btn-small">■ Center</button>
+                    <button id="btn-img-align-right" class="tb-btn-small">Right ▶</button>
+                    <button id="btn-img-delete" class="tb-btn-small btn-tb-danger">🗑️ Delete</button>
+                </div>
+
+                <!-- DIRECT IN-PLACE WYSIWYG DOCUMENT CANVAS (NO PREVIEW TAB) -->
+                <div class="editor-scroll-area" id="editor-scroll-area">
+                    <div id="note-editor" class="wysiwyg-canvas" contenteditable="true" spellcheck="true" data-placeholder="Start typing your rich notes, paste screenshots (Ctrl+V), insert tables, codeboxes, or paint..."></div>
                 </div>
             </div>
         </main>
@@ -198,25 +266,106 @@
         </div>
     </footer>
 
-    <!-- Icon Picker Modal -->
-    <div id="icon-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h3>Choose Node Icon</h3>
-            <div class="icon-grid" id="icon-grid">
-                <span class="icon-opt" data-icon="folder">📁 Folder</span>
-                <span class="icon-opt" data-icon="terminal">💻 Terminal</span>
-                <span class="icon-opt" data-icon="code">⚡ Code</span>
-                <span class="icon-opt" data-icon="key">🔑 Key</span>
-                <span class="icon-opt" data-icon="book">📖 Book</span>
-                <span class="icon-opt" data-icon="shield">🛡️ Security</span>
-                <span class="icon-opt" data-icon="lock">🔒 Locked</span>
-                <span class="icon-opt" data-icon="bug">🐛 Bug</span>
-                <span class="icon-opt" data-icon="database">🗄️ Database</span>
-                <span class="icon-opt" data-icon="server">🖥️ Server</span>
-                <span class="icon-opt" data-icon="file-text">📝 Note</span>
-                <span class="icon-opt" data-icon="check-square">✅ Checklist</span>
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Windows Paint & Signature Studio Modal -->
+    <div id="paint-modal" class="modal" style="display: none;">
+        <div class="modal-content paint-modal-content">
+            <div class="paint-header">
+                <h3>🎨 Paint & Signature Studio</h3>
+                <span class="modal-subtext">Draw diagrams, freehand notes, or sign with smooth handwritten ink:</span>
             </div>
-            <button class="btn btn-secondary modal-close-btn" onclick="closeIconModal()">Close</button>
+
+            <!-- Paint Toolbar -->
+            <div class="paint-toolbar">
+                <div class="paint-tool-group">
+                    <button id="btn-paint-tool-signature" class="paint-btn active" title="Handwritten Signature (Smooth Ink)">🖋️ Signature</button>
+                    <button id="btn-paint-tool-brush" class="paint-btn" title="Paint Brush">🖌️ Brush</button>
+                    <button id="btn-paint-tool-eraser" class="paint-btn" title="Eraser">🧹 Eraser</button>
+                </div>
+
+                <div class="paint-tool-group">
+                    <span class="paint-label">Color:</span>
+                    <div class="paint-palette">
+                        <span class="paint-color-opt active" data-color="#111111" style="background:#111111;" title="Black"></span>
+                        <span class="paint-color-opt" data-color="#1e66f5" style="background:#1e66f5;" title="Royal Blue"></span>
+                        <span class="paint-color-opt" data-color="#d20f39" style="background:#d20f39;" title="Ruby Red"></span>
+                        <span class="paint-color-opt" data-color="#40a02b" style="background:#40a02b;" title="Emerald Green"></span>
+                        <span class="paint-color-opt" data-color="#8839ef" style="background:#8839ef;" title="Purple"></span>
+                        <span class="paint-color-opt" data-color="#fe640b" style="background:#fe640b;" title="Orange"></span>
+                        <input type="color" id="paint-custom-color" value="#111111" title="Custom Color">
+                    </div>
+                </div>
+
+                <div class="paint-tool-group">
+                    <span class="paint-label">Width:</span>
+                    <input type="range" id="paint-width-slider" min="1" max="18" value="3">
+                    <span id="paint-width-val" class="paint-width-val">3px</span>
+                </div>
+
+                <div class="paint-tool-group">
+                    <button id="btn-paint-clear" class="btn btn-sm btn-secondary" title="Clear Canvas">🗑️ Clear</button>
+                </div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="paint-canvas-container">
+                <canvas id="paint-canvas" width="760" height="380"></canvas>
+            </div>
+
+            <div class="modal-actions paint-actions">
+                <button id="btn-paint-insert" class="btn btn-primary">✓ Insert into Note</button>
+                <button class="btn btn-secondary" onclick="closePaintModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Draw / Insert Table Modal -->
+    <div id="table-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="width: 380px;">
+            <h3>▦ Insert Table</h3>
+            <p>Specify the grid dimensions for your new table:</p>
+            <div class="form-group" style="display: flex; gap: 12px;">
+                <div style="flex:1;">
+                    <label>Rows:</label>
+                    <input type="number" id="tbl-input-rows" class="text-input" value="3" min="1" max="50">
+                </div>
+                <div style="flex:1;">
+                    <label>Columns:</label>
+                    <input type="number" id="tbl-input-cols" class="text-input" value="3" min="1" max="15">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-insert-table-confirm" class="btn btn-primary">Create Table</button>
+                <button class="btn btn-secondary" onclick="closeTableModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Node Color Picker Modal -->
+    <div id="node-color-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="width: 380px;">
+            <h3>🎨 Set Node Color</h3>
+            <p>Pick a custom badge color for this note in the hierarchy tree:</p>
+            <div class="node-color-grid">
+                <button class="node-color-choice" data-color="" style="background:transparent; border:2px dashed var(--border-color);" title="None / Default">Default</button>
+                <button class="node-color-choice" data-color="#f38ba8" style="background:#f38ba8;" title="Red"></button>
+                <button class="node-color-choice" data-color="#a6e3a1" style="background:#a6e3a1;" title="Green"></button>
+                <button class="node-color-choice" data-color="#89b4fa" style="background:#89b4fa;" title="Blue"></button>
+                <button class="node-color-choice" data-color="#cba6f7" style="background:#cba6f7;" title="Purple"></button>
+                <button class="node-color-choice" data-color="#fab387" style="background:#fab387;" title="Orange"></button>
+                <button class="node-color-choice" data-color="#f9e2af" style="background:#f9e2af;" title="Yellow"></button>
+                <button class="node-color-choice" data-color="#94e2d5" style="background:#94e2d5;" title="Teal"></button>
+                <button class="node-color-choice" data-color="#f5c2e7" style="background:#f5c2e7;" title="Pink"></button>
+            </div>
+            <div class="form-group" style="margin-top:14px; display:flex; align-items:center; gap:8px;">
+                <label>Custom Hex:</label>
+                <input type="color" id="node-custom-color-input" value="#89b4fa">
+                <button id="btn-apply-custom-node-color" class="btn btn-sm btn-secondary">Apply Color</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeNodeColorModal()">Close</button>
+            </div>
         </div>
     </div>
 
@@ -262,6 +411,32 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeNodeLinkModal()">Cancel</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Icon Picker Modal -->
+    <div id="icon-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Choose Node Icon</h3>
+            <div class="icon-grid" id="icon-grid">
+                <span class="icon-opt" data-icon="folder">📁 Folder</span>
+                <span class="icon-opt" data-icon="terminal">💻 Terminal</span>
+                <span class="icon-opt" data-icon="code">⚡ Code</span>
+                <span class="icon-opt" data-icon="key">🔑 Key</span>
+                <span class="icon-opt" data-icon="book">📖 Book</span>
+                <span class="icon-opt" data-icon="shield">🛡️ Security</span>
+                <span class="icon-opt" data-icon="lock">🔒 Locked</span>
+                <span class="icon-opt" data-icon="bug">🐛 Bug</span>
+                <span class="icon-opt" data-icon="database">🗄️ Database</span>
+                <span class="icon-opt" data-icon="server">🖥️ Server</span>
+                <span class="icon-opt" data-icon="file-text">📝 Note</span>
+                <span class="icon-opt" data-icon="check-square">✅ Checklist</span>
+                <span class="icon-opt" data-icon="star">⭐ Star</span>
+                <span class="icon-opt" data-icon="rocket">🚀 Rocket</span>
+                <span class="icon-opt" data-icon="fire">🔥 Fire</span>
+                <span class="icon-opt" data-icon="bulb">💡 Idea</span>
+            </div>
+            <button class="btn btn-secondary modal-close-btn" onclick="closeIconModal()">Close</button>
         </div>
     </div>
 
