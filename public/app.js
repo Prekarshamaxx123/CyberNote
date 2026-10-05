@@ -811,31 +811,25 @@ function setSyncStatus(status, text) {
 }
 
 // --- Data Fetching & Local Persistence ---
-async function loadTree() {
-    try {
-        const res = await fetch(`${API_BASE}/api/nodes?full=1`);
-        const data = await res.json();
-        state.nodes.clear();
-        for (const n of data.nodes) {
-            state.nodes.set(n.id, n);
-        }
-        saveLocalNodesBackup();
-        renderTree();
+function persistActiveNodeImmediately(nodeId, fields = {}) {
+    if (!nodeId) return;
+    const node = state.nodes.get(nodeId);
+    if (!node) return;
 
-        const lastActive = localStorage.getItem('cybernote_active');
-        if (lastActive === '__all_notes__') {
-            showAllNotesView();
-        } else if (lastActive && state.nodes.has(lastActive)) {
-            selectNode(lastActive);
-        } else if (data.nodes.length > 0) {
-            selectNode(data.nodes[0].id);
-        } else {
-            selectNode(null);
-        }
-    } catch (err) {
-        console.error('Failed to load nodes from server:', err);
-        await loadLocalNodes();
+    Object.assign(node, fields);
+    node.updated_at = Date.now();
+
+    try {
+        localStorage.setItem(`cybernote_node_${nodeId}`, JSON.stringify(node));
+        localStorage.setItem('cybernote_active', nodeId);
+        // Synchronously store raw snapshot of all nodes for zero-latency instant recovery on refresh
+        const list = Array.from(state.nodes.values());
+        localStorage.setItem('cybernote_local_raw_nodes', JSON.stringify(list));
+    } catch (e) {
+        console.warn('Immediate local persistence write error:', e);
     }
+
+    saveLocalNodesBackup();
 }
 
 let localBackupSaveTimer = null;
@@ -845,6 +839,10 @@ function saveLocalNodesBackup() {
         try {
             const list = Array.from(state.nodes.values());
             const raw = JSON.stringify(list);
+            try {
+                localStorage.setItem('cybernote_local_raw_nodes', raw);
+            } catch (e) {}
+
             // Ultra-compact GZIP compression for local storage
             // Compresses 4MB scripts down to ~15KB (< 0.05 bytes per character)
             if (raw.length > 250) {
@@ -860,20 +858,56 @@ function saveLocalNodesBackup() {
 }
 
 async function loadLocalNodes() {
-    const raw = localStorage.getItem('cybernote_local_db') || localStorage.getItem('treekeep_local_db');
-    state.nodes.clear();
-    if (raw) {
+    // 1. Try uncompressed raw local snapshot first for instant synchronous recovery
+    const rawNodes = localStorage.getItem('cybernote_local_raw_nodes');
+    if (rawNodes) {
         try {
-            let decompressed = raw;
-            if (raw.startsWith('gz:')) {
-                decompressed = await decompressStringFromBase64(raw);
+            const list = JSON.parse(rawNodes);
+            for (const n of list) {
+                if (n && n.id) state.nodes.set(n.id, n);
             }
-            const list = JSON.parse(decompressed);
-            for (const n of list) state.nodes.set(n.id, n);
         } catch (e) {
-            console.error('Failed to parse local nodes:', e);
+            console.warn('Failed to parse cybernote_local_raw_nodes:', e);
         }
     }
+
+    // 2. Supplement or load from compressed database
+    if (state.nodes.size === 0) {
+        const raw = localStorage.getItem('cybernote_local_db') || localStorage.getItem('treekeep_local_db');
+        if (raw) {
+            try {
+                let decompressed = raw;
+                if (raw.startsWith('gz:')) {
+                    decompressed = await decompressStringFromBase64(raw);
+                }
+                const list = JSON.parse(decompressed);
+                for (const n of list) {
+                    if (n && n.id) state.nodes.set(n.id, n);
+                }
+            } catch (e) {
+                console.error('Failed to parse local nodes:', e);
+            }
+        }
+    }
+
+    // 3. Check any direct active cache keys (cybernote_node_<id>) which hold the freshest keystrokes
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('cybernote_node_')) {
+                const nodeStr = localStorage.getItem(key);
+                if (nodeStr) {
+                    const nodeData = JSON.parse(nodeStr);
+                    if (nodeData && nodeData.id) {
+                        const existing = state.nodes.get(nodeData.id);
+                        if (!existing || (nodeData.updated_at && nodeData.updated_at > (existing.updated_at || 0))) {
+                            state.nodes.set(nodeData.id, nodeData);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {}
 
     if (state.nodes.size === 0) {
         seedDefaultLocalNotes();
@@ -889,6 +923,74 @@ async function loadLocalNodes() {
         selectNode(state.nodes.keys().next().value);
     } else {
         selectNode(null);
+    }
+}
+
+async function loadTree() {
+    // 1. Immediately load local nodes so UI is instant and zero content is lost on quick refresh
+    await loadLocalNodes();
+
+    if (!state.isServerMode) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/nodes?full=1`);
+        const data = await res.json();
+        const serverNodes = data.nodes || [];
+        const serverIds = new Set(serverNodes.map(n => n.id));
+
+        // 2. Reconcile with server: if local node was edited more recently than server, LOCAL WINS!
+        for (const sn of serverNodes) {
+            if (state.nodes.has(sn.id)) {
+                const ln = state.nodes.get(sn.id);
+                if (ln.updated_at && sn.updated_at && ln.updated_at > sn.updated_at) {
+                    console.log(`[Sync] Local node "${ln.title}" (${ln.id}) is newer (${ln.updated_at} > ${sn.updated_at}). Preserving local and syncing to server.`);
+                    sendDeltaPatch(ln.id, {
+                        title: ln.title,
+                        content: ln.content,
+                        tags: ln.tags,
+                        icon: ln.icon,
+                        color: ln.color,
+                        is_pinned: ln.is_pinned,
+                        is_readonly: ln.is_readonly
+                    });
+                } else {
+                    state.nodes.set(sn.id, sn);
+                }
+            } else {
+                state.nodes.set(sn.id, sn);
+            }
+        }
+
+        // 3. Push any local nodes created offline that server doesn't have
+        for (const [id, ln] of state.nodes.entries()) {
+            if (!serverIds.has(id)) {
+                try {
+                    fetch(`${API_BASE}/api/nodes`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(ln)
+                    });
+                } catch (e) {}
+            }
+        }
+
+        saveLocalNodesBackup();
+        renderTree();
+
+        const lastActive = localStorage.getItem('cybernote_active');
+        if (lastActive === '__all_notes__') {
+            showAllNotesView();
+        } else if (lastActive && state.nodes.has(lastActive)) {
+            selectNode(lastActive);
+        } else if (serverNodes.length > 0) {
+            selectNode(serverNodes[0].id);
+        } else if (state.nodes.size > 0) {
+            selectNode(state.nodes.keys().next().value);
+        } else {
+            selectNode(null);
+        }
+    } catch (err) {
+        console.error('Failed to load nodes from server:', err);
     }
 }
 
@@ -1724,6 +1826,29 @@ function selectNode(id) {
     const navAllNotes = document.getElementById('nav-all-notes');
     if (navAllNotes) navAllNotes.classList.remove('active');
 
+    // Flush previous active node immediately before switching
+    if (state.activeNodeId && state.activeNodeId !== id && !state.isReadOnly) {
+        const prevId = state.activeNodeId;
+        const prevNode = state.nodes.get(prevId);
+        if (prevNode) {
+            const curContent = noteEditor.innerHTML;
+            const curTitle = noteTitleInput.value;
+            const curTags = noteTagsInput ? noteTagsInput.value : '';
+            if (prevNode.content !== curContent || prevNode.title !== curTitle || prevNode.tags !== curTags) {
+                prevNode.content = curContent;
+                prevNode.title = curTitle;
+                prevNode.tags = curTags;
+                prevNode.updated_at = Date.now();
+                persistActiveNodeImmediately(prevId, { content: curContent, title: curTitle, tags: curTags });
+            }
+        }
+        if (nodeSaveTimers.has(prevId)) {
+            clearTimeout(nodeSaveTimers.get(prevId));
+            nodeSaveTimers.delete(prevId);
+            flushNodeDelta(prevId);
+        }
+    }
+
     if (!id || !state.nodes.has(id)) {
         state.activeNodeId = null;
         noNoteSelected.style.display = 'flex';
@@ -1822,6 +1947,9 @@ function updateBreadcrumbs(id) {
 }
 
 // --- Delta Sync Logic with Transparent On-The-Fly GZIP Compression ---
+const nodeSaveTimers = new Map();
+const nodePendingPatches = new Map();
+
 async function sendDeltaPatch(nodeId, partialUpdate) {
     if (!nodeId) return;
 
@@ -1833,7 +1961,7 @@ async function sendDeltaPatch(nodeId, partialUpdate) {
         Object.assign(existing, partialUpdate, { updated_at: Date.now() });
         state.nodes.set(nodeId, existing);
     }
-    saveLocalNodesBackup();
+    persistActiveNodeImmediately(nodeId, partialUpdate);
 
     if (state.isServerMode) {
         const payloadStr = JSON.stringify(partialUpdate);
@@ -1894,17 +2022,107 @@ async function sendDeltaPatch(nodeId, partialUpdate) {
     scheduleDriveAutoBackup();
 }
 
-function scheduleSave(field, value) {
-    if (!state.activeNodeId) return;
-    clearTimeout(state.saveTimer);
-
-    const node = state.nodes.get(state.activeNodeId);
-    if (node) node[field] = value;
-
-    state.saveTimer = setTimeout(() => {
-        sendDeltaPatch(state.activeNodeId, { [field]: value });
-    }, 350);
+function flushNodeDelta(nodeId) {
+    if (!nodeId || !nodePendingPatches.has(nodeId)) return;
+    const patch = nodePendingPatches.get(nodeId);
+    nodePendingPatches.delete(nodeId);
+    if (!patch || Object.keys(patch).length === 0) return;
+    sendDeltaPatch(nodeId, patch);
 }
+
+function scheduleSave(field, value, targetNodeId = null) {
+    const nodeId = targetNodeId || state.activeNodeId;
+    if (!nodeId) return;
+
+    const node = state.nodes.get(nodeId);
+    if (node) {
+        node[field] = value;
+        node.updated_at = Date.now();
+    }
+
+    // 1. Synchronously persist to localStorage on every single keystroke
+    persistActiveNodeImmediately(nodeId, { [field]: value });
+
+    // 2. Queue delta patch for server
+    if (!nodePendingPatches.has(nodeId)) {
+        nodePendingPatches.set(nodeId, {});
+    }
+    nodePendingPatches.get(nodeId)[field] = value;
+
+    // 3. Clear existing debounce timer for this specific node
+    if (nodeSaveTimers.has(nodeId)) {
+        clearTimeout(nodeSaveTimers.get(nodeId));
+    }
+
+    // 4. Send delta to server after 250ms debounce
+    const timer = setTimeout(() => {
+        nodeSaveTimers.delete(nodeId);
+        flushNodeDelta(nodeId);
+    }, 250);
+    nodeSaveTimers.set(nodeId, timer);
+}
+
+// Flush active note changes immediately when closing/reloading page
+function flushActiveNodeBeforeUnload() {
+    if (!state.activeNodeId || state.isReadOnly) return;
+    const activeId = state.activeNodeId;
+    const cur = state.nodes.get(activeId);
+    if (!cur) return;
+
+    const curContent = noteEditor ? noteEditor.innerHTML : cur.content;
+    const curTitle = noteTitleInput ? noteTitleInput.value : cur.title;
+    const curTags = noteTagsInput ? noteTagsInput.value : cur.tags;
+    const now = Date.now();
+
+    cur.content = curContent;
+    cur.title = curTitle;
+    cur.tags = curTags;
+    cur.updated_at = now;
+
+    // 1. Instant synchronous write to localStorage
+    try {
+        localStorage.setItem(`cybernote_node_${activeId}`, JSON.stringify(cur));
+        localStorage.setItem('cybernote_active', activeId);
+        const list = Array.from(state.nodes.values());
+        localStorage.setItem('cybernote_local_raw_nodes', JSON.stringify(list));
+    } catch (e) {}
+
+    // 2. Clear pending timers
+    if (nodeSaveTimers.has(activeId)) {
+        clearTimeout(nodeSaveTimers.get(activeId));
+        nodeSaveTimers.delete(activeId);
+    }
+
+    // 3. Keepalive PATCH to server
+    if (state.isServerMode) {
+        const payload = JSON.stringify({
+            content: curContent,
+            title: curTitle,
+            tags: curTags,
+            updated_at: now
+        });
+        try {
+            fetch(`${API_BASE}/api/nodes/${activeId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload,
+                keepalive: true
+            });
+        } catch (e) {
+            try {
+                navigator.sendBeacon(`${API_BASE}/api/nodes/${activeId}`, new Blob([payload], { type: 'application/json' }));
+            } catch (e2) {}
+        }
+    }
+}
+
+window.addEventListener('beforeunload', flushActiveNodeBeforeUnload);
+window.addEventListener('pagehide', flushActiveNodeBeforeUnload);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        flushActiveNodeBeforeUnload();
+    }
+});
 
 // --- CRUD Node Operations ---
 async function createNewRootNode(type = 'note') {
@@ -2924,8 +3142,16 @@ function confirmInsertTable() {
     closeTableModal();
 }
 
-// Floating Table Actions
+// Floating Table Actions & Interactive Resizing
+let isResizingTableCol = false;
+let resizeColIdx = -1;
+let resizeTableElem = null;
+let resizeStartX = 0;
+let resizeStartWidth = 0;
+let resizeHoverCell = null;
+
 function setupTableInteractions() {
+    // Focus listener to show table toolbar
     noteEditor.addEventListener('focusin', (e) => {
         const cell = e.target.closest('td, th');
         if (cell) {
@@ -2936,6 +3162,176 @@ function setupTableInteractions() {
             tableToolbar.style.display = 'none';
         }
     });
+
+    // Detect column borders on hover and set col-resize cursor
+    noteEditor.addEventListener('mousemove', (e) => {
+        if (isResizingTableCol) return;
+        const cell = e.target.closest('td, th');
+        if (!cell || state.isReadOnly) {
+            if (resizeHoverCell) {
+                resizeHoverCell.style.cursor = '';
+                resizeHoverCell = null;
+            }
+            return;
+        }
+
+        const rect = cell.getBoundingClientRect();
+        const distFromRight = rect.right - e.clientX;
+        if (distFromRight >= -2 && distFromRight <= 8) {
+            cell.style.cursor = 'col-resize';
+            resizeHoverCell = cell;
+        } else {
+            cell.style.cursor = '';
+            if (resizeHoverCell === cell) resizeHoverCell = null;
+        }
+    });
+
+    // Start column drag resizing on mousedown
+    noteEditor.addEventListener('mousedown', (e) => {
+        if (state.isReadOnly) return;
+        const cell = e.target.closest('td, th');
+        if (!cell) return;
+
+        const rect = cell.getBoundingClientRect();
+        const distFromRight = rect.right - e.clientX;
+        if (distFromRight >= -2 && distFromRight <= 8) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            isResizingTableCol = true;
+            resizeHoverCell = cell;
+            resizeTableElem = cell.closest('table');
+            resizeColIdx = cell.cellIndex;
+            resizeStartX = e.clientX;
+            resizeStartWidth = cell.offsetWidth;
+
+            if (resizeTableElem) {
+                resizeTableElem.style.tableLayout = 'fixed';
+                const firstRow = resizeTableElem.rows[0];
+                if (firstRow) {
+                    for (let i = 0; i < firstRow.children.length; i++) {
+                        const colCell = firstRow.children[i];
+                        if (!colCell.style.width) {
+                            colCell.style.width = `${colCell.offsetWidth}px`;
+                        }
+                    }
+                }
+            }
+
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        }
+    });
+
+    // Handle column resize dragging on window
+    window.addEventListener('mousemove', (e) => {
+        if (!isResizingTableCol || !resizeTableElem || resizeColIdx < 0) return;
+
+        const delta = e.clientX - resizeStartX;
+        const newWidth = Math.max(35, resizeStartWidth + delta);
+
+        for (const row of resizeTableElem.rows) {
+            if (row.children[resizeColIdx]) {
+                row.children[resizeColIdx].style.width = `${newWidth}px`;
+            }
+        }
+
+        let totalW = 0;
+        const firstRow = resizeTableElem.rows[0];
+        if (firstRow) {
+            for (let i = 0; i < firstRow.children.length; i++) {
+                totalW += firstRow.children[i].offsetWidth;
+            }
+            resizeTableElem.style.width = `${totalW}px`;
+        }
+    });
+
+    // Finish column resize dragging on window
+    const finishColResize = () => {
+        if (isResizingTableCol) {
+            isResizingTableCol = false;
+            resizeColIdx = -1;
+            resizeTableElem = null;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            if (resizeHoverCell) {
+                resizeHoverCell.style.cursor = '';
+                resizeHoverCell = null;
+            }
+            handleEditorInput();
+        }
+    };
+
+    window.addEventListener('mouseup', finishColResize);
+    window.addEventListener('mouseleave', finishColResize);
+}
+
+function setTableWidthFull() {
+    if (!state.activeTableElement) return;
+    const table = state.activeTableElement;
+    table.style.width = '100%';
+    table.style.tableLayout = 'fixed';
+    for (const row of table.rows) {
+        for (const c of row.children) {
+            c.style.width = '';
+        }
+    }
+    handleEditorInput();
+}
+
+function setTableWidthAuto() {
+    if (!state.activeTableElement) return;
+    const table = state.activeTableElement;
+    table.style.width = 'auto';
+    table.style.tableLayout = 'auto';
+    for (const row of table.rows) {
+        for (const c of row.children) {
+            c.style.width = '';
+        }
+    }
+    handleEditorInput();
+}
+
+function distributeTableColsEvenly() {
+    if (!state.activeTableElement) return;
+    const table = state.activeTableElement;
+    const cols = table.rows[0]?.children.length || 1;
+    const pct = (100 / cols).toFixed(2);
+    table.style.width = '100%';
+    table.style.tableLayout = 'fixed';
+    for (const row of table.rows) {
+        for (const c of row.children) {
+            c.style.width = `${pct}%`;
+        }
+    }
+    handleEditorInput();
+}
+
+function adjustActiveColWidth(delta) {
+    if (!state.activeTableCell || !state.activeTableElement) return;
+    const colIdx = state.activeTableCell.cellIndex;
+    const table = state.activeTableElement;
+    table.style.tableLayout = 'fixed';
+
+    const curWidth = state.activeTableCell.offsetWidth;
+    const newWidth = Math.max(35, curWidth + delta);
+
+    for (const row of table.rows) {
+        if (row.children[colIdx]) {
+            row.children[colIdx].style.width = `${newWidth}px`;
+        }
+    }
+
+    let totalW = 0;
+    const firstRow = table.rows[0];
+    if (firstRow) {
+        for (let i = 0; i < firstRow.children.length; i++) {
+            totalW += firstRow.children[i].offsetWidth;
+        }
+        table.style.width = `${totalW}px`;
+    }
+
+    handleEditorInput();
 }
 
 function addTableRow(above = false) {
@@ -4288,6 +4684,17 @@ function setupEventListeners() {
     document.getElementById('btn-tbl-del-row').onclick = deleteTableRow;
     document.getElementById('btn-tbl-del-col').onclick = deleteTableColumn;
     document.getElementById('btn-tbl-del-table').onclick = deleteEntireTable;
+
+    const btnTblWidthFull = document.getElementById('btn-tbl-width-full');
+    if (btnTblWidthFull) btnTblWidthFull.onclick = setTableWidthFull;
+    const btnTblWidthAuto = document.getElementById('btn-tbl-width-auto');
+    if (btnTblWidthAuto) btnTblWidthAuto.onclick = setTableWidthAuto;
+    const btnTblDistributeCols = document.getElementById('btn-tbl-distribute-cols');
+    if (btnTblDistributeCols) btnTblDistributeCols.onclick = distributeTableColsEvenly;
+    const btnTblColWider = document.getElementById('btn-tbl-col-wider');
+    if (btnTblColWider) btnTblColWider.onclick = () => adjustActiveColWidth(30);
+    const btnTblColNarrower = document.getElementById('btn-tbl-col-narrower');
+    if (btnTblColNarrower) btnTblColNarrower.onclick = () => adjustActiveColWidth(-30);
 
     // Node Actions
     const btnNewRoot = document.getElementById('btn-new-root');
