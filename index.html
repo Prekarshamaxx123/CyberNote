@@ -204,6 +204,12 @@
                     <div class="breadcrumbs" id="breadcrumbs">
                         <span>Root</span>
                     </div>
+                    <div class="note-meta-actions">
+                        <button id="btn-toggle-readonly" class="btn btn-sm btn-secondary note-lock-btn" title="Toggle Lock / Read-Only Mode">
+                            <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                            <span id="readonly-btn-label">Lock Note</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="title-container">
@@ -212,10 +218,10 @@
                     </button>
                     <span id="title-color-dot" class="node-color-indicator" title="Node Color"></span>
                     <input type="text" id="note-title" class="note-title-input" placeholder="Note Title...">
-                    <span id="readonly-badge" class="readonly-badge" style="display: none;" title="Note is Read-Only. Click to unlock and edit.">
+                    <button id="readonly-badge" class="readonly-badge" style="display: none;" title="Note is locked. Click to unlock and edit.">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        <span>Read Only (Click to Unlock)</span>
-                    </span>
+                        <span>Locked (Click to Unlock)</span>
+                    </button>
                 </div>
 
                 <div class="tags-container" id="tags-container">
@@ -797,6 +803,21 @@
                                 <span id="ribbon-word-count" class="ribbon-word-badge" title="Live Document Word Count & Reading Time">0 words</span>
                             </div>
                             <span class="ribbon-group-label">Document Stats</span>
+                        </div>
+
+                        <div class="ribbon-group-sep"></div>
+
+                        <!-- Group 4: Security & Lock -->
+                        <div class="ribbon-word-group" title="Lock Note Protection">
+                            <div class="ribbon-group-items">
+                                <button class="ribbon-btn ribbon-badge-action" id="btn-ribbon-lock" title="Lock Note (Make Read-Only)">
+                                    <span class="badge-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    </span>
+                                    <span class="badge-label">Lock Note</span>
+                                </button>
+                            </div>
+                            <span class="ribbon-group-label">Security</span>
                         </div>
                     </div>
                 </div>

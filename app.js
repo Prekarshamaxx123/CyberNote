@@ -1327,8 +1327,12 @@ function renderTree() {
             if (node.is_readonly) {
                 lockBadge = document.createElement('span');
                 lockBadge.className = 'tree-lock-badge';
-                lockBadge.title = 'Read-Only (Locked)';
+                lockBadge.title = 'Locked (Click to Unlock)';
                 lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+                lockBadge.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleReadOnlyMode(node.id);
+                };
             }
 
             // Pin badge if pinned
@@ -1520,7 +1524,7 @@ function openTreeContextMenu(e, nodeId) {
 
         if (ctxReadonly) {
             const readonlyText = document.getElementById('ctx-readonly-text');
-            if (readonlyText) readonlyText.textContent = isReadOnly ? 'Make Editable' : 'Make Read-Only';
+            if (readonlyText) readonlyText.textContent = isReadOnly ? 'Unlock Note' : 'Lock Note';
             const readonlySvg = document.getElementById('ctx-readonly-svg');
             if (readonlySvg) {
                 readonlySvg.innerHTML = isReadOnly 
@@ -1727,10 +1731,14 @@ function createKeepCard(node) {
 
     if (node.is_readonly) {
         const lockBadge = document.createElement('span');
-        lockBadge.className = 'tree-lock-badge';
-        lockBadge.title = 'Read-Only (Locked)';
+        lockBadge.className = 'tree-lock-badge keep-card-lock-badge';
+        lockBadge.title = 'Locked (Click to Unlock)';
         lockBadge.style.display = 'inline-flex';
-        lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+        lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Locked</span>`;
+        lockBadge.onclick = (e) => {
+            e.stopPropagation();
+            toggleReadOnlyMode(node.id);
+        };
         titleGroup.appendChild(lockBadge);
     }
 
@@ -2330,16 +2338,24 @@ function moveActiveNode(direction) {
 }
 
 // --- Read-Only Mode ---
-function toggleReadOnlyMode() {
-    if (!state.activeNodeId || !state.nodes.has(state.activeNodeId)) return;
-    const node = state.nodes.get(state.activeNodeId);
+function toggleReadOnlyMode(targetNodeId = null) {
+    const nodeId = (typeof targetNodeId === 'string' && targetNodeId) ? targetNodeId : state.activeNodeId;
+    if (!nodeId || !state.nodes.has(nodeId)) return;
+    const node = state.nodes.get(nodeId);
     const newStatus = !node.is_readonly;
     node.is_readonly = newStatus ? 1 : 0;
-    applyReadOnlyState(newStatus);
-    sendDeltaPatch(state.activeNodeId, { is_readonly: node.is_readonly });
+    node.updated_at = Date.now();
+
+    if (nodeId === state.activeNodeId) {
+        applyReadOnlyState(newStatus);
+    }
+    persistActiveNodeImmediately(nodeId, { is_readonly: node.is_readonly });
+    sendDeltaPatch(nodeId, { is_readonly: node.is_readonly });
     renderTree();
-    if (isAllNotesViewActive()) renderAllNotesView();
-    showToast(newStatus ? '🔒 Note is now Read-Only (Toolbar hidden)' : '🔓 Note is now Editable (Toolbar visible)');
+    if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
+        renderAllNotesView();
+    }
+    showToast(newStatus ? '🔒 Note locked (Read-Only mode)' : '🔓 Note unlocked (Editable mode)', newStatus ? 'warning' : 'success');
 }
 
 function applyReadOnlyState(isReadOnly) {
@@ -2422,13 +2438,22 @@ function applyReadOnlyState(isReadOnly) {
         titleColorDot.style.pointerEvents = isReadOnly ? 'none' : '';
     }
 
-    // 6. Context menu button state
+    // 6. Header Lock/Unlock Button State
     const btn = document.getElementById('btn-toggle-readonly');
     if (btn) {
         const lockSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
         const unlockSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`;
-        btn.innerHTML = `${isReadOnly ? lockSvg : unlockSvg}<span>${isReadOnly ? 'Read Only' : 'Read/Write'}</span>`;
-        btn.className = `btn btn-sm ${isReadOnly ? 'btn-danger' : 'btn-secondary'}`;
+        btn.innerHTML = `${isReadOnly ? lockSvg : unlockSvg}<span>${isReadOnly ? 'Unlock Note' : 'Lock Note'}</span>`;
+        btn.className = `btn btn-sm note-lock-btn ${isReadOnly ? 'btn-danger' : 'btn-secondary'}`;
+        btn.title = isReadOnly ? 'Note is Locked. Click to unlock and edit.' : 'Note is Editable. Click to lock (Read-Only).';
+    }
+
+    // 7. Ribbon Lock Button State (in Tools tab)
+    const ribbonLockBtn = document.getElementById('btn-ribbon-lock');
+    if (ribbonLockBtn) {
+        const badgeLabel = ribbonLockBtn.querySelector('.badge-label');
+        if (badgeLabel) badgeLabel.textContent = isReadOnly ? 'Unlock Note' : 'Lock Note';
+        ribbonLockBtn.title = isReadOnly ? 'Unlock Note for editing' : 'Lock Note (Make Read-Only)';
     }
 }
 
@@ -5934,11 +5959,21 @@ function setupEventListeners() {
         scheduleSave('tags', e.target.value);
     });
 
+    let lastReadOnlyNoticeTime = 0;
+    function notifyReadOnlyNotice() {
+        const now = Date.now();
+        if (now - lastReadOnlyNoticeTime > 2500) {
+            lastReadOnlyNoticeTime = now;
+            showToast('🔒 Note is locked. Click "Unlock Note" above to edit.', 'warning');
+        }
+    }
+
     // Strict Read-Only Input Protection (Capture Phase - blocks any attempt to edit nested elements)
     noteEditor.addEventListener('beforeinput', (e) => {
         if (state.isReadOnly) {
             e.preventDefault();
             e.stopPropagation();
+            notifyReadOnlyNotice();
         }
     }, true);
 
@@ -5954,6 +5989,7 @@ function setupEventListeners() {
             }
             e.preventDefault();
             e.stopPropagation();
+            notifyReadOnlyNotice();
         }
     }, true);
 
@@ -5961,6 +5997,7 @@ function setupEventListeners() {
         if (state.isReadOnly) {
             e.preventDefault();
             e.stopPropagation();
+            notifyReadOnlyNotice();
         }
     }, true);
 
@@ -6272,13 +6309,15 @@ function setupEventListeners() {
     const btnDup = document.getElementById('btn-duplicate-node');
     if (btnDup) btnDup.onclick = duplicateCurrentNode;
     const btnToggleRo = document.getElementById('btn-toggle-readonly');
-    if (btnToggleRo) btnToggleRo.onclick = toggleReadOnlyMode;
+    if (btnToggleRo) btnToggleRo.onclick = () => toggleReadOnlyMode();
     const btnDel = document.getElementById('btn-delete-node');
     if (btnDel) btnDel.onclick = () => {
         if (state.activeNodeId) deleteNode(state.activeNodeId);
     };
     const readonlyBadge = document.getElementById('readonly-badge');
-    if (readonlyBadge) readonlyBadge.onclick = toggleReadOnlyMode;
+    if (readonlyBadge) readonlyBadge.onclick = () => toggleReadOnlyMode();
+    const btnRibbonLock = document.getElementById('btn-ribbon-lock');
+    if (btnRibbonLock) btnRibbonLock.onclick = () => toggleReadOnlyMode();
 
     // Tree Right-Click Context Menu Actions
     const ctxNewRoot = document.getElementById('ctx-new-root');
@@ -6343,8 +6382,9 @@ function setupEventListeners() {
     if (ctxReadonly) ctxReadonly.onclick = () => {
         const tid = activeContextMenuNodeId || state.activeNodeId;
         closeTreeContextMenu();
-        if (tid && tid !== state.activeNodeId) selectNode(tid);
-        toggleReadOnlyMode();
+        if (tid) {
+            toggleReadOnlyMode(tid);
+        }
     };
     const ctxExpandAll = document.getElementById('ctx-expand-all');
     if (ctxExpandAll) ctxExpandAll.onclick = () => {
