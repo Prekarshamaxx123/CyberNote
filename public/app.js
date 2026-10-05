@@ -2501,6 +2501,8 @@ function closeWelcomeModal() {
 
 // --- Centralized Settings Hub & Bug Report ---
 function openSettingsModal(targetTab = 'tab-gdrive') {
+    hideFloatingToolbars();
+    closeTreeContextMenu();
     const modal = document.getElementById('settings-modal');
     if (!modal) return;
     modal.style.display = 'flex';
@@ -2539,45 +2541,68 @@ function updateSettingsUI() {
     // 1. Google Drive info
     const nameEl = document.getElementById('settings-drive-status-name');
     const detailEl = document.getElementById('settings-drive-status-detail');
+    const pillEl = document.getElementById('settings-drive-status-pill');
     const avatarImg = document.getElementById('settings-user-avatar');
     const placeholder = document.getElementById('settings-user-avatar-placeholder');
-    const btnLogin = document.getElementById('btn-settings-google-login');
-    const btnSignout = document.getElementById('btn-settings-signout');
+    const loggedOutSection = document.getElementById('settings-gdrive-logged-out');
+    const loggedInSection = document.getElementById('settings-gdrive-logged-in');
+
+    const storageTitle = document.getElementById('settings-storage-title');
+    const storageUsedTag = document.getElementById('settings-storage-used');
+    const storageFill = document.getElementById('settings-storage-fill');
+    const storageText = document.getElementById('settings-storage-text');
+    const storageSubtext = document.getElementById('settings-storage-subtext');
+
+    // 2. Storage footprint calculation
+    const allNodes = Array.from(state.nodes.values());
+    const minifiedJson = JSON.stringify(allNodes);
+    const sizeBytes = new Blob([minifiedJson]).size;
+    const sizeKb = (sizeBytes / 1024).toFixed(1);
 
     if (state.googleUser && state.googleAccessToken) {
-        if (nameEl) nameEl.innerHTML = `<span style="color:var(--success);">● Connected:</span> ${state.googleUser.name}`;
+        if (nameEl) nameEl.textContent = state.googleUser.name || 'Google User';
+        if (pillEl) {
+            pillEl.textContent = '● Connected';
+            pillEl.className = 'status-pill status-pill-online';
+        }
         if (detailEl) detailEl.textContent = state.googleUser.email || 'Auto-Sync Active';
         if (avatarImg && state.googleUser.picture) {
             avatarImg.src = state.googleUser.picture;
             avatarImg.style.display = 'block';
             if (placeholder) placeholder.style.display = 'none';
         }
-        if (btnLogin) btnLogin.style.display = 'none';
-        if (btnSignout) btnSignout.style.display = 'inline-block';
+        if (loggedOutSection) loggedOutSection.style.display = 'none';
+        if (loggedInSection) loggedInSection.style.display = 'flex';
+
+        if (storageTitle) storageTitle.textContent = 'Google Drive Storage Footprint (15 GB Quota)';
+        if (storageUsedTag) storageUsedTag.textContent = `${sizeKb} KB (< 0.001% used)`;
+        if (storageFill) storageFill.style.width = '2%';
+        if (storageText) storageText.textContent = `Backup size: ~${sizeKb} KB (Minified JSON)`;
+        if (storageSubtext) {
+            storageSubtext.textContent = '✓ ~14.9999 GB Free Space Remaining';
+            storageSubtext.style.color = 'var(--success)';
+        }
     } else {
-        if (nameEl) nameEl.textContent = 'Not Signed In';
-        if (detailEl) detailEl.textContent = 'Sign in with Google to enable automatic cloud backup.';
+        if (nameEl) nameEl.textContent = 'Guest User';
+        if (pillEl) {
+            pillEl.textContent = 'Offline Mode';
+            pillEl.className = 'status-pill status-pill-offline';
+        }
+        if (detailEl) detailEl.textContent = 'Google Drive Cloud Sync Paused';
         if (avatarImg) avatarImg.style.display = 'none';
         if (placeholder) placeholder.style.display = 'flex';
-        if (btnLogin) btnLogin.style.display = 'inline-flex';
-        if (btnSignout) btnSignout.style.display = 'none';
+        if (loggedOutSection) loggedOutSection.style.display = 'flex';
+        if (loggedInSection) loggedInSection.style.display = 'none';
+
+        if (storageTitle) storageTitle.textContent = 'Local Notebook Footprint';
+        if (storageUsedTag) storageUsedTag.textContent = `${sizeKb} KB (Local Database)`;
+        if (storageFill) storageFill.style.width = '2%';
+        if (storageText) storageText.textContent = `Local storage size: ~${sizeKb} KB (Minified JSON & SQLite)`;
+        if (storageSubtext) {
+            storageSubtext.textContent = 'Sign in with Google to enable automatic cloud backup to your 15 GB quota';
+            storageSubtext.style.color = 'var(--text-muted)';
+        }
     }
-
-    // 2. Storage meter calculation
-    const allNodes = Array.from(state.nodes.values());
-    const minifiedJson = JSON.stringify(allNodes);
-    const sizeBytes = new Blob([minifiedJson]).size;
-    const sizeKb = (sizeBytes / 1024).toFixed(1);
-    const quotaBytes = 15 * 1024 * 1024 * 1024; // 15 GB
-    const usagePct = ((sizeBytes / quotaBytes) * 100).toFixed(6);
-
-    const storageUsedTag = document.getElementById('settings-storage-used');
-    const storageFill = document.getElementById('settings-storage-fill');
-    const storageText = document.getElementById('settings-storage-text');
-
-    if (storageUsedTag) storageUsedTag.textContent = `${sizeKb} KB (< 0.001% used)`;
-    if (storageFill) storageFill.style.width = '2%';
-    if (storageText) storageText.textContent = `Backup size: ~${sizeKb} KB (Minified JSON)`;
 
     // 3. Connection indicator
     const isOnline = navigator.onLine;
