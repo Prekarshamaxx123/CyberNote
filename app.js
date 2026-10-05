@@ -120,7 +120,11 @@ function applyTheme(theme) {
     state.theme = theme;
     document.body.className = theme === 'light' ? 'theme-light' : 'theme-dark';
     const themeBtn = document.getElementById('btn-theme');
-    if (themeBtn) themeBtn.textContent = theme === 'light' ? '☀️' : '🌙';
+    if (themeBtn) {
+        themeBtn.innerHTML = theme === 'light'
+            ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+            : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    }
     localStorage.setItem('cybernote_theme', theme);
 }
 
@@ -251,7 +255,7 @@ function signoutGoogle() {
 async function autoRestoreFromDriveOnSignIn() {
     setSyncStatus('syncing', 'Connecting to Google Drive...');
     const logDiv = document.getElementById('drive-sync-log');
-    if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">🔍 Checking Google Drive for CyberNote backup...</span>';
+    if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">Checking Google Drive for CyberNote backup...</span>';
 
     try {
         // Search Drive for CyberNote_Backup.json
@@ -265,7 +269,7 @@ async function autoRestoreFromDriveOnSignIn() {
             state.driveFileId = file.id;
             localStorage.setItem('cybernote_drive_file_id', file.id);
 
-            if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">📥 Downloading latest notes from Google Drive...</span>';
+            if (logDiv) logDiv.innerHTML = '<span style="color:var(--accent);">Downloading latest notes from Google Drive...</span>';
 
             const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
                 headers: { Authorization: `Bearer ${state.googleAccessToken}` }
@@ -277,7 +281,7 @@ async function autoRestoreFromDriveOnSignIn() {
             try {
                 const parsed = JSON.parse(rawContent);
                 if (parsed.e2ee) {
-                    const pass = prompt('🔒 This backup is encrypted! Enter your Master Password to decrypt:');
+                    const pass = prompt('This backup is encrypted! Enter your Master Password to decrypt:');
                     if (pass) {
                         finalJson = await decryptData(parsed, pass);
                         state.e2eePassword = pass;
@@ -578,21 +582,21 @@ function seedDefaultLocalNotes() {
     const welcome = {
         id: 'welcome-root',
         parent_id: null,
-        title: 'Welcome to CyberNote 🛡️',
-        content: `<h1>Welcome to CyberNote 🛡️</h1>
+        title: 'Welcome to CyberNote',
+        content: `<h1>Welcome to CyberNote</h1>
 <p><b>CyberNote</b> is your secure, all-in-one hierarchical cloud notebook featuring <b>direct in-place WYSIWYG editing</b>, Google Account Sign-In, and automatic Google Drive backup!</p>
 <div class="callout-box callout-tip">
-    <span class="callout-icon">💡</span>
+    <span class="callout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
     <div class="callout-content" contenteditable="true"><b>Google Account Sign-In:</b> Click "Sign in with Google" at the top right to automatically restore your backup from Google Drive!</div>
 </div>
-<h3>🚀 Key Capabilities:</h3>
+<h3>Key Capabilities:</h3>
 <div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Direct In-Place WYSIWYG editing (No split preview tab!)</span></div>
 <div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Google Drive auto-backup & instant restore on login</span></div>
 <div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text todo-done">Full security with optional AES-256-GCM End-to-End Encryption</span></div>
 <div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Windows Paint Studio & smooth handwritten signatures</span></div>
 <div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')"><span contenteditable="true" class="todo-text">Paste screenshots directly with Ctrl+V</span></div>
 <div class="code-box" contenteditable="false">
-    <div class="code-box-header"><span>BASH</span><button class="btn-copy-code" onclick="copySnippet(this)">📋 Copy Code</button></div>
+    <div class="code-box-header"><span>BASH</span><button class="btn-copy-code" onclick="copySnippet(this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code</button></div>
     <pre contenteditable="true"><code>echo "Your knowledge, secure in the cloud with CyberNote!"</code></pre>
 </div>`,
         icon: 'shield',
@@ -1075,7 +1079,9 @@ function applyReadOnlyState(isReadOnly) {
     state.isReadOnly = isReadOnly;
     const btn = document.getElementById('btn-toggle-readonly');
     if (btn) {
-        btn.textContent = isReadOnly ? '🔒 Read Only' : '🔓 Read/Write';
+        const lockSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+        const unlockSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`;
+        btn.innerHTML = `${isReadOnly ? lockSvg : unlockSvg}<span>${isReadOnly ? 'Read Only' : 'Read/Write'}</span>`;
         btn.className = `btn btn-sm ${isReadOnly ? 'btn-danger' : 'btn-secondary'}`;
     }
     noteEditor.contentEditable = !isReadOnly;
@@ -1130,10 +1136,15 @@ function handleHeadingChange(val) {
 
 function handleCalloutInsert(type) {
     if (state.isReadOnly || !type) return;
-    const icons = { tip: '💡', warning: '⚠️', info: 'ℹ️', danger: '🚨' };
+    const calloutSvgs = {
+        tip: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
+        warning: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+        info: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+        danger: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
+    };
     const html = `
         <div class="callout-box callout-${type}" contenteditable="false">
-            <span class="callout-icon">${icons[type] || '💡'}</span>
+            <span class="callout-icon">${calloutSvgs[type] || calloutSvgs.info}</span>
             <div class="callout-content" contenteditable="true">Callout note text here...</div>
         </div><p><br></p>
     `;
@@ -1241,7 +1252,7 @@ function confirmInsertCodeBox() {
         <div class="code-box" contenteditable="false">
             <div class="code-box-header">
                 <span>${lang.toUpperCase()}</span>
-                <button class="btn-copy-code" onclick="copySnippet(this)">📋 Copy Code</button>
+                <button class="btn-copy-code" onclick="copySnippet(this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code</button>
             </div>
             <pre contenteditable="true"><code>${cleanCode || 'code snippet here...'}</code></pre>
         </div><p><br></p>
@@ -1255,8 +1266,10 @@ function copySnippet(btn) {
     const pre = btn.closest('.code-box').querySelector('pre code');
     if (!pre) return;
     navigator.clipboard.writeText(pre.innerText).then(() => {
-        btn.textContent = '✓ Copied!';
-        setTimeout(() => { btn.textContent = '📋 Copy Code'; }, 2000);
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Copied!';
+        setTimeout(() => {
+            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code';
+        }, 2000);
     });
 }
 
@@ -1811,6 +1824,17 @@ function closeDriveModal() {
     document.getElementById('drive-modal').style.display = 'none';
 }
 
+// --- About CyberNote & Support Prekarshamaxx123 Modal ---
+function openAboutModal() {
+    const modal = document.getElementById('about-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAboutModal() {
+    const modal = document.getElementById('about-modal');
+    if (modal) modal.style.display = 'none';
+}
+
 // --- GitHub Sync Modal ---
 function openGitHubModal() {
     const modal = document.getElementById('github-modal');
@@ -1991,7 +2015,7 @@ function convertMarkdownToHtml(md) {
         const language = lang || 'code';
         return `
             <div class="code-box" contenteditable="false">
-                <div class="code-box-header"><span>${language.toUpperCase()}</span><button class="btn-copy-code" onclick="copySnippet(this)">📋 Copy Code</button></div>
+                <div class="code-box-header"><span>${language.toUpperCase()}</span><button class="btn-copy-code" onclick="copySnippet(this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code</button></div>
                 <pre contenteditable="true"><code>${code.trim()}</code></pre>
             </div><p><br></p>
         `;
@@ -2219,12 +2243,21 @@ function setupEventListeners() {
     document.getElementById('btn-find-replace-all').onclick = performReplaceAll;
 
     // Tree Info & Modals
+    const btnAbout = document.getElementById('btn-about');
+    if (btnAbout) btnAbout.onclick = openAboutModal;
     document.getElementById('btn-tree-info').onclick = openTreeInfoModal;
     document.getElementById('btn-github-sync').onclick = openGitHubModal;
     document.getElementById('btn-gh-save').onclick = connectAndSyncGitHub;
     document.getElementById('btn-import-ct').onclick = openImportModal;
     document.getElementById('btn-do-import').onclick = doImportCherryTree;
     document.getElementById('btn-export').onclick = exportNotes;
+
+    // Close modals on clicking backdrop
+    window.addEventListener('click', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('modal')) {
+            e.target.style.display = 'none';
+        }
+    });
 
     // Search
     const searchInput = document.getElementById('global-search');
@@ -2385,7 +2418,7 @@ const slashItemsList = document.getElementById('slash-items-list');
 const SLASH_COMMANDS = [
     {
         id: 'paint',
-        icon: '🎨',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>',
         name: 'Paint & Signature Studio',
         desc: 'Draw diagrams, freehand sketches, or sign handwritten notes',
         action: openPaintModal,
@@ -2393,7 +2426,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'table',
-        icon: '▦',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>',
         name: 'Table',
         desc: 'Insert customizable grid table with rows & columns',
         action: openTableModal,
@@ -2401,7 +2434,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'code',
-        icon: '💻',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
         name: 'CodeBox with 1-Click Copy',
         desc: 'Syntax container with dark theme & instant copy button',
         action: openCodeBoxModal,
@@ -2409,7 +2442,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'todo',
-        icon: '☑️',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
         name: 'Interactive To-Do Checklist',
         desc: 'Task item with clickable checkbox toggle',
         action: insertTodoItem,
@@ -2417,7 +2450,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'callout-tip',
-        icon: '💡',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
         name: 'Callout: Tip Box',
         desc: 'Highlighted helpful tip container',
         action: () => handleCalloutInsert('tip'),
@@ -2425,7 +2458,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'callout-warning',
-        icon: '⚠️',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
         name: 'Callout: Warning Box',
         desc: 'Highlighted warning / caution banner',
         action: () => handleCalloutInsert('warning'),
@@ -2433,7 +2466,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'callout-info',
-        icon: 'ℹ️',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
         name: 'Callout: Info Note',
         desc: 'Informational note box',
         action: () => handleCalloutInsert('info'),
@@ -2441,7 +2474,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'image',
-        icon: '🖼️',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
         name: 'Insert Photo / Screenshot',
         desc: 'Upload image file or paste with Ctrl+V',
         action: triggerImageUpload,
@@ -2449,7 +2482,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'h1',
-        icon: '🔤',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="m17 12 3-2v8"/></svg>',
         name: 'Heading 1',
         desc: 'Top-level large section heading',
         action: () => handleHeadingChange('h1'),
@@ -2457,7 +2490,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'h2',
-        icon: '🔡',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M21 18h-4c0-4 4-3 4-6 0-1.5-1-2.5-2.5-2.5A2.5 2.5 0 0 0 16 12"/></svg>',
         name: 'Heading 2',
         desc: 'Medium subsection heading',
         action: () => handleHeadingChange('h2'),
@@ -2465,7 +2498,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'h3',
-        icon: '🏷️',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17.5 10.5c1.7-1 4.5.5 3 2.5 1.5 2-.8 3.5-3 2.5"/><path d="M17 9h4"/></svg>',
         name: 'Heading 3',
         desc: 'Small topic heading',
         action: () => handleHeadingChange('h3'),
@@ -2473,7 +2506,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'bullet',
-        icon: '📋',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
         name: 'Bulleted List',
         desc: 'Standard bullet point list',
         action: () => execFormat('insertUnorderedList'),
@@ -2481,7 +2514,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'numbered',
-        icon: '🔢',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>',
         name: 'Numbered List',
         desc: 'Ordered numerical sequence list',
         action: () => execFormat('insertOrderedList'),
@@ -2489,7 +2522,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'quote',
-        icon: '❝',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1 0 1-1.5 3-4 5"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1 0 1-1.5 3-4 5"/></svg>',
         name: 'Quote Block',
         desc: 'Styled quotation block with accent border',
         action: () => execFormat('formatBlock', '<blockquote>'),
@@ -2497,7 +2530,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'divider',
-        icon: '➖',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/></svg>',
         name: 'Horizontal Divider',
         desc: 'Clean visual separator line between sections',
         action: insertDivider,
@@ -2505,7 +2538,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'timestamp',
-        icon: '📅',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
         name: 'Current Timestamp',
         desc: 'Insert current date and time string',
         action: insertTimestamp,
@@ -2513,7 +2546,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'link',
-        icon: '🔗',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
         name: 'Hyperlink',
         desc: 'Insert external web link',
         action: insertHyperlink,
@@ -2521,7 +2554,7 @@ const SLASH_COMMANDS = [
     },
     {
         id: 'nodelink',
-        icon: '📌',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>',
         name: 'Internal Node Link',
         desc: 'Link to another note in your hierarchy tree',
         action: openNodeLinkModal,
