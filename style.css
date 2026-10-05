@@ -1427,11 +1427,11 @@ body {
 .editor-scroll-area {
     flex: 1;
     overflow-y: auto;
-    padding: 32px 40px;
+    padding: 16px 24px 80px 24px;
     background: linear-gradient(180deg, var(--bg-editor) 0%, rgba(20, 20, 32, 0.95) 100%);
     cursor: text;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     scroll-behavior: smooth;
     position: relative;
 }
@@ -1445,8 +1445,8 @@ body {
     line-height: 1.75;
     position: relative;
     width: 100%;
-    max-width: 860px;
-    padding: 10px 16px 140px 16px;
+    max-width: 100%;
+    padding: 6px 12px 140px 12px;
 }
 
 .wysiwyg-canvas:empty::before {
