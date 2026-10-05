@@ -6,7 +6,7 @@
 // ==========================================================================
 
 const API_BASE = '';
-const DEFAULT_GOOGLE_CLIENT_ID = '872135362876-levmtlpqku4dimbfe2hdpa5m40a7bleq.apps.googleusercontent.com';
+const DEFAULT_GOOGLE_CLIENT_ID = '872135362876-ig6gd1lqt8alrb9cu43f1om05ssodsjn.apps.googleusercontent.com';
 
 const ICON_MAP = {
     'folder': '📁',
@@ -270,11 +270,15 @@ function toggleTheme() {
 // --- Google Authentication & Google Drive Integration ---
 function getEffectiveGoogleClientId() {
     const saved = localStorage.getItem('cybernote_client_id');
-    if (saved && saved.trim()) return saved.trim();
+    if (saved && saved.includes('levmtlpqku4dimbfe2hdpa5m40a7bleq')) {
+        localStorage.removeItem('cybernote_client_id');
+    } else if (saved && saved.trim()) {
+        return saved.trim();
+    }
     const settingsVal = document.getElementById('settings-google-client-id')?.value?.trim();
-    if (settingsVal) return settingsVal;
+    if (settingsVal && !settingsVal.includes('levmtlpqku4dimbfe2hdpa5m40a7bleq')) return settingsVal;
     const inputVal = document.getElementById('google-client-id-input')?.value?.trim();
-    if (inputVal) return inputVal;
+    if (inputVal && !inputVal.includes('levmtlpqku4dimbfe2hdpa5m40a7bleq')) return inputVal;
     return DEFAULT_GOOGLE_CLIENT_ID;
 }
 

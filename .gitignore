@@ -7,10 +7,12 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 
-# Environment & Logs
+# Environment & Logs & Secrets
 .env
 .env.*
 *.log
+client_secret*.json
+credentials*.json
 
 # OS files
 .DS_Store
