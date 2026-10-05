@@ -28,6 +28,7 @@ body.theme-dark {
     --danger: #f38ba8;
     --code-bg: #11111b;
     --code-border: #313244;
+    --bg-card: #1e1e2e;
 }
 
 /* Light Theme */
@@ -50,6 +51,7 @@ body.theme-light {
     --danger: #dc3545;
     --code-bg: #f8f9fa;
     --code-border: #e9ecef;
+    --bg-card: #ffffff;
 }
 
 * {
@@ -3662,11 +3664,12 @@ body {
     top: calc(100% + 6px);
     left: 0;
     min-width: 180px;
-    background-color: var(--bg-card);
+    background: var(--bg-card, #1e1e2e);
+    background-color: var(--bg-card, #1e1e2e);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-    z-index: 1200;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.75);
+    z-index: 3000;
     padding: 6px;
     display: flex;
     flex-direction: column;
@@ -3914,13 +3917,17 @@ body {
     text-transform: uppercase;
 }
 
-/* Emoji Grid Popover */
+/* Emoji / Icons Grid Popover */
 .emoji-grid-popover {
-    display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
-    gap: 4px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
     padding: 8px;
-    width: 172px;
+    width: 176px;
+    background: var(--bg-card, #1e1e2e);
+    background-color: var(--bg-card, #1e1e2e);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.8);
+    z-index: 3100;
 }
 .emoji-chip {
     display: inline-flex;

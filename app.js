@@ -2423,7 +2423,6 @@ function insertHtmlAtCursor(html) {
     updateDocumentStats();
 }
 
-// --- Creative Ribbon Tools: Neon Glowing Text, Animated Text, Arrows & Shapes ---
 function toggleRibbonPopover(menuId, buttonEl, e) {
     if (e) {
         e.preventDefault();
@@ -2432,7 +2431,7 @@ function toggleRibbonPopover(menuId, buttonEl, e) {
     saveSelection();
     const targetMenu = document.getElementById(menuId);
     if (!targetMenu) return;
-    const isShowing = targetMenu.style.display !== 'none';
+    const isShowing = targetMenu.style.display !== 'none' && targetMenu.style.display !== '';
     closeAllRibbonPopovers();
     if (!isShowing) {
         targetMenu.style.display = targetMenu.classList.contains('emoji-grid-popover') ? 'grid' : 'flex';
@@ -2440,7 +2439,9 @@ function toggleRibbonPopover(menuId, buttonEl, e) {
 }
 
 function closeAllRibbonPopovers() {
-    document.querySelectorAll('.ribbon-popover-menu').forEach(m => m.style.display = 'none');
+    document.querySelectorAll('.ribbon-popover-menu').forEach(m => {
+        m.style.display = 'none';
+    });
 }
 
 function applyNeonEffect(color) {
@@ -4631,7 +4632,10 @@ function setupEventListeners() {
     const btnPrint = document.getElementById('btn-print-note');
     if (btnPrint) btnPrint.onclick = handlePrintNote;
 
-    // Creative Ribbon Popovers (Neon, Animations, Arrows, Shapes)
+    // Creative Ribbon Popovers (Emoji, Neon, Animations, Arrows, Shapes)
+    const btnEmoji = document.getElementById('btn-emoji-picker');
+    if (btnEmoji) btnEmoji.onclick = (e) => toggleRibbonPopover('emoji-dropdown-menu', btnEmoji, e);
+
     const btnNeon = document.getElementById('btn-neon-effects');
     if (btnNeon) btnNeon.onclick = (e) => toggleRibbonPopover('neon-dropdown-menu', btnNeon, e);
 
@@ -4652,7 +4656,16 @@ function setupEventListeners() {
         }
     });
 
-    // Global outside click closer for ribbon popovers and context menus
+    // Global outside click & escape closer for ribbon popovers and context menus
+    document.addEventListener('pointerdown', (e) => {
+        if (!e.target.closest('.ribbon-dropdown-wrap')) {
+            closeAllRibbonPopovers();
+        }
+        if (!e.target.closest('#tree-context-menu')) {
+            closeTreeContextMenu();
+        }
+    });
+
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.ribbon-dropdown-wrap')) {
             closeAllRibbonPopovers();
@@ -4662,8 +4675,6 @@ function setupEventListeners() {
         }
     });
 
-    // Close popovers immediately when focusing in editor or pressing Escape
-    noteEditor.addEventListener('focusin', closeAllRibbonPopovers);
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeAllRibbonPopovers();

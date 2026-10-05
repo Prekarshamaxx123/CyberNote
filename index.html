@@ -207,7 +207,9 @@
                 </div>
 
                 <div class="title-container">
-                    <button id="btn-icon-picker" class="icon-selector" title="Change Node Icon">📁</button>
+                    <button id="btn-icon-picker" class="icon-selector" title="Change Node Icon">
+                        <svg class="node-svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    </button>
                     <span id="title-color-dot" class="node-color-indicator" title="Node Color"></span>
                     <input type="text" id="note-title" class="note-title-input" placeholder="Note Title...">
                     <span id="readonly-badge" class="readonly-badge" style="display: none;" title="Note is Read-Only. Click or right-click in sidebar to toggle.">
@@ -307,15 +309,43 @@
 
                         <div class="ribbon-divider"></div>
 
-                        <!-- Creative & Aesthetic Group: Neon, Animation, Arrows & Shapes -->
+                        <!-- Creative & Aesthetic Group: Icons, Neon, Animation, Arrows & Shapes -->
                         <div class="ribbon-cluster ribbon-cluster-creative">
+                            <!-- Quick Icons & Symbols Picker -->
+                            <div class="ribbon-dropdown-wrap">
+                                <button id="btn-emoji-picker" class="ribbon-btn ribbon-badge-action" title="Quick Icons & Symbols Picker">
+                                    <span class="badge-icon">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                                    </span>
+                                    <span class="badge-label">Icons</span>
+                                </button>
+                                <div id="emoji-dropdown-menu" class="ribbon-popover-menu emoji-grid-popover" style="display: none;">
+                                    <span class="emoji-chip" onclick="insertEmoji('⭐')" title="Star">⭐</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('✅')" title="Checkmark">✅</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🔥')" title="Fire">🔥</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('💡')" title="Idea">💡</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🚀')" title="Rocket">🚀</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('📌')" title="Pin">📌</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('⚠️')" title="Warning">⚠️</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🎯')" title="Target">🎯</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('💻')" title="Laptop">💻</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🛡️')" title="Shield">🛡️</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('📝')" title="Note">📝</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🔒')" title="Lock">🔒</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🎉')" title="Party">🎉</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('📊')" title="Chart">📊</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('❤️')" title="Heart">❤️</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('✨')" title="Sparkle">✨</span>
+                                </div>
+                            </div>
+
                             <!-- Neon Glow Effects -->
                             <div class="ribbon-dropdown-wrap">
                                 <button id="btn-neon-effects" class="ribbon-btn ribbon-badge-action" title="Neon Glowing Text Effects">
                                     <span class="badge-icon">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
                                     </span>
-                                    <span class="badge-label">Neon ✨</span>
+                                    <span class="badge-label">Neon</span>
                                 </button>
                                 <div id="neon-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
                                     <div class="popover-item" onclick="applyNeonEffect('cyan')"><span class="popover-color-dot" style="background:#00ffff; box-shadow:0 0 8px #00ffff;"></span>Neon Cyan</div>
@@ -332,12 +362,12 @@
                                     <span class="badge-icon">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                                     </span>
-                                    <span class="badge-label">Anim ⚡</span>
+                                    <span class="badge-label">Anim</span>
                                 </button>
                                 <div id="anim-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
-                                    <div class="popover-item" onclick="applyAnimatedText('rainbow')">🌈 Rainbow Flow</div>
-                                    <div class="popover-item" onclick="applyAnimatedText('pulse')">💫 Pulse Glow</div>
-                                    <div class="popover-item" onclick="applyAnimatedText('float')">🌊 Floating Wave</div>
+                                    <div class="popover-item" onclick="applyAnimatedText('rainbow')">Rainbow Flow</div>
+                                    <div class="popover-item" onclick="applyAnimatedText('pulse')">Pulse Glow</div>
+                                    <div class="popover-item" onclick="applyAnimatedText('float')">Floating Wave</div>
                                 </div>
                             </div>
 
@@ -347,7 +377,7 @@
                                     <span class="badge-icon">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                                     </span>
-                                    <span class="badge-label">Arrows ➔</span>
+                                    <span class="badge-label">Arrows</span>
                                 </button>
                                 <div id="arrows-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
                                     <div class="popover-item" onclick="insertSymbol('➔')">➔ Right Arrow</div>
@@ -358,7 +388,7 @@
                                     <div class="popover-item" onclick="insertSymbol('⤴')">⤴ Return Flow</div>
                                     <div class="popover-item" onclick="insertSymbol('⤵')">⤵ Downward Flow</div>
                                     <div class="popover-divider"></div>
-                                    <div class="popover-item" onclick="insertFlowSteps()">🔄 Step 1 ➔ Step 2 Flow</div>
+                                    <div class="popover-item" onclick="insertFlowSteps()">Step 1 ➔ Step 2 Flow</div>
                                     <div class="popover-item" onclick="insertArrowDivider()">──➔ Section Divider</div>
                                 </div>
                             </div>
@@ -369,15 +399,15 @@
                                     <span class="badge-icon">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
                                     </span>
-                                    <span class="badge-label">Shapes 🏷️</span>
+                                    <span class="badge-label">Shapes</span>
                                 </button>
                                 <div id="shapes-dropdown-menu" class="ribbon-popover-menu" style="display: none;">
-                                    <div class="popover-item" onclick="insertNeonBanner()">🪧 Glowing Gradient Card</div>
-                                    <div class="popover-item" onclick="insertPillBadge('success')">🟢 [DONE] Success Badge</div>
-                                    <div class="popover-item" onclick="insertPillBadge('priority')">🔴 [HIGH] Priority Badge</div>
-                                    <div class="popover-item" onclick="insertPillBadge('cyber')">🛡️ [SECURE] Cyber Badge</div>
-                                    <div class="popover-item" onclick="insertPillBadge('pending')">🟡 [PENDING] Status Badge</div>
-                                    <div class="popover-item" onclick="insertMetricTile()">📊 2-Column Metric Card</div>
+                                    <div class="popover-item" onclick="insertNeonBanner()">Glowing Gradient Card</div>
+                                    <div class="popover-item" onclick="insertPillBadge('success')"><span class="badge-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#a6e3a1;margin-right:6px;"></span>[DONE] Success Badge</div>
+                                    <div class="popover-item" onclick="insertPillBadge('priority')"><span class="badge-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f38ba8;margin-right:6px;"></span>[HIGH] Priority Badge</div>
+                                    <div class="popover-item" onclick="insertPillBadge('cyber')"><span class="badge-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#89b4fa;margin-right:6px;"></span>[SECURE] Cyber Badge</div>
+                                    <div class="popover-item" onclick="insertPillBadge('pending')"><span class="badge-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f9e2af;margin-right:6px;"></span>[PENDING] Status Badge</div>
+                                    <div class="popover-item" onclick="insertMetricTile()">2-Column Metric Card</div>
                                 </div>
                             </div>
                         </div>
