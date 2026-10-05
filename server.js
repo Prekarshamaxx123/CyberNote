@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const os = require('node:os');
+const zlib = require('node:zlib');
 
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
@@ -117,29 +118,54 @@ const MIME_TYPES = {
 
 function sendJson(res, statusCode, data) {
     const json = JSON.stringify(data);
-    res.writeHead(statusCode, {
+    const req = res.req;
+    const acceptEncoding = (req && req.headers && req.headers['accept-encoding']) || '';
+    const headers = {
         'Content-Type': 'application/json; charset=UTF-8',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type'
-    });
-    res.end(json);
+        'Access-Control-Allow-Headers': 'Content-Type, Content-Encoding'
+    };
+
+    if (acceptEncoding.includes('gzip') && json.length > 512) {
+        const compressed = zlib.gzipSync(Buffer.from(json, 'utf-8'));
+        headers['Content-Encoding'] = 'gzip';
+        headers['Content-Length'] = compressed.length;
+        res.writeHead(statusCode, headers);
+        res.end(compressed);
+    } else {
+        headers['Content-Length'] = Buffer.byteLength(json, 'utf-8');
+        res.writeHead(statusCode, headers);
+        res.end(json);
+    }
 }
 
 function parseJsonBody(req) {
     return new Promise((resolve, reject) => {
-        let body = '';
+        const chunks = [];
+        let totalLen = 0;
         req.on('data', chunk => {
-            body += chunk;
-            if (body.length > 50 * 1024 * 1024) {
+            chunks.push(chunk);
+            totalLen += chunk.length;
+            if (totalLen > 50 * 1024 * 1024) {
                 req.destroy();
                 reject(new Error('Payload too large'));
             }
         });
         req.on('end', () => {
-            if (!body) return resolve({});
+            if (totalLen === 0) return resolve({});
+            let buffer = Buffer.concat(chunks);
+            const contentEncoding = req.headers['content-encoding'];
+            if (contentEncoding === 'gzip') {
+                try {
+                    buffer = zlib.gunzipSync(buffer);
+                } catch (e) {
+                    return reject(e);
+                }
+            }
             try {
-                resolve(JSON.parse(body));
+                const text = buffer.toString('utf-8');
+                resolve(JSON.parse(text));
             } catch (err) {
                 reject(err);
             }
@@ -350,8 +376,22 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(500, { 'Content-Type': 'text/plain' });
             res.end('Server Error');
         } else {
-            res.writeHead(200, { 'Content-Type': contentType });
-            res.end(content);
+            const acceptEncoding = (req.headers && req.headers['accept-encoding']) || '';
+            if (acceptEncoding.includes('gzip') && content.length > 512) {
+                const compressed = zlib.gzipSync(content);
+                res.writeHead(200, {
+                    'Content-Type': contentType,
+                    'Content-Encoding': 'gzip',
+                    'Content-Length': compressed.length
+                });
+                res.end(compressed);
+            } else {
+                res.writeHead(200, {
+                    'Content-Type': contentType,
+                    'Content-Length': content.length
+                });
+                res.end(content);
+            }
         }
     });
 });
