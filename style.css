@@ -4579,18 +4579,16 @@ body {
 }
 
 .ribbon-popover-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
+    position: fixed;
     min-width: 180px;
     background: var(--bg-card, #1e1e2e);
     background-color: var(--bg-card, #1e1e2e);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.75);
-    z-index: 3000;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    z-index: 999999 !important;
     padding: 6px;
-    display: flex;
+    display: none;
     flex-direction: column;
     gap: 3px;
     animation: popoverFadeIn 0.15s ease-out;
