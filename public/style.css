@@ -387,6 +387,23 @@ body {
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
+    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease;
+    overflow: hidden;
+    position: relative;
+    z-index: 5;
+}
+
+.sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    border-right: none !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sidebar.collapsed + .resizer {
+    display: none;
 }
 
 .sidebar-header {
@@ -634,112 +651,453 @@ body {
     font-size: 0.85rem;
 }
 
-/* 2-Row CherryTree Editor Toolbars */
-.editor-toolbar {
+/* ==========================================================================
+   CYBERNOTE CATEGORIZED STUDIO RIBBON (Clean, Modern, Organized)
+   ========================================================================== */
+.editor-ribbon {
     background-color: var(--bg-toolbar);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 12px;
-}
-
-.toolbar-row1 {
     border-top: 1px solid var(--border-color);
     border-bottom: 1px solid var(--border-color);
-    height: 38px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 6px 14px;
+    user-select: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.toolbar-row2 {
-    border-bottom: 1px solid var(--border-color);
-    height: 36px;
-}
-
-.tb-group {
+.ribbon-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     overflow-x: auto;
+    scrollbar-width: none;
+}
+.ribbon-row::-webkit-scrollbar {
+    display: none;
 }
 
-.tb-btn {
+.ribbon-row-studio {
+    padding-bottom: 3px;
+}
+
+.ribbon-row-format {
+    padding-top: 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Cluster Pills */
+.ribbon-cluster {
+    display: inline-flex;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 2px 4px;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.ribbon-divider {
+    width: 1px;
+    height: 20px;
+    background-color: var(--border-color);
+    margin: 0 3px;
+    flex-shrink: 0;
+}
+
+/* Base Ribbon Button */
+.ribbon-btn {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 4px 7px;
-    border-radius: 4px;
+    padding: 5px 8px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.84rem;
-    display: flex;
+    font-size: 0.82rem;
+    display: inline-flex;
     align-items: center;
-    gap: 2px;
+    justify-content: center;
+    gap: 5px;
+    transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
 }
 
-.tb-btn:hover {
+.ribbon-btn:hover {
     background-color: var(--bg-hover);
     color: var(--text-primary);
+    transform: translateY(-1px);
 }
 
-.tb-select {
+.ribbon-btn:active {
+    transform: translateY(0);
+}
+
+.ribbon-btn-icon {
+    width: 29px;
+    height: 29px;
+    padding: 0;
+}
+
+.ribbon-btn-compact {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    font-weight: 500;
+}
+
+/* Highlighted Creative Studio Badges */
+.ribbon-badge-paint {
+    background: linear-gradient(135deg, rgba(137, 180, 250, 0.18), rgba(243, 139, 168, 0.22));
+    border: 1px solid rgba(137, 180, 250, 0.45);
+    color: #e0def4;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.ribbon-badge-paint:hover {
+    background: linear-gradient(135deg, rgba(137, 180, 250, 0.3), rgba(243, 139, 168, 0.4));
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(137, 180, 250, 0.3);
+}
+
+.ribbon-badge-action {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-weight: 500;
+    padding: 4px 9px;
+    border-radius: 6px;
+}
+
+.ribbon-badge-action:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.badge-icon {
+    font-size: 0.95rem;
+}
+
+.badge-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* Ribbon Select Dropdowns */
+.ribbon-select {
     background-color: var(--bg-app);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 0.8rem;
-    padding: 2px 6px;
+    padding: 4px 8px;
     outline: none;
     cursor: pointer;
+    transition: border-color 0.15s ease;
 }
 
-.color-picker-label {
+.ribbon-select:hover, .ribbon-select:focus {
+    border-color: var(--accent);
+}
+
+.ribbon-heading-select {
+    font-weight: 600;
+    min-width: 105px;
+}
+
+.ribbon-font-select {
+    max-width: 120px;
+}
+
+.ribbon-size-select {
+    max-width: 75px;
+}
+
+/* Color Pickers with Underline Indicator */
+.ribbon-color-btn {
+    position: relative;
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
+    width: 29px;
+    height: 29px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.85rem;
-    padding: 2px 4px;
-    border-radius: 4px;
+    transition: background 0.15s ease;
 }
 
-.color-picker-label:hover {
+.ribbon-color-btn:hover {
     background-color: var(--bg-hover);
 }
 
-.color-picker-label input[type="color"] {
+.color-icon-char {
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.color-indicator-bar {
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+    margin-top: 2px;
+    background-color: #f38ba8;
+}
+
+#bg-color-indicator {
+    background-color: #f5c211;
+}
+
+.ribbon-color-btn input[type="color"] {
+    position: absolute;
     opacity: 0;
     width: 0;
     height: 0;
-    position: absolute;
     pointer-events: none;
 }
 
-.tb-divider {
-    width: 1px;
-    height: 18px;
-    background-color: var(--border-color);
-    margin: 0 4px;
-}
-
-.view-mode-tabs {
+/* Floating Table & Image Toolbars */
+.table-toolbar, .image-toolbar {
+    background: rgba(30, 30, 46, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+    padding: 6px 14px;
     display: flex;
     align-items: center;
-    background-color: var(--bg-app);
-    border-radius: 6px;
-    padding: 2px;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 5;
+    animation: fadeIn 0.2s ease;
 }
 
-.tab-btn {
+.table-tb-title, .image-tb-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.tb-btn-small {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.tb-btn-small:hover {
+    background-color: var(--bg-hover);
+}
+
+.btn-tb-danger:hover {
+    background-color: var(--danger);
+    color: #111;
+}
+
+/* ==========================================================================
+   FLOATING SELECTION BUBBLE (Notion-style Hover Formatting Menu)
+   ========================================================================== */
+.selection-bubble {
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 8px;
+    background: rgba(24, 24, 37, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.25);
+    border-radius: 24px;
+    transform: translate(-50%, -100%);
+    margin-top: -12px;
+    animation: bubblePop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    user-select: none;
+}
+
+@keyframes bubblePop {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -85%) scale(0.92);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -100%) scale(1);
+    }
+}
+
+.bubble-btn {
     background: transparent;
     border: none;
-    color: var(--text-muted);
-    padding: 3px 10px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 600;
+    color: var(--text-primary);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
     cursor: pointer;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
 }
 
-.tab-btn.active {
-    background-color: var(--accent);
-    color: #111;
+.bubble-btn:hover {
+    background-color: var(--bg-hover);
+    color: var(--accent);
+    transform: scale(1.1);
+}
+
+.bubble-sep {
+    width: 1px;
+    height: 18px;
+    background-color: rgba(255, 255, 255, 0.15);
+    margin: 0 2px;
+}
+
+.bubble-color-label {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+
+.bubble-color-label:hover {
+    background-color: var(--bg-hover);
+}
+
+.bubble-color-label input[type="color"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.bubble-color-glyph {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   SLASH COMMAND PALETTE (Notion / RemNote style)
+   ========================================================================== */
+.slash-menu {
+    position: fixed;
+    z-index: 1050;
+    width: 300px;
+    max-height: 360px;
+    background: rgba(24, 24, 37, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 255, 255, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slashMenuPop 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slashMenuPop {
+    0% {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.slash-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 6px 12px;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.slash-title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+}
+
+.slash-hint {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.slash-items-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+    max-height: 310px;
+}
+
+.slash-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+    user-select: none;
+}
+
+.slash-item:hover, .slash-item.selected {
+    background-color: var(--bg-hover);
+}
+
+.slash-item.selected {
+    background-color: rgba(137, 180, 250, 0.15);
+    border: 1px solid rgba(137, 180, 250, 0.3);
+}
+
+.slash-item-icon {
+    font-size: 1.15rem;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.slash-item-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.slash-item-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.slash-item-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Find & Replace Floating Panel */
@@ -789,9 +1147,13 @@ body {
 .editor-scroll-area {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 32px;
-    background-color: var(--bg-editor);
+    padding: 32px 40px;
+    background: linear-gradient(180deg, var(--bg-editor) 0%, rgba(20, 20, 32, 0.95) 100%);
     cursor: text;
+    display: flex;
+    justify-content: center;
+    scroll-behavior: smooth;
+    position: relative;
 }
 
 .wysiwyg-canvas {
@@ -799,11 +1161,12 @@ body {
     outline: none;
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: 1rem;
-    line-height: 1.7;
+    font-size: 1.05rem;
+    line-height: 1.75;
     position: relative;
-    max-width: 900px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: 860px;
+    padding: 10px 16px 140px 16px;
 }
 
 .wysiwyg-canvas:empty::before {

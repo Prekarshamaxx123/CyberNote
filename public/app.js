@@ -2111,9 +2111,23 @@ function setupEventListeners() {
     document.getElementById('btn-subscript').onclick = () => execFormat('subscript');
     document.getElementById('btn-superscript').onclick = () => execFormat('superscript');
 
-    // Colors
-    document.getElementById('text-color-picker').onchange = (e) => execFormat('foreColor', e.target.value);
-    document.getElementById('bg-color-picker').onchange = (e) => execFormat('hiliteColor', e.target.value);
+    // Colors & Swatch Indicators
+    const textColorPicker = document.getElementById('text-color-picker');
+    if (textColorPicker) {
+        textColorPicker.oninput = (e) => {
+            const ind = document.getElementById('text-color-indicator');
+            if (ind) ind.style.backgroundColor = e.target.value;
+            execFormat('foreColor', e.target.value);
+        };
+    }
+    const bgColorPicker = document.getElementById('bg-color-picker');
+    if (bgColorPicker) {
+        bgColorPicker.oninput = (e) => {
+            const ind = document.getElementById('bg-color-indicator');
+            if (ind) ind.style.backgroundColor = e.target.value;
+            execFormat('hiliteColor', e.target.value);
+        };
+    }
 
     // Alignments
     document.getElementById('btn-align-left').onclick = () => execFormat('justifyLeft');
@@ -2239,14 +2253,481 @@ function setupEventListeners() {
             e.preventDefault();
             moveActiveNode('down');
         }
+        if (isCtrl && (e.key === '\\' || e.key === '|')) {
+            e.preventDefault();
+            toggleSidebar();
+        }
     });
 
     setupImageInteractions();
     setupTableInteractions();
 
+    const toggleSidebar = () => {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle('open');
+        } else {
+            sidebar.classList.toggle('collapsed');
+        }
+    };
+
     const toggleSidebarBtn = document.getElementById('btn-toggle-sidebar');
-    const sidebar = document.getElementById('sidebar');
-    if (toggleSidebarBtn && sidebar) {
-        toggleSidebarBtn.onclick = () => sidebar.classList.toggle('open');
+    const toggleSidebarRibbonBtn = document.getElementById('btn-toggle-sidebar-view');
+    if (toggleSidebarBtn) toggleSidebarBtn.onclick = toggleSidebar;
+    if (toggleSidebarRibbonBtn) toggleSidebarRibbonBtn.onclick = toggleSidebar;
+
+    setupSelectionBubble();
+    setupSlashCommandMenu();
+}
+
+// ==========================================================================
+// NOTION-STYLE FLOATING SELECTION BUBBLE
+// ==========================================================================
+const selectionBubble = document.getElementById('selection-bubble');
+
+function setupSelectionBubble() {
+    if (!selectionBubble) return;
+
+    const updateBubblePosition = () => {
+        if (state.isReadOnly) {
+            selectionBubble.style.display = 'none';
+            return;
+        }
+
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || !noteEditor.contains(selection.anchorNode)) {
+            selectionBubble.style.display = 'none';
+            return;
+        }
+
+        const selectedText = selection.toString().trim();
+        if (!selectedText) {
+            selectionBubble.style.display = 'none';
+            return;
+        }
+
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+            selectionBubble.style.display = 'none';
+            return;
+        }
+
+        selectionBubble.style.display = 'flex';
+        const bubbleX = Math.round(rect.left + rect.width / 2);
+        const bubbleY = Math.round(rect.top);
+
+        selectionBubble.style.left = `${bubbleX}px`;
+        selectionBubble.style.top = `${bubbleY}px`;
+    };
+
+    document.addEventListener('selectionchange', () => {
+        requestAnimationFrame(updateBubblePosition);
+    });
+
+    // Bubble button actions
+    const bindBubbleBtn = (id, fn) => {
+        const el = document.getElementById(id);
+        if (el) el.onclick = (e) => { e.preventDefault(); fn(); };
+    };
+
+    bindBubbleBtn('bubble-bold', () => execFormat('bold'));
+    bindBubbleBtn('bubble-italic', () => execFormat('italic'));
+    bindBubbleBtn('bubble-underline', () => execFormat('underline'));
+    bindBubbleBtn('bubble-strike', () => execFormat('strikeThrough'));
+    bindBubbleBtn('bubble-code', () => {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const parentCode = range.commonAncestorContainer.parentElement?.closest('code');
+            if (parentCode) {
+                const text = parentCode.textContent;
+                parentCode.replaceWith(document.createTextNode(text));
+            } else {
+                const codeEl = document.createElement('code');
+                codeEl.textContent = sel.toString();
+                range.deleteContents();
+                range.insertNode(codeEl);
+            }
+            handleEditorInput();
+        }
+    });
+    bindBubbleBtn('bubble-h1', () => handleHeadingChange('h1'));
+    bindBubbleBtn('bubble-h2', () => handleHeadingChange('h2'));
+    bindBubbleBtn('bubble-quote', () => execFormat('formatBlock', '<blockquote>'));
+    bindBubbleBtn('bubble-link', () => insertHyperlink());
+
+    const bubbleTextColor = document.getElementById('bubble-text-color');
+    if (bubbleTextColor) {
+        bubbleTextColor.oninput = (e) => {
+            const ind = document.getElementById('text-color-indicator');
+            if (ind) ind.style.backgroundColor = e.target.value;
+            execFormat('foreColor', e.target.value);
+        };
     }
+    const bubbleBgColor = document.getElementById('bubble-bg-color');
+    if (bubbleBgColor) {
+        bubbleBgColor.oninput = (e) => {
+            const ind = document.getElementById('bg-color-indicator');
+            if (ind) ind.style.backgroundColor = e.target.value;
+            execFormat('hiliteColor', e.target.value);
+        };
+    }
+}
+
+// ==========================================================================
+// NOTION / REMNOTE-STYLE SLASH COMMAND PALETTE (/)
+// ==========================================================================
+const slashMenu = document.getElementById('slash-menu');
+const slashItemsList = document.getElementById('slash-items-list');
+
+const SLASH_COMMANDS = [
+    {
+        id: 'paint',
+        icon: '🎨',
+        name: 'Paint & Signature Studio',
+        desc: 'Draw diagrams, freehand sketches, or sign handwritten notes',
+        action: openPaintModal,
+        keywords: ['paint', 'draw', 'sign', 'sketch', 'signature', 'canvas']
+    },
+    {
+        id: 'table',
+        icon: '▦',
+        name: 'Table',
+        desc: 'Insert customizable grid table with rows & columns',
+        action: openTableModal,
+        keywords: ['table', 'grid', 'matrix', 'rows', 'columns']
+    },
+    {
+        id: 'code',
+        icon: '💻',
+        name: 'CodeBox with 1-Click Copy',
+        desc: 'Syntax container with dark theme & instant copy button',
+        action: openCodeBoxModal,
+        keywords: ['code', 'codebox', 'pre', 'snippet', 'python', 'bash', 'terminal']
+    },
+    {
+        id: 'todo',
+        icon: '☑️',
+        name: 'Interactive To-Do Checklist',
+        desc: 'Task item with clickable checkbox toggle',
+        action: insertTodoItem,
+        keywords: ['todo', 'task', 'check', 'checklist', 'checkbox']
+    },
+    {
+        id: 'callout-tip',
+        icon: '💡',
+        name: 'Callout: Tip Box',
+        desc: 'Highlighted helpful tip container',
+        action: () => handleCalloutInsert('tip'),
+        keywords: ['callout', 'tip', 'hint', 'idea']
+    },
+    {
+        id: 'callout-warning',
+        icon: '⚠️',
+        name: 'Callout: Warning Box',
+        desc: 'Highlighted warning / caution banner',
+        action: () => handleCalloutInsert('warning'),
+        keywords: ['warning', 'caution', 'alert', 'danger']
+    },
+    {
+        id: 'callout-info',
+        icon: 'ℹ️',
+        name: 'Callout: Info Note',
+        desc: 'Informational note box',
+        action: () => handleCalloutInsert('info'),
+        keywords: ['info', 'note', 'information']
+    },
+    {
+        id: 'image',
+        icon: '🖼️',
+        name: 'Insert Photo / Screenshot',
+        desc: 'Upload image file or paste with Ctrl+V',
+        action: triggerImageUpload,
+        keywords: ['photo', 'image', 'picture', 'screenshot', 'img']
+    },
+    {
+        id: 'h1',
+        icon: '🔤',
+        name: 'Heading 1',
+        desc: 'Top-level large section heading',
+        action: () => handleHeadingChange('h1'),
+        keywords: ['h1', 'heading', 'title', 'large']
+    },
+    {
+        id: 'h2',
+        icon: '🔡',
+        name: 'Heading 2',
+        desc: 'Medium subsection heading',
+        action: () => handleHeadingChange('h2'),
+        keywords: ['h2', 'subheading', 'medium']
+    },
+    {
+        id: 'h3',
+        icon: '🏷️',
+        name: 'Heading 3',
+        desc: 'Small topic heading',
+        action: () => handleHeadingChange('h3'),
+        keywords: ['h3', 'small']
+    },
+    {
+        id: 'bullet',
+        icon: '📋',
+        name: 'Bulleted List',
+        desc: 'Standard bullet point list',
+        action: () => execFormat('insertUnorderedList'),
+        keywords: ['bullet', 'list', 'ul', 'points']
+    },
+    {
+        id: 'numbered',
+        icon: '🔢',
+        name: 'Numbered List',
+        desc: 'Ordered numerical sequence list',
+        action: () => execFormat('insertOrderedList'),
+        keywords: ['numbered', 'number', 'ol', 'ordered']
+    },
+    {
+        id: 'quote',
+        icon: '❝',
+        name: 'Quote Block',
+        desc: 'Styled quotation block with accent border',
+        action: () => execFormat('formatBlock', '<blockquote>'),
+        keywords: ['quote', 'blockquote', 'citation']
+    },
+    {
+        id: 'divider',
+        icon: '➖',
+        name: 'Horizontal Divider',
+        desc: 'Clean visual separator line between sections',
+        action: insertDivider,
+        keywords: ['divider', 'hr', 'line', 'separator']
+    },
+    {
+        id: 'timestamp',
+        icon: '📅',
+        name: 'Current Timestamp',
+        desc: 'Insert current date and time string',
+        action: insertTimestamp,
+        keywords: ['timestamp', 'date', 'time', 'now', 'clock']
+    },
+    {
+        id: 'link',
+        icon: '🔗',
+        name: 'Hyperlink',
+        desc: 'Insert external web link',
+        action: insertHyperlink,
+        keywords: ['link', 'url', 'web', 'hyperlink']
+    },
+    {
+        id: 'nodelink',
+        icon: '📌',
+        name: 'Internal Node Link',
+        desc: 'Link to another note in your hierarchy tree',
+        action: openNodeLinkModal,
+        keywords: ['nodelink', 'node', 'internal', 'reference', 'page']
+    }
+];
+
+let slashState = {
+    active: false,
+    query: '',
+    selectedIndex: 0,
+    filteredCommands: [],
+    triggerRange: null,
+    textNode: null,
+    slashIndex: -1
+};
+
+function renderSlashMenuItems() {
+    if (!slashItemsList) return;
+    slashItemsList.innerHTML = '';
+
+    const q = slashState.query.toLowerCase().trim();
+    slashState.filteredCommands = SLASH_COMMANDS.filter(cmd => {
+        if (!q) return true;
+        if (cmd.name.toLowerCase().includes(q)) return true;
+        if (cmd.keywords.some(k => k.toLowerCase().includes(q))) return true;
+        return false;
+    });
+
+    if (slashState.filteredCommands.length === 0) {
+        slashItemsList.innerHTML = `<div style="padding: 12px; color: var(--text-muted); font-size: 0.8rem; text-align: center;">No matching actions for "/${q}"</div>`;
+        return;
+    }
+
+    if (slashState.selectedIndex >= slashState.filteredCommands.length) {
+        slashState.selectedIndex = 0;
+    }
+
+    slashState.filteredCommands.forEach((cmd, idx) => {
+        const item = document.createElement('div');
+        item.className = `slash-item ${idx === slashState.selectedIndex ? 'selected' : ''}`;
+        item.innerHTML = `
+            <div class="slash-item-icon">${cmd.icon}</div>
+            <div class="slash-item-info">
+                <div class="slash-item-name">${cmd.name}</div>
+                <div class="slash-item-desc">${cmd.desc}</div>
+            </div>
+        `;
+        item.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            executeSlashCommand(cmd);
+        };
+        slashItemsList.appendChild(item);
+    });
+
+    const selectedEl = slashItemsList.children[slashState.selectedIndex];
+    if (selectedEl) {
+        selectedEl.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function openSlashMenuAtCursor() {
+    if (!slashMenu) return;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+
+    slashState.active = true;
+    slashState.query = '';
+    slashState.selectedIndex = 0;
+    slashState.triggerRange = range.cloneRange();
+
+    slashMenu.style.display = 'flex';
+
+    let menuX = Math.round(rect.left);
+    let menuY = Math.round(rect.bottom + 6);
+
+    if (menuX + 310 > window.innerWidth) {
+        menuX = window.innerWidth - 320;
+    }
+    if (menuY + 360 > window.innerHeight) {
+        menuY = Math.max(10, Math.round(rect.top - 370));
+    }
+
+    slashMenu.style.left = `${Math.max(16, menuX)}px`;
+    slashMenu.style.top = `${menuY}px`;
+
+    renderSlashMenuItems();
+}
+
+function closeSlashMenu() {
+    if (!slashMenu) return;
+    slashMenu.style.display = 'none';
+    slashState.active = false;
+    slashState.query = '';
+    slashState.selectedIndex = 0;
+    slashState.triggerRange = null;
+    slashState.textNode = null;
+    slashState.slashIndex = -1;
+}
+
+function executeSlashCommand(cmd) {
+    if (slashState.textNode && slashState.slashIndex !== -1) {
+        try {
+            const currentText = slashState.textNode.textContent;
+            const beforeSlash = currentText.substring(0, slashState.slashIndex);
+            const afterQuery = currentText.substring(slashState.slashIndex + 1 + slashState.query.length);
+            slashState.textNode.textContent = beforeSlash + afterQuery;
+
+            const sel = window.getSelection();
+            const newRange = document.createRange();
+            newRange.setStart(slashState.textNode, beforeSlash.length);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        } catch (err) {
+            console.warn('Error removing slash command text:', err);
+        }
+    }
+
+    closeSlashMenu();
+
+    if (cmd && typeof cmd.action === 'function') {
+        cmd.action();
+    }
+}
+
+function setupSlashCommandMenu() {
+    if (!slashMenu || !noteEditor) return;
+
+    noteEditor.addEventListener('keydown', (e) => {
+        if (!slashState.active) {
+            if (e.key === '/') {
+                setTimeout(() => {
+                    const sel = window.getSelection();
+                    if (!sel || !sel.rangeCount) return;
+                    const node = sel.anchorNode;
+                    const offset = sel.anchorOffset;
+                    if (node && node.nodeType === Node.TEXT_NODE) {
+                        const text = node.textContent;
+                        const slashPos = offset - 1;
+                        if (slashPos === 0 || /\s/.test(text[slashPos - 1])) {
+                            slashState.textNode = node;
+                            slashState.slashIndex = slashPos;
+                            openSlashMenuAtCursor();
+                        }
+                    }
+                }, 10);
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (slashState.filteredCommands.length > 0) {
+                slashState.selectedIndex = (slashState.selectedIndex + 1) % slashState.filteredCommands.length;
+                renderSlashMenuItems();
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (slashState.filteredCommands.length > 0) {
+                slashState.selectedIndex = (slashState.selectedIndex - 1 + slashState.filteredCommands.length) % slashState.filteredCommands.length;
+                renderSlashMenuItems();
+            }
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (slashState.filteredCommands.length > 0) {
+                executeSlashCommand(slashState.filteredCommands[slashState.selectedIndex]);
+            } else {
+                closeSlashMenu();
+            }
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeSlashMenu();
+            return;
+        }
+
+        setTimeout(() => {
+            if (!slashState.active) return;
+            if (slashState.textNode) {
+                const text = slashState.textNode.textContent;
+                if (slashState.slashIndex < text.length && text[slashState.slashIndex] === '/') {
+                    slashState.query = text.substring(slashState.slashIndex + 1);
+                    renderSlashMenuItems();
+                } else {
+                    closeSlashMenu();
+                }
+            }
+        }, 10);
+    });
+
+    document.addEventListener('mousedown', (e) => {
+        if (slashState.active && !slashMenu.contains(e.target) && e.target !== noteEditor) {
+            closeSlashMenu();
+        }
+    });
 }
