@@ -1,4 +1,4 @@
-name: Deploy TreeKeep to GitHub Pages
+name: Deploy CyberNote to GitHub Pages
 
 on:
   push:
