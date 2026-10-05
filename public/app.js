@@ -1284,15 +1284,6 @@ function renderTree() {
                 if (hasKids) toggleNodeExpand(node.id);
             };
 
-            // Node Color Indicator Dot
-            const colorDot = document.createElement('span');
-            colorDot.className = 'tree-node-color-dot';
-            if (node.color) {
-                colorDot.style.backgroundColor = node.color;
-            } else {
-                colorDot.style.display = 'none';
-            }
-
             // Vector SVG Icon
             const icon = document.createElement('span');
             icon.className = 'tree-icon';
@@ -1353,7 +1344,6 @@ function renderTree() {
             `;
 
             item.appendChild(arrow);
-            item.appendChild(colorDot);
             item.appendChild(icon);
             item.appendChild(label);
             if (lockBadge) item.appendChild(lockBadge);
