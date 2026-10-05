@@ -118,10 +118,19 @@ const state = {
     e2eePassword: '',
     // Paint Studio State
     paintTool: 'signature',
-    paintColor: '#111111',
+    paintColor: '#00ffff',
     paintWidth: 3,
     isPainting: false,
-    paintPoints: []
+    paintPoints: [],
+    paintTransparentBg: true,
+    // Geometric Shape Studio State
+    shapeState: {
+        shape: 'rect',
+        mode: 'outline',
+        color: '#00ffff',
+        strokeWidth: 3,
+        size: 220
+    }
 };
 
 // --- DOM References ---
@@ -207,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(state.theme);
     setupEventListeners();
     setupPaintStudio();
+    setupShapeStudio();
     initGoogleAuth();
     initApp();
 });
@@ -3039,6 +3049,9 @@ window.updateDocumentStats = updateDocumentStats;
 window.createNewRootNode = createNewRootNode;
 window.createSubNode = createSubNode;
 window.openPaintModal = openPaintModal;
+window.closePaintModal = closePaintModal;
+window.openShapeModal = openShapeModal;
+window.closeShapeModal = closeShapeModal;
 window.exportNoteAs = exportNoteAs;
 window.insertTimeline = insertTimeline;
 window.insertQuoteCard = insertQuoteCard;
@@ -4011,92 +4024,73 @@ function hideFloatingToolbars() {
     hideImageToolbar();
 }
 
-// Helper for drawing shapes and arrows on HTML5 canvas
-function drawCanvasShape(ctx, shape, x1, y1, x2, y2, color, width, isFilled) {
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
-    ctx.lineWidth = width;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    if (shape === 'arrow') {
-        const headLen = Math.max(12, width * 3.5);
-        const angle = Math.atan2(y2 - y1, x2 - x1);
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(x2, y2);
-        ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
-        ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
-        ctx.closePath();
-        ctx.fill();
-        return;
+// --- Canvas Auto-Crop & Transparency Helpers ---
+function isCanvasEmpty(canvas) {
+    const ctx = canvas.getContext('2d');
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 10) return false;
     }
+    return true;
+}
 
-    if (shape === 'line') {
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-        return;
-    }
+function getCroppedCanvas(srcCanvas, isTransparent) {
+    const w = srcCanvas.width;
+    const h = srcCanvas.height;
+    const ctx = srcCanvas.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
 
-    if (shape === 'rect') {
-        const w = x2 - x1;
-        const h = y2 - y1;
-        ctx.beginPath();
-        ctx.rect(x1, y1, w, h);
-        if (isFilled) ctx.fill();
-        ctx.stroke();
-        return;
-    }
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let hasContent = false;
 
-    if (shape === 'circle') {
-        const rx = Math.abs(x2 - x1) / 2;
-        const ry = Math.abs(y2 - y1) / 2;
-        const cx = (x1 + x2) / 2;
-        const cy = (y1 + y2) / 2;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, Math.max(1, rx), Math.max(1, ry), 0, 0, 2 * Math.PI);
-        if (isFilled) ctx.fill();
-        ctx.stroke();
-        return;
-    }
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const idx = (y * w + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const a = data[idx + 3];
 
-    if (shape === 'triangle') {
-        ctx.beginPath();
-        ctx.moveTo((x1 + x2) / 2, y1);
-        ctx.lineTo(x2, y2);
-        ctx.lineTo(x1, y2);
-        ctx.closePath();
-        if (isFilled) ctx.fill();
-        ctx.stroke();
-        return;
-    }
+            let isDrawn = false;
+            if (isTransparent) {
+                if (a > 15) isDrawn = true;
+            } else {
+                if (a > 15 && (r < 240 || g < 240 || b < 240)) isDrawn = true;
+            }
 
-    if (shape === 'star') {
-        const cx = (x1 + x2) / 2;
-        const cy = (y1 + y2) / 2;
-        const outerR = Math.max(8, Math.hypot(x2 - x1, y2 - y1) / 2);
-        const innerR = outerR * 0.42;
-        const points = 5;
-        ctx.beginPath();
-        for (let i = 0; i < points * 2; i++) {
-            const r = i % 2 === 0 ? outerR : innerR;
-            const a = (i * Math.PI) / points - Math.PI / 2;
-            const px = cx + r * Math.cos(a);
-            const py = cy + r * Math.sin(a);
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
+            if (isDrawn) {
+                hasContent = true;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
         }
-        ctx.closePath();
-        if (isFilled) ctx.fill();
-        ctx.stroke();
-        return;
     }
+
+    if (!hasContent) return srcCanvas;
+
+    const pad = 12;
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX = Math.min(w, maxX + pad);
+    maxY = Math.min(h, maxY + pad);
+
+    const cropW = Math.max(20, maxX - minX);
+    const cropH = Math.max(20, maxY - minY);
+
+    const out = document.createElement('canvas');
+    out.width = cropW;
+    out.height = cropH;
+    const outCtx = out.getContext('2d');
+
+    if (!isTransparent) {
+        outCtx.fillStyle = '#ffffff';
+        outCtx.fillRect(0, 0, cropW, cropH);
+    }
+    outCtx.drawImage(srcCanvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+    return out;
 }
 
 // --- Windows Paint & Signature Studio ---
@@ -4105,45 +4099,70 @@ function setupPaintStudio() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const btnSignature = document.getElementById('btn-paint-tool-signature');
+    const btnBrush = document.getElementById('btn-paint-tool-brush');
+    const btnEraser = document.getElementById('btn-paint-tool-eraser');
+    const btnBgToggle = document.getElementById('btn-paint-bg-toggle');
+    const bgLabel = document.getElementById('paint-bg-label');
+    const widthSlider = document.getElementById('paint-width-slider');
+    const widthVal = document.getElementById('paint-width-val');
+    const customColor = document.getElementById('paint-custom-color');
+    const btnClear = document.getElementById('btn-paint-clear');
+    const btnInsert = document.getElementById('btn-paint-insert');
 
-    const isShape = (t) => ['arrow', 'rect', 'circle', 'triangle', 'line', 'star'].includes(t);
-    let shapeStartPoint = null;
-    let canvasSnapshot = null;
+    function applyBgMode() {
+        if (state.paintTransparentBg) {
+            canvas.classList.add('checkered-bg');
+            if (bgLabel) bgLabel.textContent = 'Transparent';
+            if (btnBgToggle) btnBgToggle.classList.add('active');
+        } else {
+            canvas.classList.remove('checkered-bg');
+            if (bgLabel) bgLabel.textContent = 'White Paper';
+            if (btnBgToggle) btnBgToggle.classList.remove('active');
+        }
+    }
 
-    document.getElementById('btn-paint-tool-signature').onclick = () => setPaintTool('signature');
-    document.getElementById('btn-paint-tool-brush').onclick = () => setPaintTool('brush');
-    document.getElementById('btn-paint-tool-eraser').onclick = () => setPaintTool('eraser');
-    const btnArrow = document.getElementById('btn-paint-tool-arrow');
-    if (btnArrow) btnArrow.onclick = () => setPaintTool('arrow');
-    const btnRect = document.getElementById('btn-paint-tool-rect');
-    if (btnRect) btnRect.onclick = () => setPaintTool('rect');
-    const btnCircle = document.getElementById('btn-paint-tool-circle');
-    if (btnCircle) btnCircle.onclick = () => setPaintTool('circle');
-    const btnTriangle = document.getElementById('btn-paint-tool-triangle');
-    if (btnTriangle) btnTriangle.onclick = () => setPaintTool('triangle');
-    const btnStar = document.getElementById('btn-paint-tool-star');
-    if (btnStar) btnStar.onclick = () => setPaintTool('star');
-    const btnLine = document.getElementById('btn-paint-tool-line');
-    if (btnLine) btnLine.onclick = () => setPaintTool('line');
+    function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!state.paintTransparentBg) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+    }
 
-    const btnFillToggle = document.getElementById('btn-paint-fill-toggle');
-    const fillLabel = document.getElementById('paint-fill-label');
-    if (btnFillToggle) {
-        btnFillToggle.onclick = () => {
-            state.paintFill = !state.paintFill;
-            btnFillToggle.classList.toggle('active', state.paintFill);
-            if (fillLabel) fillLabel.textContent = state.paintFill ? 'Filled' : 'Outline';
+    if (btnBgToggle) {
+        btnBgToggle.onclick = () => {
+            const wasEmpty = isCanvasEmpty(canvas);
+            state.paintTransparentBg = !state.paintTransparentBg;
+            applyBgMode();
+            if (wasEmpty) {
+                clearCanvas();
+            } else if (!state.paintTransparentBg) {
+                const currentData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                tempCanvas.getContext('2d').putImageData(currentData, 0, 0);
+                ctx.drawImage(tempCanvas, 0, 0);
+            }
         };
     }
 
-    const widthSlider = document.getElementById('paint-width-slider');
-    const widthVal = document.getElementById('paint-width-val');
-    widthSlider.oninput = (e) => {
-        state.paintWidth = parseInt(e.target.value, 10);
-        widthVal.textContent = state.paintWidth + 'px';
-    };
+    clearCanvas();
+    applyBgMode();
+
+    if (btnSignature) btnSignature.onclick = () => setPaintTool('signature');
+    if (btnBrush) btnBrush.onclick = () => setPaintTool('brush');
+    if (btnEraser) btnEraser.onclick = () => setPaintTool('eraser');
+
+    if (widthSlider) {
+        widthSlider.oninput = (e) => {
+            state.paintWidth = parseInt(e.target.value, 10);
+            if (widthVal) widthVal.textContent = state.paintWidth + 'px';
+        };
+    }
 
     document.querySelectorAll('.paint-color-opt').forEach(opt => {
         opt.onclick = () => {
@@ -4154,7 +4173,6 @@ function setupPaintStudio() {
         };
     });
 
-    const customColor = document.getElementById('paint-custom-color');
     if (customColor) {
         customColor.oninput = (e) => {
             state.paintColor = e.target.value;
@@ -4162,10 +4180,9 @@ function setupPaintStudio() {
         };
     }
 
-    document.getElementById('btn-paint-clear').onclick = () => {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    };
+    if (btnClear) {
+        btnClear.onclick = clearCanvas;
+    }
 
     function getCanvasCoords(e) {
         const rect = canvas.getBoundingClientRect();
@@ -4175,41 +4192,33 @@ function setupPaintStudio() {
         };
     }
 
-    canvas.addEventListener('mousedown', (e) => {
+    function startPaint(pt) {
         state.isPainting = true;
-        const pt = getCanvasCoords(e);
         state.paintPoints = [pt];
-        if (isShape(state.paintTool)) {
-            shapeStartPoint = pt;
-            canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        } else {
-            ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y);
-        }
-    });
+        ctx.beginPath();
+        ctx.moveTo(pt.x, pt.y);
+    }
 
-    canvas.addEventListener('mousemove', (e) => {
+    function drawPaint(pt) {
         if (!state.isPainting) return;
-        const pt = getCanvasCoords(e);
         state.paintPoints.push(pt);
 
-        if (isShape(state.paintTool)) {
-            if (canvasSnapshot && shapeStartPoint) {
-                ctx.putImageData(canvasSnapshot, 0, 0);
-                drawCanvasShape(ctx, state.paintTool, shapeStartPoint.x, shapeStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth, state.paintFill);
-            }
-            return;
-        }
-
-        ctx.lineWidth = state.paintWidth;
+        ctx.lineWidth = state.paintTool === 'eraser' ? state.paintWidth * 2.5 : state.paintWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
         if (state.paintTool === 'eraser') {
-            ctx.strokeStyle = '#ffffff';
+            if (state.paintTransparentBg) {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.strokeStyle = 'rgba(0,0,0,1)';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = '#ffffff';
+            }
             ctx.lineTo(pt.x, pt.y);
             ctx.stroke();
         } else if (state.paintTool === 'signature') {
+            ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = state.paintColor;
             if (state.paintPoints.length >= 3) {
                 const p0 = state.paintPoints[state.paintPoints.length - 2];
@@ -4223,108 +4232,266 @@ function setupPaintStudio() {
                 ctx.stroke();
             }
         } else {
+            // Freehand brush
+            ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = state.paintColor;
             ctx.lineTo(pt.x, pt.y);
             ctx.stroke();
         }
-    });
+    }
 
-    window.addEventListener('mouseup', () => {
+    function stopPaint() {
         if (state.isPainting) {
-            if (isShape(state.paintTool) && shapeStartPoint && state.paintPoints.length > 0) {
-                const pt = state.paintPoints[state.paintPoints.length - 1];
-                if (canvasSnapshot) ctx.putImageData(canvasSnapshot, 0, 0);
-                drawCanvasShape(ctx, state.paintTool, shapeStartPoint.x, shapeStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth, state.paintFill);
-            }
             state.isPainting = false;
             state.paintPoints = [];
-            shapeStartPoint = null;
-            canvasSnapshot = null;
+            ctx.globalCompositeOperation = 'source-over';
         }
-    });
+    }
+
+    canvas.addEventListener('mousedown', (e) => startPaint(getCanvasCoords(e)));
+    canvas.addEventListener('mousemove', (e) => drawPaint(getCanvasCoords(e)));
+    window.addEventListener('mouseup', stopPaint);
 
     canvas.addEventListener('touchstart', (e) => {
         if (e.touches.length === 1) {
             e.preventDefault();
-            state.isPainting = true;
-            const pt = getCanvasCoords(e.touches[0]);
-            state.paintPoints = [pt];
-            if (isShape(state.paintTool)) {
-                shapeStartPoint = pt;
-                canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            } else {
-                ctx.beginPath();
-                ctx.moveTo(pt.x, pt.y);
-            }
+            startPaint(getCanvasCoords(e.touches[0]));
         }
-    });
+    }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
-        if (!state.isPainting || e.touches.length !== 1) return;
-        e.preventDefault();
-        const pt = getCanvasCoords(e.touches[0]);
-        state.paintPoints.push(pt);
-
-        if (isShape(state.paintTool)) {
-            if (canvasSnapshot && shapeStartPoint) {
-                ctx.putImageData(canvasSnapshot, 0, 0);
-                drawCanvasShape(ctx, state.paintTool, shapeStartPoint.x, shapeStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth, state.paintFill);
-            }
-            return;
+        if (state.isPainting && e.touches.length === 1) {
+            e.preventDefault();
+            drawPaint(getCanvasCoords(e.touches[0]));
         }
+    }, { passive: false });
 
-        ctx.lineWidth = state.paintWidth;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = state.paintTool === 'eraser' ? '#ffffff' : state.paintColor;
-        ctx.lineTo(pt.x, pt.y);
-        ctx.stroke();
-    });
+    canvas.addEventListener('touchend', stopPaint);
 
-    canvas.addEventListener('touchend', () => {
-        if (state.isPainting) {
-            if (isShape(state.paintTool) && shapeStartPoint && state.paintPoints.length > 0) {
-                const pt = state.paintPoints[state.paintPoints.length - 1];
-                if (canvasSnapshot) ctx.putImageData(canvasSnapshot, 0, 0);
-                drawCanvasShape(ctx, state.paintTool, shapeStartPoint.x, shapeStartPoint.y, pt.x, pt.y, state.paintColor, state.paintWidth, state.paintFill);
+    if (btnInsert) {
+        btnInsert.onclick = () => {
+            const cropped = getCroppedCanvas(canvas, state.paintTransparentBg);
+            const dataUrl = cropped.toDataURL('image/png');
+            closePaintModal();
+            restoreSelection();
+            if (state.paintTool === 'signature') {
+                insertSignatureElement(dataUrl, 'Handwritten Signature');
+            } else {
+                insertImageElement(dataUrl, 'Paint Drawing');
             }
-            state.isPainting = false;
-            state.paintPoints = [];
-            shapeStartPoint = null;
-            canvasSnapshot = null;
-        }
-    });
-
-    document.getElementById('btn-paint-insert').onclick = () => {
-        const dataUrl = canvas.toDataURL('image/png');
-        closePaintModal();
-        restoreSelection();
-        let label = 'Paint Drawing';
-        if (state.paintTool === 'signature') label = 'Handwritten Signature';
-        else if (state.paintTool === 'arrow') label = 'Arrow Diagram';
-        else if (isShape(state.paintTool)) label = 'Drawn Shape';
-        insertImageElement(dataUrl, label);
-    };
+        };
+    }
 }
 
 function setPaintTool(tool) {
     state.paintTool = tool;
-    const tools = ['signature', 'brush', 'eraser', 'arrow', 'rect', 'circle', 'triangle', 'star', 'line'];
-    tools.forEach(t => {
+    ['signature', 'brush', 'eraser'].forEach(t => {
         const btn = document.getElementById(`btn-paint-tool-${t}`);
         if (btn) btn.classList.toggle('active', tool === t);
     });
 }
 
-function openPaintModal(initialTool = 'brush') {
+function openPaintModal(initialTool = 'signature') {
     saveSelection();
-    document.getElementById('paint-modal').style.display = 'flex';
+    const modal = document.getElementById('paint-modal');
+    if (modal) modal.style.display = 'flex';
     setPaintTool(initialTool);
 }
 
 function closePaintModal() {
-    document.getElementById('paint-modal').style.display = 'none';
+    const modal = document.getElementById('paint-modal');
+    if (modal) modal.style.display = 'none';
 }
+
+function insertSignatureElement(src, alt) {
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    const html = `<p><br></p><div class="editor-img-wrap editor-signature-wrap" style="margin: 12px 0; display: inline-block; max-width: 100%; border: none; background: transparent;"><img class="note-signature-img" src="${src}" alt="${alt || 'Signature'}" style="max-width: 100%; height: auto; display: block; border: none; background: transparent; box-shadow: none;"></div><p><br></p>`;
+    document.execCommand('insertHTML', false, html);
+    handleEditorInput();
+}
+
+// --- Dedicated Geometric Shape Studio ---
+function generateShapeSvg(shape, color, mode, strokeWidth, size) {
+    let fillAttr = 'none';
+    let fillOpacity = '0';
+    if (mode === 'solid') {
+        fillAttr = color;
+        fillOpacity = '1';
+    } else if (mode === 'tint') {
+        fillAttr = color;
+        fillOpacity = '0.22';
+    }
+
+    const strokeAttr = color;
+    const sw = strokeWidth;
+
+    let vbW = 200;
+    let vbH = 200;
+    let innerSvg = '';
+
+    switch (shape) {
+        case 'rect':
+            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="3" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+            break;
+        case 'rounded':
+            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="32" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+            break;
+        case 'circle':
+            innerSvg = `<circle cx="100" cy="100" r="84" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+            break;
+        case 'triangle':
+            innerSvg = `<polygon points="100,16 186,184 14,184" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            break;
+        case 'star':
+            innerSvg = `<polygon points="100,12 126,68 188,76 143,120 154,182 100,152 46,182 57,120 12,76 74,68" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            break;
+        case 'diamond':
+            innerSvg = `<polygon points="100,14 186,100 100,186 14,100" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            break;
+        case 'hexagon':
+            innerSvg = `<polygon points="100,14 182,60 182,140 100,186 18,140 18,60" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            break;
+        case 'arrow':
+            vbW = 200;
+            vbH = 110;
+            innerSvg = `<polygon points="16,36 120,36 120,16 184,55 120,94 120,74 16,74" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            break;
+        case 'line':
+            vbW = 200;
+            vbH = 40;
+            innerSvg = `<line x1="16" y1="20" x2="184" y2="20" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" />`;
+            break;
+        case 'speech':
+            vbW = 200;
+            vbH = 180;
+            innerSvg = `<path d="M 24,18 C 18,18 14,22 14,28 L 14,124 C 14,130 18,134 24,134 L 56,134 L 44,166 L 90,134 L 176,134 C 182,134 186,130 186,124 L 186,28 C 186,22 182,18 176,18 Z" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            break;
+        default:
+            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="3" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+    }
+
+    const calcW = size;
+    const calcH = Math.round(size * (vbH / vbW));
+    const fullSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vbW} ${vbH}" width="${calcW}" height="${calcH}" style="background:transparent;overflow:visible;">${innerSvg}</svg>`;
+
+    return { vbW, vbH, innerSvg, fullSvg, calcW, calcH };
+}
+
+function renderShapePreview() {
+    const s = state.shapeState;
+    const { vbW, vbH, innerSvg } = generateShapeSvg(s.shape, s.color, s.mode, s.strokeWidth, s.size);
+    const svgElem = document.getElementById('shape-live-preview-svg');
+    if (svgElem) {
+        svgElem.setAttribute('viewBox', `0 0 ${vbW} ${vbH}`);
+        svgElem.innerHTML = innerSvg;
+    }
+}
+
+function setupShapeStudio() {
+    const shapeBtns = document.querySelectorAll('.shape-opt-btn');
+    const modeBtns = document.querySelectorAll('.shape-mode-btn');
+    const colorDots = document.querySelectorAll('.shape-color-dot');
+    const customColor = document.getElementById('shape-custom-color');
+    const strokeBtns = document.querySelectorAll('.shape-stroke-btn');
+    const sizeBtns = document.querySelectorAll('.shape-size-btn');
+    const btnConfirm = document.getElementById('btn-insert-shape-confirm');
+
+    shapeBtns.forEach(btn => {
+        btn.onclick = () => {
+            shapeBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.shapeState.shape = btn.dataset.shape;
+            renderShapePreview();
+        };
+    });
+
+    modeBtns.forEach(btn => {
+        btn.onclick = () => {
+            modeBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.shapeState.mode = btn.dataset.mode;
+            renderShapePreview();
+        };
+    });
+
+    colorDots.forEach(dot => {
+        dot.onclick = () => {
+            colorDots.forEach(d => d.classList.remove('active'));
+            dot.classList.add('active');
+            state.shapeState.color = dot.dataset.color;
+            if (customColor) customColor.value = dot.dataset.color;
+            renderShapePreview();
+        };
+    });
+
+    if (customColor) {
+        customColor.oninput = (e) => {
+            colorDots.forEach(d => d.classList.remove('active'));
+            state.shapeState.color = e.target.value;
+            renderShapePreview();
+        };
+    }
+
+    strokeBtns.forEach(btn => {
+        btn.onclick = () => {
+            strokeBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.shapeState.strokeWidth = parseFloat(btn.dataset.width) || 3;
+            renderShapePreview();
+        };
+    });
+
+    sizeBtns.forEach(btn => {
+        btn.onclick = () => {
+            sizeBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.shapeState.size = parseInt(btn.dataset.size, 10) || 220;
+            renderShapePreview();
+        };
+    });
+
+    if (btnConfirm) {
+        btnConfirm.onclick = () => {
+            const s = state.shapeState;
+            const { fullSvg, calcW } = generateShapeSvg(s.shape, s.color, s.mode, s.strokeWidth, s.size);
+            const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(fullSvg);
+            closeShapeModal();
+            restoreSelection();
+            insertShapeElement(dataUrl, `${s.shape} shape`, calcW);
+        };
+    }
+
+    renderShapePreview();
+}
+
+function openShapeModal(initialShape = 'rect') {
+    saveSelection();
+    if (initialShape) {
+        state.shapeState.shape = initialShape;
+        document.querySelectorAll('.shape-opt-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.shape === initialShape);
+        });
+    }
+    renderShapePreview();
+    const modal = document.getElementById('shape-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeShapeModal() {
+    const modal = document.getElementById('shape-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function insertShapeElement(src, alt, width) {
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    const w = width ? `${width}px` : '220px';
+    const html = `<p><br></p><div class="editor-img-wrap editor-shape-wrap" style="margin: 14px 0; display: inline-block; max-width: 100%; border: none; background: transparent;"><img class="note-vector-shape" src="${src}" alt="${alt || 'Shape'}" style="width: ${w}; max-width: 100%; height: auto; display: block; border: none; background: transparent; box-shadow: none;"></div><p><br></p>`;
+    document.execCommand('insertHTML', false, html);
+    handleEditorInput();
+}
+
 
 // --- Node Color Picker Modal ---
 function openNodeColorModal() {
@@ -5454,8 +5621,9 @@ function setupEventListeners() {
     document.getElementById('btn-align-justify').onclick = () => execFormat('justifyFull');
     document.getElementById('btn-clear-format').onclick = () => execFormat('removeFormat');
 
-    // Insertions (Row 2)
-    document.getElementById('btn-open-paint').onclick = openPaintModal;
+    // Insertions (Row 1 & 2)
+    const btnOpenPaint = document.getElementById('btn-open-paint');
+    if (btnOpenPaint) btnOpenPaint.onclick = () => openPaintModal('signature');
     document.getElementById('btn-insert-image').onclick = triggerImageUpload;
     document.getElementById('image-file-input').onchange = handleImageFileSelected;
     document.getElementById('btn-open-table-modal').onclick = openTableModal;
@@ -5537,7 +5705,7 @@ function setupEventListeners() {
     if (btnShapes) btnShapes.onclick = (e) => toggleRibbonPopover('shapes-dropdown-menu', btnShapes, e);
 
     const btnDrawShape = document.getElementById('btn-draw-shape');
-    if (btnDrawShape) btnDrawShape.onclick = () => openPaintModal('rect');
+    if (btnDrawShape) btnDrawShape.onclick = () => openShapeModal('rect');
 
     const btnTimeline = document.getElementById('btn-insert-timeline');
     if (btnTimeline) btnTimeline.onclick = insertTimeline;
@@ -6076,6 +6244,14 @@ const SLASH_COMMANDS = [
         desc: 'Draw diagrams, freehand sketches, or sign handwritten notes',
         action: openPaintModal,
         keywords: ['paint', 'draw', 'sign', 'sketch', 'signature', 'canvas']
+    },
+    {
+        id: 'shape',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><circle cx="17" cy="7" r="4"/><polygon points="7 15 11 21 3 21"/></svg>',
+        name: 'Geometric Shape Studio',
+        desc: 'Insert transparent, resizable vector shapes (Rect, Circle, Star, Arrow, etc.)',
+        action: () => openShapeModal('rect'),
+        keywords: ['shape', 'shapes', 'vector', 'rectangle', 'circle', 'triangle', 'arrow', 'star']
     },
     {
         id: 'table',
