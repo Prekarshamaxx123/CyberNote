@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberNote 🛡️ - Secure Hierarchical Cloud Notes</title>
+    <link rel="icon" href="/icons/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body {
+            background-color: #11111b;
+            color: #cdd6f4;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .landing-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 36px;
+            background: rgba(24, 24, 37, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .landing-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #89b4fa;
+            text-decoration: none;
+        }
+        .landing-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .landing-links a {
+            color: #a6adc8;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: color 0.15s ease;
+        }
+        .landing-links a:hover {
+            color: #89b4fa;
+        }
+        .hero-section {
+            padding: 80px 24px 60px 24px;
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: rgba(137, 180, 250, 0.12);
+            border: 1px solid rgba(137, 180, 250, 0.3);
+            color: #89b4fa;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0 0 20px 0;
+            letter-spacing: -0.02em;
+        }
+        .hero-sub {
+            font-size: 1.2rem;
+            color: #a6adc8;
+            max-width: 680px;
+            margin: 0 auto 36px auto;
+        }
+        .hero-cta-group {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .btn-launch {
+            background: linear-gradient(135deg, #89b4fa 0%, #cba6f7 100%);
+            color: #11111b;
+            font-size: 1.05rem;
+            font-weight: 700;
+            padding: 12px 28px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            box-shadow: 0 4px 18px rgba(137, 180, 250, 0.35);
+        }
+        .btn-launch:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 26px rgba(137, 180, 250, 0.5);
+        }
+        .btn-doc {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #cdd6f4;
+            font-size: 1.05rem;
+            font-weight: 600;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: background 0.18s ease;
+        }
+        .btn-doc:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            max-width: 1040px;
+            margin: 40px auto 80px auto;
+            padding: 0 24px;
+        }
+        .feature-card {
+            background: rgba(24, 24, 37, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 28px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(137, 180, 250, 0.4);
+        }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 14px;
+        }
+        .feature-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+        .feature-desc {
+            font-size: 0.92rem;
+            color: #a6adc8;
+            line-height: 1.5;
+        }
+        .landing-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 32px 24px;
+            text-align: center;
+            color: #6c7086;
+            font-size: 0.85rem;
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 12px;
+        }
+        .footer-links a {
+            color: #89b4fa;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <nav class="landing-nav">
+        <a href="/home" class="landing-brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>CyberNote 🛡️</span>
+        </a>
+        <div class="landing-links">
+            <a href="/">Launch App</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="https://github.com/Prekarshamaxx123/CyberNote" target="_blank" rel="noopener noreferrer">GitHub ⭐</a>
+        </div>
+    </nav>
+
+    <header class="hero-section">
+        <div class="hero-badge">🛡️ Ultra-Secure • Hierarchical • Offline-First</div>
+        <h1 class="hero-title">Your Private Knowledge Tree with Google Drive Cloud Backup</h1>
+        <p class="hero-sub">Organize ideas, code snippets, handwritten signatures, flow diagrams, and notes in an intuitive tree structure. Full offline support with seamless Google Drive auto-sync.</p>
+        <div class="hero-cta-group">
+            <a href="/" class="btn-launch">Launch CyberNote Free</a>
+            <a href="https://github.com/Prekarshamaxx123/CyberNote" target="_blank" rel="noopener noreferrer" class="btn-doc">View on GitHub</a>
+        </div>
+    </header>
+
+    <section class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">☁️</div>
+            <div class="feature-title">Google Drive Auto-Sync</div>
+            <div class="feature-desc">Continuous encrypted cloud backup directly into your personal Google Drive quota. CyberNote uses restricted scopes so your data stays exclusively in your hands.</div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <div class="feature-title">100% Offline Capable</div>
+            <div class="feature-desc">Engineered as a Progressive Web App (PWA). Create, organize, and edit notes without an active internet connection. Everything syncs smoothly when you reconnect.</div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon">🌳</div>
+            <div class="feature-title">Infinite Hierarchical Trees</div>
+            <div class="feature-desc">Structure notes in infinite parent-child folders and sub-nodes with custom vector icons, tags, color indicators, and bidirectional internal note linking.</div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <div class="feature-title">Windows Paint &amp; Signatures</div>
+            <div class="feature-desc">Handwrite signatures, sketch diagrams, and draw arrows with the built-in Paint Studio. Interactive corner resizing and 1-click clipboard copying included.</div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon">🔐</div>
+            <div class="feature-title">End-to-End Encryption</div>
+            <div class="feature-desc">Optional military-grade AES-256-GCM client-side encryption. Secure your sensitive credentials, keys, and notes with your personal master password.</div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon">🗜️</div>
+            <div class="feature-title">High-Efficiency Compression</div>
+            <div class="feature-desc">Ultra-fast GZIP stream compression reduces large notes and scripts from megabytes down to tiny kilobytes, consuming less than 0.001% of your cloud quota.</div>
+        </div>
+    </section>
+
+    <footer class="landing-footer">
+        <div class="footer-links">
+            <a href="/home">Home</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="/">Open App</a>
+            <a href="https://github.com/Prekarshamaxx123/CyberNote">GitHub Repository</a>
+        </div>
+        <p>&copy; 2026 CyberNote. Open-source hierarchical cloud notebook created by Prekarshamaxx123.</p>
+    </footer>
+</body>
+</html>
