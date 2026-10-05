@@ -1336,6 +1336,54 @@ body {
     max-width: 75px;
 }
 
+/* Segmented Text Case Buttons Group */
+.case-buttons-group {
+    display: inline-flex;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1px;
+    gap: 1px;
+}
+
+.ribbon-btn-case {
+    font-family: inherit;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    padding: 2px 6px;
+    min-width: 25px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+
+.ribbon-btn-case:hover {
+    background-color: var(--bg-hover);
+    color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.ribbon-btn-case:active {
+    transform: translateY(0);
+    background-color: var(--accent);
+    color: #11111b;
+}
+
+.ribbon-btn-case .case-badge {
+    pointer-events: none;
+    line-height: 1;
+}
+
 /* Color Pickers with Underline Indicator */
 .ribbon-color-btn {
     position: relative;

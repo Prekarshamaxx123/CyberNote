@@ -524,12 +524,20 @@
 
                         <!-- Utilities: Text Case, Print, Find & Live Counter -->
                         <div class="ribbon-cluster">
-                            <select id="select-text-case" class="ribbon-select" title="Change Text Case">
-                                <option value="">Case...</option>
-                                <option value="upper">UPPERCASE</option>
-                                <option value="lower">lowercase</option>
-                                <option value="title">Title Case</option>
-                            </select>
+                            <div class="case-buttons-group" role="group" aria-label="Text Case Converter">
+                                <button class="ribbon-btn ribbon-btn-case" id="btn-case-upper" title="UPPERCASE (AA)">
+                                    <span class="case-badge">AA</span>
+                                </button>
+                                <button class="ribbon-btn ribbon-btn-case" id="btn-case-lower" title="lowercase (aa)">
+                                    <span class="case-badge">aa</span>
+                                </button>
+                                <button class="ribbon-btn ribbon-btn-case" id="btn-case-title" title="Title Case (Aa)">
+                                    <span class="case-badge">Aa</span>
+                                </button>
+                                <button class="ribbon-btn ribbon-btn-case" id="btn-case-sentence" title="Sentence case (A.)">
+                                    <span class="case-badge">A.</span>
+                                </button>
+                            </div>
                             <button class="ribbon-btn ribbon-btn-compact" id="btn-print-note" title="Print Note / Export PDF">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                                 <span>Print</span>

@@ -2604,17 +2604,74 @@ function insertKbdBadge() {
 function handleTextCaseChange(caseType) {
     if (state.isReadOnly || !caseType) return;
     restoreSelection();
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-        const text = sel.getRangeAt(0).toString();
-        let transformed = text;
-        if (caseType === 'upper') transformed = text.toUpperCase();
-        else if (caseType === 'lower') transformed = text.toLowerCase();
-        else if (caseType === 'title') {
-            transformed = text.replace(/\\w\\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
-        }
-        insertHtmlAtCursor(escapeHtml(transformed));
+    let sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        noteEditor.focus();
+        sel = window.getSelection();
     }
+    if (!sel || sel.rangeCount === 0) return;
+
+    let range = sel.getRangeAt(0);
+
+    // If selection is collapsed, automatically expand to the word at the cursor
+    if (range.collapsed) {
+        const node = range.startContainer;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent;
+            let start = range.startOffset;
+            let end = range.endOffset;
+            while (start > 0 && /\S/.test(text[start - 1])) start--;
+            while (end < text.length && /\S/.test(text[end])) end++;
+            if (start < end) {
+                range = document.createRange();
+                range.setStart(node, start);
+                range.setEnd(node, end);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        }
+    }
+
+    if (range.collapsed) return;
+
+    const frag = range.cloneContents();
+    const walker = document.createTreeWalker(frag, NodeFilter.SHOW_TEXT, null, false);
+    let textNode;
+    let hasText = false;
+    while ((textNode = walker.nextNode())) {
+        const val = textNode.nodeValue;
+        if (!val || val.length === 0) continue;
+        hasText = true;
+        if (caseType === 'upper') {
+            textNode.nodeValue = val.toUpperCase();
+        } else if (caseType === 'lower') {
+            textNode.nodeValue = val.toLowerCase();
+        } else if (caseType === 'title') {
+            textNode.nodeValue = val.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+        } else if (caseType === 'sentence') {
+            textNode.nodeValue = val.toLowerCase().replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase());
+        }
+    }
+
+    if (!hasText) return;
+
+    range.deleteContents();
+
+    const firstChild = frag.firstChild;
+    const lastChild = frag.lastChild;
+    range.insertNode(frag);
+
+    if (firstChild && lastChild) {
+        const newRange = document.createRange();
+        newRange.setStartBefore(firstChild);
+        newRange.setEndAfter(lastChild);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+    }
+
+    saveSelection();
+    handleEditorInput();
+    updateDocumentStats();
 }
 
 function handlePrintNote() {
@@ -4830,13 +4887,17 @@ function setupEventListeners() {
     const btnOutdent = document.getElementById('btn-outdent');
     if (btnOutdent) btnOutdent.onclick = () => execFormat('outdent');
 
-    const selectTextCase = document.getElementById('select-text-case');
-    if (selectTextCase) {
-        selectTextCase.onchange = (e) => {
-            handleTextCaseChange(e.target.value);
-            e.target.value = '';
-        };
-    }
+    const btnCaseUpper = document.getElementById('btn-case-upper');
+    if (btnCaseUpper) btnCaseUpper.onclick = () => handleTextCaseChange('upper');
+
+    const btnCaseLower = document.getElementById('btn-case-lower');
+    if (btnCaseLower) btnCaseLower.onclick = () => handleTextCaseChange('lower');
+
+    const btnCaseTitle = document.getElementById('btn-case-title');
+    if (btnCaseTitle) btnCaseTitle.onclick = () => handleTextCaseChange('title');
+
+    const btnCaseSentence = document.getElementById('btn-case-sentence');
+    if (btnCaseSentence) btnCaseSentence.onclick = () => handleTextCaseChange('sentence');
 
     const btnPrint = document.getElementById('btn-print-note');
     if (btnPrint) btnPrint.onclick = handlePrintNote;
