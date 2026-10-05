@@ -1181,15 +1181,19 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+.editor-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
 .ribbon-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-.ribbon-row::-webkit-scrollbar {
-    display: none;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 .ribbon-row-studio {
@@ -1197,7 +1201,7 @@ body {
 }
 
 .ribbon-row-format {
-    padding-top: 3px;
+    padding-top: 4px;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -3892,6 +3896,103 @@ body {
     color: var(--text-muted);
     font-weight: 600;
     text-transform: uppercase;
+}
+
+/* Emoji Grid Popover */
+.emoji-grid-popover {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 4px;
+    padding: 8px;
+    width: 172px;
+}
+.emoji-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.12s ease, transform 0.12s ease;
+    user-select: none;
+}
+.emoji-chip:hover {
+    background-color: var(--bg-hover);
+    transform: scale(1.2);
+}
+
+/* Collapsible Toggle / Accordion Block */
+.note-toggle-block {
+    margin: 12px 0;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+}
+.note-toggle-block summary {
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--accent);
+    user-select: none;
+    outline: none;
+    margin-bottom: 6px;
+}
+.note-toggle-block .toggle-content {
+    padding-left: 12px;
+    border-left: 2px solid rgba(137, 180, 250, 0.4);
+    margin-top: 6px;
+}
+
+/* Math Formula Card */
+.math-formula-box {
+    margin: 14px 0;
+    padding: 12px 18px;
+    background: rgba(17, 17, 27, 0.9);
+    border: 1px solid rgba(137, 180, 250, 0.35);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: #a6e3a1;
+    text-align: center;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.5px;
+}
+
+/* Keyboard Shortcut Key Badge */
+kbd.editor-kbd, .editor-kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #cdd6f4;
+    background-color: #181825;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    box-shadow: 0 2px 0 #313244;
+    margin: 0 3px;
+    vertical-align: middle;
+}
+
+/* Word Count Badge */
+.ribbon-word-badge {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #a6adc8;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
+/* Align right-most dropdown menus so they never overflow window */
+.ribbon-dropdown-wrap:nth-last-child(-n+2) .ribbon-popover-menu {
+    left: auto;
+    right: 0;
 }
 
 /* Folder View in Editor */

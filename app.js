@@ -2125,15 +2125,99 @@ function applyReadOnlyState(isReadOnly) {
     if (noteTagsInput) noteTagsInput.readOnly = isReadOnly;
 }
 
+// --- Selection Management & Safe Cursor Insertion ---
+function saveSelection() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        if (noteEditor && noteEditor.contains(range.commonAncestorContainer)) {
+            state.savedSelectionRange = range.cloneRange();
+        }
+    }
+}
+
+function restoreSelection() {
+    if (state.savedSelectionRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(state.savedSelectionRange);
+        return true;
+    }
+    return false;
+}
+
+// --- Cursor-Safe HTML Insertion (Prevents Element Conflicts) ---
+function insertHtmlAtCursor(html) {
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    restoreSelection();
+    const sel = window.getSelection();
+    let range = null;
+
+    if (sel && sel.rangeCount > 0) {
+        range = sel.getRangeAt(0);
+        if (!noteEditor.contains(range.commonAncestorContainer)) {
+            range = null;
+        }
+    }
+
+    if (!range) {
+        range = document.createRange();
+        range.selectNodeContents(noteEditor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    // If cursor is inside an image or specialized container, safely step outside to prevent entrapment
+    let container = range.commonAncestorContainer;
+    if (container.nodeType === 3) container = container.parentNode;
+    const specialParent = container.closest?.('.editor-img-wrap, .neon-banner-card, .flow-steps-container, .metric-card-grid, .code-box, .pill-badge, .arrow-divider, .note-toggle-block, .math-formula-box');
+    if (specialParent && specialParent.parentNode) {
+        range = document.createRange();
+        range.setStartAfter(specialParent);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    range.deleteContents();
+
+    const el = document.createElement('div');
+    el.innerHTML = html;
+    const frag = document.createDocumentFragment();
+    let node, lastNode;
+    while ((node = el.firstChild)) {
+        lastNode = frag.appendChild(node);
+    }
+    range.insertNode(frag);
+
+    if (lastNode) {
+        range = document.createRange();
+        range.setStartAfter(lastNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    saveSelection();
+    handleEditorInput();
+    updateDocumentStats();
+}
+
 // --- Creative Ribbon Tools: Neon Glowing Text, Animated Text, Arrows & Shapes ---
 function toggleRibbonPopover(menuId, buttonEl, e) {
-    if (e) e.stopPropagation();
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    saveSelection();
     const targetMenu = document.getElementById(menuId);
     if (!targetMenu) return;
     const isShowing = targetMenu.style.display !== 'none';
     closeAllRibbonPopovers();
     if (!isShowing) {
-        targetMenu.style.display = 'flex';
+        targetMenu.style.display = targetMenu.classList.contains('emoji-grid-popover') ? 'grid' : 'flex';
     }
 }
 
@@ -2144,85 +2228,45 @@ function closeAllRibbonPopovers() {
 function applyNeonEffect(color) {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
-    noteEditor.focus();
+    restoreSelection();
     const sel = window.getSelection();
     let text = 'Glowing Neon Text';
-    let range = null;
-
-    if (sel && sel.rangeCount > 0) {
-        range = sel.getRangeAt(0);
-        if (!sel.isCollapsed) {
-            text = range.toString() || text;
-            range.deleteContents();
-        }
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        text = sel.getRangeAt(0).toString() || text;
     }
-
-    const span = document.createElement('span');
-    span.className = `neon-text neon-${color}`;
-    span.textContent = text;
-
-    if (range) {
-        range.insertNode(span);
-        const space = document.createTextNode('\u00A0');
-        span.parentNode.insertBefore(space, span.nextSibling);
-        const newRange = document.createRange();
-        newRange.setStartAfter(space);
-        newRange.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(newRange);
-    } else {
-        noteEditor.appendChild(span);
-    }
-    handleEditorInput();
+    const html = `<span class="neon-text neon-${color}">${escapeHtml(text)}</span>&nbsp;`;
+    insertHtmlAtCursor(html);
 }
 
 function applyAnimatedText(type) {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
-    noteEditor.focus();
+    restoreSelection();
     const sel = window.getSelection();
-    let text = type === 'rainbow' ? 'Rainbow Shimmering Title' : (type === 'pulse' ? 'Pulsing Ambient Text' : 'Floating Waves Text');
-    let range = null;
-
-    if (sel && sel.rangeCount > 0) {
-        range = sel.getRangeAt(0);
-        if (!sel.isCollapsed) {
-            text = range.toString() || text;
-            range.deleteContents();
-        }
+    let defaultText = type === 'rainbow' ? 'Rainbow Shimmering Title' : (type === 'pulse' ? 'Pulsing Ambient Text' : 'Floating Waves Text');
+    let text = defaultText;
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        text = sel.getRangeAt(0).toString() || defaultText;
     }
-
-    const span = document.createElement('span');
-    span.className = `anim-${type}-text`;
-    span.textContent = text;
-
-    if (range) {
-        range.insertNode(span);
-        const space = document.createTextNode('\u00A0');
-        span.parentNode.insertBefore(space, span.nextSibling);
-        const newRange = document.createRange();
-        newRange.setStartAfter(space);
-        newRange.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(newRange);
-    } else {
-        noteEditor.appendChild(span);
-    }
-    handleEditorInput();
+    const html = `<span class="anim-${type}-text">${escapeHtml(text)}</span>&nbsp;`;
+    insertHtmlAtCursor(html);
 }
 
 function insertSymbol(sym) {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
-    noteEditor.focus();
-    document.execCommand('insertHTML', false, `&nbsp;${sym}&nbsp;`);
-    handleEditorInput();
+    insertHtmlAtCursor(`&nbsp;${sym}&nbsp;`);
+}
+
+function insertEmoji(emoji) {
+    closeAllRibbonPopovers();
+    if (state.isReadOnly) return;
+    insertHtmlAtCursor(`&nbsp;${emoji}&nbsp;`);
 }
 
 function insertFlowSteps() {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
-    noteEditor.focus();
     const html = `
         <div class="flow-steps-container" contenteditable="false">
             <span class="flow-step-badge" contenteditable="true">Step 1: Input</span>
@@ -2233,14 +2277,12 @@ function insertFlowSteps() {
         </div>
         <p><br></p>
     `;
-    document.execCommand('insertHTML', false, html);
-    handleEditorInput();
+    insertHtmlAtCursor(html);
 }
 
 function insertArrowDivider() {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
-    noteEditor.focus();
     const html = `
         <div class="arrow-divider" contenteditable="false">
             <span class="arrow-divider-line"></span>
@@ -2249,50 +2291,44 @@ function insertArrowDivider() {
         </div>
         <p><br></p>
     `;
-    document.execCommand('insertHTML', false, html);
-    handleEditorInput();
+    insertHtmlAtCursor(html);
 }
 
 function insertNeonBanner() {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
-    noteEditor.focus();
     const html = `
         <div class="neon-banner-card">
             <div class="neon-banner-title">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span>Important CyberNote Notice</span>
+                <span>Important Highlight</span>
             </div>
             <div>Enter your key takeaways, instructions or summary here...</div>
         </div>
         <p><br></p>
     `;
-    document.execCommand('insertHTML', false, html);
-    handleEditorInput();
+    insertHtmlAtCursor(html);
 }
 
 function insertPillBadge(type) {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
-    noteEditor.focus();
     let badgeHtml = '';
     if (type === 'success') {
-        badgeHtml = `<span class="pill-badge pill-success" contenteditable="false">✓ DONE</span>&nbsp;`;
+        badgeHtml = `&nbsp;<span class="pill-badge pill-success" contenteditable="false">✓ DONE</span>&nbsp;`;
     } else if (type === 'priority') {
-        badgeHtml = `<span class="pill-badge pill-priority" contenteditable="false">🔥 HIGH</span>&nbsp;`;
+        badgeHtml = `&nbsp;<span class="pill-badge pill-priority" contenteditable="false">🔥 HIGH</span>&nbsp;`;
     } else if (type === 'cyber') {
-        badgeHtml = `<span class="pill-badge pill-cyber" contenteditable="false">🛡️ SECURE</span>&nbsp;`;
+        badgeHtml = `&nbsp;<span class="pill-badge pill-cyber" contenteditable="false">🛡️ SECURE</span>&nbsp;`;
     } else {
-        badgeHtml = `<span class="pill-badge pill-pending" contenteditable="false">⏳ PENDING</span>&nbsp;`;
+        badgeHtml = `&nbsp;<span class="pill-badge pill-pending" contenteditable="false">⏳ PENDING</span>&nbsp;`;
     }
-    document.execCommand('insertHTML', false, badgeHtml);
-    handleEditorInput();
+    insertHtmlAtCursor(badgeHtml);
 }
 
 function insertMetricTile() {
     closeAllRibbonPopovers();
     if (state.isReadOnly) return;
-    noteEditor.focus();
     const html = `
         <div class="metric-card-grid">
             <div class="metric-card-tile">
@@ -2306,8 +2342,72 @@ function insertMetricTile() {
         </div>
         <p><br></p>
     `;
-    document.execCommand('insertHTML', false, html);
-    handleEditorInput();
+    insertHtmlAtCursor(html);
+}
+
+function insertToggleBlock() {
+    if (state.isReadOnly) return;
+    const html = `
+        <details class="note-toggle-block" open>
+            <summary contenteditable="true">▶ Click to expand or collapse</summary>
+            <div class="toggle-content" contenteditable="true">
+                <p>Hidden notes or details here...</p>
+            </div>
+        </details>
+        <p><br></p>
+    `;
+    insertHtmlAtCursor(html);
+}
+
+function insertMathBox() {
+    if (state.isReadOnly) return;
+    const html = `
+        <div class="math-formula-box" contenteditable="true">
+            f(x) = \\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}
+        </div>
+        <p><br></p>
+    `;
+    insertHtmlAtCursor(html);
+}
+
+function insertKbdBadge() {
+    if (state.isReadOnly) return;
+    restoreSelection();
+    const sel = window.getSelection();
+    let text = 'Ctrl + S';
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        text = sel.getRangeAt(0).toString() || text;
+    }
+    const html = `<kbd class="editor-kbd">${escapeHtml(text)}</kbd>&nbsp;`;
+    insertHtmlAtCursor(html);
+}
+
+function handleTextCaseChange(caseType) {
+    if (state.isReadOnly || !caseType) return;
+    restoreSelection();
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        const text = sel.getRangeAt(0).toString();
+        let transformed = text;
+        if (caseType === 'upper') transformed = text.toUpperCase();
+        else if (caseType === 'lower') transformed = text.toLowerCase();
+        else if (caseType === 'title') {
+            transformed = text.replace(/\\w\\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+        }
+        insertHtmlAtCursor(escapeHtml(transformed));
+    }
+}
+
+function handlePrintNote() {
+    window.print();
+}
+
+function updateDocumentStats() {
+    const badge = document.getElementById('ribbon-word-count');
+    if (!badge || !noteEditor) return;
+    const text = noteEditor.innerText || '';
+    const words = text.trim() ? text.trim().split(/\\s+/).length : 0;
+    badge.textContent = `${words} words`;
 }
 
 // Expose functions globally for inline HTML onclick handlers
@@ -2316,11 +2416,18 @@ window.closeAllRibbonPopovers = closeAllRibbonPopovers;
 window.applyNeonEffect = applyNeonEffect;
 window.applyAnimatedText = applyAnimatedText;
 window.insertSymbol = insertSymbol;
+window.insertEmoji = insertEmoji;
 window.insertFlowSteps = insertFlowSteps;
 window.insertArrowDivider = insertArrowDivider;
 window.insertNeonBanner = insertNeonBanner;
 window.insertPillBadge = insertPillBadge;
 window.insertMetricTile = insertMetricTile;
+window.insertToggleBlock = insertToggleBlock;
+window.insertMathBox = insertMathBox;
+window.insertKbdBadge = insertKbdBadge;
+window.handleTextCaseChange = handleTextCaseChange;
+window.handlePrintNote = handlePrintNote;
+window.updateDocumentStats = updateDocumentStats;
 window.createNewRootNode = createNewRootNode;
 window.createSubNode = createSubNode;
 
@@ -2418,65 +2525,6 @@ function insertHyperlink() {
     }
 }
 
-// --- Cursor-Safe HTML Insertion (Prevents Element Conflicts) ---
-function insertHtmlAtCursor(html) {
-    noteEditor.focus();
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) {
-        noteEditor.innerHTML += html;
-        handleEditorInput();
-        return;
-    }
-
-    let range = sel.getRangeAt(0);
-
-    // If cursor is inside an image or specialized container, safely step outside to prevent entrapment
-    let container = range.commonAncestorContainer;
-    if (container.nodeType === 3) container = container.parentNode;
-    const specialParent = container.closest?.('.editor-img-wrap, .neon-banner-card, .flow-steps-container, .metric-card-grid, .code-box');
-    if (specialParent && specialParent.parentNode) {
-        range = document.createRange();
-        range.setStartAfter(specialParent);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-    }
-
-    range.deleteContents();
-
-    const el = document.createElement('div');
-    el.innerHTML = html;
-    const frag = document.createDocumentFragment();
-    let node, lastNode;
-    while ((node = el.firstChild)) {
-        lastNode = frag.appendChild(node);
-    }
-    range.insertNode(frag);
-
-    if (lastNode) {
-        range.setStartAfter(lastNode);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-    }
-
-    handleEditorInput();
-}
-
-function saveSelection() {
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-        state.savedSelectionRange = sel.getRangeAt(0).cloneRange();
-    }
-}
-
-function restoreSelection() {
-    if (state.savedSelectionRange) {
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(state.savedSelectionRange);
-    }
-}
 
 // --- CodeBox Modal & Insertion ---
 function openCodeBoxModal() {
@@ -2651,11 +2699,19 @@ function updateImageResizeOverlay() {
     const imgRect = img.getBoundingClientRect();
     const scrollRect = scrollArea.getBoundingClientRect();
 
+    if (imgRect.width === 0 || imgRect.height === 0) {
+        overlay.style.display = 'none';
+        return;
+    }
+
     overlay.style.display = 'block';
-    overlay.style.left = `${imgRect.left - scrollRect.left + scrollArea.scrollLeft}px`;
-    overlay.style.top = `${imgRect.top - scrollRect.top + scrollArea.scrollTop}px`;
-    overlay.style.width = `${imgRect.width}px`;
-    overlay.style.height = `${imgRect.height}px`;
+    const left = imgRect.left - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
+    const top = imgRect.top - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
+
+    overlay.style.left = `${Math.round(left)}px`;
+    overlay.style.top = `${Math.round(top)}px`;
+    overlay.style.width = `${Math.round(imgRect.width)}px`;
+    overlay.style.height = `${Math.round(imgRect.height)}px`;
 
     const badge = document.getElementById('img-dimension-badge');
     if (badge) {
@@ -2709,7 +2765,7 @@ function setupImageResizeHandles() {
         }
 
         const editorWidth = noteEditor.clientWidth || 600;
-        newWidth = Math.max(60, Math.min(newWidth, editorWidth));
+        newWidth = Math.max(60, Math.min(newWidth, editorWidth - 20));
 
         state.activeImageElement.style.width = `${Math.round(newWidth)}px`;
         state.activeImageElement.style.height = 'auto';
@@ -3559,6 +3615,10 @@ function updateWordStats() {
     const text = noteEditor.innerText || '';
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
+    const ribbonBadge = document.getElementById('ribbon-word-count');
+    if (ribbonBadge) {
+        ribbonBadge.textContent = `${words} words`;
+    }
     if (chars > 3000) {
         const estCompressedKb = Math.max(1, Math.round((chars * 0.04) / 1024));
         footerStats.textContent = `${words} words, ${chars} chars (~${(chars / 1024).toFixed(1)} KB) • Compressed: ~${estCompressedKb} KB (< 0.05 B/char)`;
@@ -4135,7 +4195,50 @@ function setupEventListeners() {
     document.getElementById('btn-insert-nodelink').onclick = openNodeLinkModal;
     document.getElementById('nodelink-search').oninput = (e) => renderNodeLinkList(e.target.value);
 
-    // Creative Ribbon Popovers (Neon, Animations, Arrows, Shapes)
+    // New Studio & Utility Items (Toggle, Math, Kbd, Inline Code, Indent/Outdent, Case, Print)
+    const btnToggle = document.getElementById('btn-insert-toggle');
+    if (btnToggle) btnToggle.onclick = insertToggleBlock;
+
+    const btnMath = document.getElementById('btn-insert-math');
+    if (btnMath) btnMath.onclick = insertMathBox;
+
+    const btnKbd = document.getElementById('btn-insert-kbd');
+    if (btnKbd) btnKbd.onclick = insertKbdBadge;
+
+    const btnInlineCode = document.getElementById('btn-inline-code');
+    if (btnInlineCode) {
+        btnInlineCode.onclick = () => {
+            restoreSelection();
+            const sel = window.getSelection();
+            let text = 'code';
+            if (sel && sel.rangeCount > 0 && !sel.isCollapsed && noteEditor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+                text = sel.getRangeAt(0).toString() || text;
+            }
+            insertHtmlAtCursor(`<code>${escapeHtml(text)}</code>&nbsp;`);
+        };
+    }
+
+    const btnIndent = document.getElementById('btn-indent');
+    if (btnIndent) btnIndent.onclick = () => execFormat('indent');
+
+    const btnOutdent = document.getElementById('btn-outdent');
+    if (btnOutdent) btnOutdent.onclick = () => execFormat('outdent');
+
+    const selectTextCase = document.getElementById('select-text-case');
+    if (selectTextCase) {
+        selectTextCase.onchange = (e) => {
+            handleTextCaseChange(e.target.value);
+            e.target.value = '';
+        };
+    }
+
+    const btnPrint = document.getElementById('btn-print-note');
+    if (btnPrint) btnPrint.onclick = handlePrintNote;
+
+    // Creative Ribbon Popovers (Emoji, Neon, Animations, Arrows, Shapes)
+    const btnEmoji = document.getElementById('btn-emoji-picker');
+    if (btnEmoji) btnEmoji.onclick = (e) => toggleRibbonPopover('emoji-dropdown-menu', btnEmoji, e);
+
     const btnNeon = document.getElementById('btn-neon-effects');
     if (btnNeon) btnNeon.onclick = (e) => toggleRibbonPopover('neon-dropdown-menu', btnNeon, e);
 
@@ -4147,6 +4250,14 @@ function setupEventListeners() {
 
     const btnShapes = document.getElementById('btn-shapes-menu');
     if (btnShapes) btnShapes.onclick = (e) => toggleRibbonPopover('shapes-dropdown-menu', btnShapes, e);
+
+    // Prevent toolbar click from stealing focus from noteEditor
+    document.querySelector('.editor-ribbon')?.addEventListener('mousedown', (e) => {
+        saveSelection();
+        if (e.target.closest('button, .popover-item, .emoji-chip, .color-indicator-bar')) {
+            e.preventDefault();
+        }
+    });
 
     // Global outside click closer for ribbon popovers and context menus
     document.addEventListener('click', (e) => {

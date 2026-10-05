@@ -1,5 +1,5 @@
 // CyberNote 🛡️ - Service Worker for Offline Execution & WebAPK / PWA Installation
-const CACHE_NAME = 'cybernote-v2-cache';
+const CACHE_NAME = 'cybernote-v3-cache';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',

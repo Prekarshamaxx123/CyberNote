@@ -291,12 +291,50 @@
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                                 <span>Date</span>
                             </button>
+                            <button id="btn-insert-toggle" class="ribbon-btn ribbon-btn-compact" title="Collapsible Toggle / Accordion">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 4 18 12 6 20 6 4"/></svg>
+                                <span>Toggle</span>
+                            </button>
+                            <button id="btn-insert-math" class="ribbon-btn ribbon-btn-compact" title="Insert Math / LaTeX Box">
+                                <span style="font-weight:700;font-size:0.95rem;line-height:1;margin-right:2px;">∑</span>
+                                <span>Math</span>
+                            </button>
+                            <button id="btn-insert-kbd" class="ribbon-btn ribbon-btn-compact" title="Insert Keyboard Shortcut Key Badge">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/></svg>
+                                <span>Kbd</span>
+                            </button>
                         </div>
 
                         <div class="ribbon-divider"></div>
 
-                        <!-- Creative & Aesthetic Group: Neon, Animation, Arrows & Shapes -->
+                        <!-- Creative & Aesthetic Group: Emojis, Neon, Animation, Arrows & Shapes -->
                         <div class="ribbon-cluster ribbon-cluster-creative">
+                            <!-- Quick Emoji Picker -->
+                            <div class="ribbon-dropdown-wrap">
+                                <button id="btn-emoji-picker" class="ribbon-btn ribbon-badge-action" title="Quick Emoji Picker">
+                                    <span class="badge-icon">😀</span>
+                                    <span class="badge-label">Emoji</span>
+                                </button>
+                                <div id="emoji-dropdown-menu" class="ribbon-popover-menu emoji-grid-popover" style="display: none;">
+                                    <span class="emoji-chip" onclick="insertEmoji('🔥')">🔥</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('💡')">💡</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🚀')">🚀</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('📌')">📌</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('⭐')">⭐</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('✅')">✅</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('⚠️')">⚠️</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🎯')">🎯</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('💻')">💻</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🛡️')">🛡️</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('📝')">📝</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🔒')">🔒</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('🎉')">🎉</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('📊')">📊</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('❤️')">❤️</span>
+                                    <span class="emoji-chip" onclick="insertEmoji('✨')">✨</span>
+                                </div>
+                            </div>
+
                             <!-- Neon Glow Effects -->
                             <div class="ribbon-dropdown-wrap">
                                 <button id="btn-neon-effects" class="ribbon-btn ribbon-badge-action" title="Neon Glowing Text Effects">
@@ -410,6 +448,7 @@
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-italic" title="Italic (Ctrl+I)"><i>I</i></button>
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-underline" title="Underline (Ctrl+U)"><u>U</u></button>
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-strike" title="Strikethrough"><s>S</s></button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-inline-code" title="Inline Code (&lt;/&gt;)"><code>&lt;/&gt;</code></button>
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-subscript" title="Subscript">X<sub>2</sub></button>
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-superscript" title="Superscript">X<sup>2</sup></button>
                         </div>
@@ -455,13 +494,19 @@
 
                         <div class="ribbon-divider"></div>
 
-                        <!-- Paragraph Elements -->
+                        <!-- Paragraph Elements & Lists -->
                         <div class="ribbon-cluster">
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-bullet-list" title="Bullet List">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.5" fill="currentColor"/><circle cx="3.5" cy="12" r="1.5" fill="currentColor"/><circle cx="3.5" cy="18" r="1.5" fill="currentColor"/></svg>
                             </button>
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-numbered-list" title="Numbered List">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h2v4"/><path d="M4 10h4"/></svg>
+                            </button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-indent" title="Indent Text (Tab)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="11" y1="18" x2="21" y2="18"/><polyline points="3 8 7 12 3 16"/></svg>
+                            </button>
+                            <button class="ribbon-btn ribbon-btn-icon" id="btn-outdent" title="Outdent Text (Shift+Tab)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="11" y1="18" x2="21" y2="18"/><polyline points="7 8 3 12 7 16"/></svg>
                             </button>
                             <button class="ribbon-btn ribbon-btn-icon" id="btn-quote" title="Quote Block">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .01-1 1V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2h-4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .01-1 1V20c0 1 0 1 1 1z"/></svg>
@@ -473,12 +518,23 @@
 
                         <div class="ribbon-divider"></div>
 
-                        <!-- Find in Note Button -->
-                        <div class="ribbon-cluster ribbon-cluster-find">
+                        <!-- Utilities: Text Case, Print, Find & Live Counter -->
+                        <div class="ribbon-cluster">
+                            <select id="select-text-case" class="ribbon-select" title="Change Text Case">
+                                <option value="">Case...</option>
+                                <option value="upper">UPPERCASE</option>
+                                <option value="lower">lowercase</option>
+                                <option value="title">Title Case</option>
+                            </select>
+                            <button class="ribbon-btn ribbon-btn-compact" id="btn-print-note" title="Print Note / Export PDF">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                <span>Print</span>
+                            </button>
                             <button class="ribbon-btn ribbon-btn-compact" id="btn-toggle-find" title="Find & Replace in Note (Ctrl+F)">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                                 <span>Find</span>
                             </button>
+                            <span id="ribbon-word-count" class="ribbon-word-badge" title="Live Document Word Count">0 words</span>
                         </div>
                     </div>
                 </div>
@@ -576,17 +632,16 @@
                     </button>
                 </div>
 
-                <!-- Interactive Corner Resize Overlay for Images & Signatures -->
-                <div id="image-resize-overlay" class="image-resize-overlay" style="display: none;">
-                    <div class="img-resize-handle handle-nw" data-handle="nw"></div>
-                    <div class="img-resize-handle handle-ne" data-handle="ne"></div>
-                    <div class="img-resize-handle handle-se" data-handle="se"></div>
-                    <div class="img-resize-handle handle-sw" data-handle="sw"></div>
-                    <div class="img-dimension-badge" id="img-dimension-badge">300 × 200</div>
-                </div>
-
                 <!-- DIRECT IN-PLACE WYSIWYG DOCUMENT CANVAS (NO PREVIEW TAB) -->
                 <div class="editor-scroll-area" id="editor-scroll-area">
+                    <!-- Interactive Corner Resize Overlay for Images & Signatures (inside scroll container) -->
+                    <div id="image-resize-overlay" class="image-resize-overlay" style="display: none;">
+                        <div class="img-resize-handle handle-nw" data-handle="nw"></div>
+                        <div class="img-resize-handle handle-ne" data-handle="ne"></div>
+                        <div class="img-resize-handle handle-se" data-handle="se"></div>
+                        <div class="img-resize-handle handle-sw" data-handle="sw"></div>
+                        <div class="img-dimension-badge" id="img-dimension-badge">300 × 200</div>
+                    </div>
                     <div id="note-editor" class="wysiwyg-canvas" contenteditable="true" spellcheck="true" data-placeholder="Start typing notes, or type '/' for quick actions (paint, tables, codebox, checklist, callouts)..."></div>
                 </div>
             </div>
