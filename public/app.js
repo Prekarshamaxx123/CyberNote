@@ -285,6 +285,7 @@ function initGoogleAuth() {
                 state.tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: clientId,
                     scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                    prompt: 'select_account',
                     callback: handleGoogleTokenResponse
                 });
             } catch (err) {
@@ -329,7 +330,8 @@ function updateDriveModalStatus(isSignedIn) {
 
 function requestGoogleLogin() {
     if (state.tokenClient) {
-        state.tokenClient.requestAccessToken({ prompt: 'consent' });
+        // 'select_account' ensures Google always shows the account picker / email selector
+        state.tokenClient.requestAccessToken({ prompt: 'select_account' });
     } else {
         alert('Google authentication service is loading... please click again in a moment.');
         initGoogleAuth();
@@ -376,6 +378,16 @@ async function fetchGoogleUserProfile() {
 }
 
 function signoutGoogle() {
+    const token = state.googleAccessToken;
+    if (token && window.google?.accounts?.oauth2?.revoke) {
+        try {
+            google.accounts.oauth2.revoke(token, () => {
+                console.log('Google OAuth token revoked on signout');
+            });
+        } catch (e) {
+            console.warn('Revoke token error:', e);
+        }
+    }
     state.googleAccessToken = null;
     state.googleUser = null;
     localStorage.removeItem('cybernote_google_token');
