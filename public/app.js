@@ -237,6 +237,7 @@ async function initApp() {
     state.isServerMode = false;
     setSyncStatus('live', 'CyberNote Cloud Mode');
     await loadLocalNodes();
+    checkShowStarBanner();
 }
 
 // --- Theme Management ---
@@ -499,6 +500,7 @@ async function autoRestoreFromDriveOnSignIn() {
         }
         updateSettingsUI();
         hideSyncOverlay();
+        checkShowStarBanner();
     } catch (err) {
         console.error('Auto restore from drive error:', err);
         if (logDiv) logDiv.innerHTML = `<span style="color:var(--danger);">Error: ${err.message}</span>`;
@@ -1751,6 +1753,11 @@ function selectNode(id) {
     updateWordStats();
     renderTree();
 
+    if (window.innerWidth <= 768) {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.remove('open');
+    }
+
     footerPath.textContent = `Node: ${node.title}`;
     footerTime.textContent = `Last edited ${new Date(node.updated_at || Date.now()).toLocaleTimeString()}`;
 }
@@ -2411,7 +2418,7 @@ function insertHyperlink() {
     }
 }
 
-// --- Cursor-Safe HTML Insertion ---
+// --- Cursor-Safe HTML Insertion (Prevents Element Conflicts) ---
 function insertHtmlAtCursor(html) {
     noteEditor.focus();
     const sel = window.getSelection();
@@ -2421,7 +2428,20 @@ function insertHtmlAtCursor(html) {
         return;
     }
 
-    const range = sel.getRangeAt(0);
+    let range = sel.getRangeAt(0);
+
+    // If cursor is inside an image or specialized container, safely step outside to prevent entrapment
+    let container = range.commonAncestorContainer;
+    if (container.nodeType === 3) container = container.parentNode;
+    const specialParent = container.closest?.('.editor-img-wrap, .neon-banner-card, .flow-steps-container, .metric-card-grid, .code-box');
+    if (specialParent && specialParent.parentNode) {
+        range = document.createRange();
+        range.setStartAfter(specialParent);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
     range.deleteContents();
 
     const el = document.createElement('div');
@@ -2578,19 +2598,25 @@ function handleClipboardPaste(e) {
 }
 
 function insertImageElement(src, alt) {
-    const html = `<p><img src="${src}" alt="${alt || 'Image'}" style="max-width:100%;"><br></p>`;
-    insertHtmlAtCursor(html);
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    // Wrap safely with paragraphs before & after to prevent getting stuck
+    const html = `<p><br></p><div class="editor-img-wrap" style="margin: 14px 0; display: inline-block; max-width: 100%;"><img src="${src}" alt="${alt || 'Image'}" style="max-width: 100%; height: auto; border-radius: 6px; display: block;"></div><p><br></p>`;
+    document.execCommand('insertHTML', false, html);
+    handleEditorInput();
 }
 
-// Floating Image Controls
+// Floating Image Controls & Corner Resizing
 function setupImageInteractions() {
     noteEditor.addEventListener('click', (e) => {
         if (e.target.tagName === 'IMG') {
             selectImageElement(e.target);
-        } else {
+        } else if (!e.target.closest('#image-toolbar') && !e.target.closest('#image-resize-overlay')) {
             hideImageToolbar();
         }
     });
+
+    setupImageResizeHandles();
 }
 
 function selectImageElement(img) {
@@ -2598,6 +2624,7 @@ function selectImageElement(img) {
     document.querySelectorAll('.wysiwyg-canvas img').forEach(i => i.classList.remove('selected-img'));
     img.classList.add('selected-img');
     imageToolbar.style.display = 'flex';
+    updateImageResizeOverlay();
 }
 
 function hideImageToolbar() {
@@ -2606,11 +2633,176 @@ function hideImageToolbar() {
         state.activeImageElement = null;
     }
     imageToolbar.style.display = 'none';
+    const overlay = document.getElementById('image-resize-overlay');
+    if (overlay) overlay.style.display = 'none';
 }
+
+function updateImageResizeOverlay() {
+    const overlay = document.getElementById('image-resize-overlay');
+    const scrollArea = document.getElementById('editor-scroll-area');
+    if (!overlay || !scrollArea) return;
+
+    if (!state.activeImageElement || !state.activeImageElement.isConnected) {
+        overlay.style.display = 'none';
+        return;
+    }
+
+    const img = state.activeImageElement;
+    const imgRect = img.getBoundingClientRect();
+    const scrollRect = scrollArea.getBoundingClientRect();
+
+    overlay.style.display = 'block';
+    overlay.style.left = `${imgRect.left - scrollRect.left + scrollArea.scrollLeft}px`;
+    overlay.style.top = `${imgRect.top - scrollRect.top + scrollArea.scrollTop}px`;
+    overlay.style.width = `${imgRect.width}px`;
+    overlay.style.height = `${imgRect.height}px`;
+
+    const badge = document.getElementById('img-dimension-badge');
+    if (badge) {
+        badge.textContent = `${Math.round(imgRect.width)} × ${Math.round(imgRect.height)}`;
+    }
+}
+
+function setupImageResizeHandles() {
+    const overlay = document.getElementById('image-resize-overlay');
+    if (!overlay) return;
+
+    let isResizing = false;
+    let currentHandle = null;
+    let startX = 0;
+    let startWidth = 0;
+
+    overlay.querySelectorAll('.img-resize-handle').forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!state.activeImageElement) return;
+
+            isResizing = true;
+            currentHandle = handle.dataset.handle;
+            startX = e.clientX;
+            const rect = state.activeImageElement.getBoundingClientRect();
+            startWidth = rect.width;
+
+            document.body.style.userSelect = 'none';
+        });
+
+        handle.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1 || !state.activeImageElement) return;
+            isResizing = true;
+            currentHandle = handle.dataset.handle;
+            startX = e.touches[0].clientX;
+            const rect = state.activeImageElement.getBoundingClientRect();
+            startWidth = rect.width;
+        }, { passive: true });
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isResizing || !state.activeImageElement) return;
+        const dx = e.clientX - startX;
+        let newWidth = startWidth;
+
+        if (currentHandle === 'se' || currentHandle === 'ne') {
+            newWidth = startWidth + dx;
+        } else if (currentHandle === 'sw' || currentHandle === 'nw') {
+            newWidth = startWidth - dx;
+        }
+
+        const editorWidth = noteEditor.clientWidth || 600;
+        newWidth = Math.max(60, Math.min(newWidth, editorWidth));
+
+        state.activeImageElement.style.width = `${Math.round(newWidth)}px`;
+        state.activeImageElement.style.height = 'auto';
+        updateImageResizeOverlay();
+    });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!isResizing || !state.activeImageElement || e.touches.length !== 1) return;
+        const dx = e.touches[0].clientX - startX;
+        let newWidth = startWidth;
+
+        if (currentHandle === 'se' || currentHandle === 'ne') {
+            newWidth = startWidth + dx;
+        } else if (currentHandle === 'sw' || currentHandle === 'nw') {
+            newWidth = startWidth - dx;
+        }
+
+        const editorWidth = noteEditor.clientWidth || 600;
+        newWidth = Math.max(60, Math.min(newWidth, editorWidth));
+
+        state.activeImageElement.style.width = `${Math.round(newWidth)}px`;
+        state.activeImageElement.style.height = 'auto';
+        updateImageResizeOverlay();
+    });
+
+    const finishResize = () => {
+        if (isResizing) {
+            isResizing = false;
+            currentHandle = null;
+            document.body.style.userSelect = '';
+            handleEditorInput();
+        }
+    };
+
+    window.addEventListener('mouseup', finishResize);
+    window.addEventListener('touchend', finishResize);
+
+    const scrollArea = document.getElementById('editor-scroll-area');
+    if (scrollArea) {
+        scrollArea.addEventListener('scroll', updateImageResizeOverlay);
+    }
+    window.addEventListener('resize', updateImageResizeOverlay);
+}
+
+// Copy selected image / signature to clipboard
+async function copyActiveImage() {
+    if (!state.activeImageElement) return;
+    const img = state.activeImageElement;
+
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width || 300;
+        canvas.height = img.naturalHeight || img.height || 200;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        canvas.toBlob(async (blob) => {
+            if (!blob) throw new Error('Could not extract blob from canvas');
+            if (navigator.clipboard && navigator.clipboard.write) {
+                await navigator.clipboard.write([
+                    new ClipboardItem({ 'image/png': blob })
+                ]);
+                showToast('✓ Image copied to clipboard!');
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(img.src);
+                showToast('✓ Image data copied to clipboard!');
+            }
+        }, 'image/png');
+    } catch (err) {
+        console.warn('Copy image error:', err);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(img.src);
+            showToast('✓ Image data copied to clipboard!');
+        }
+    }
+}
+
+// Global key shortcut for image copy
+window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && state.activeImageElement) {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || sel.toString().trim() === '') {
+            e.preventDefault();
+            copyActiveImage();
+        }
+    }
+});
 
 function setImageSize(pct) {
     if (!state.activeImageElement) return;
     state.activeImageElement.style.width = pct;
+    state.activeImageElement.style.height = 'auto';
+    updateImageResizeOverlay();
     handleEditorInput();
 }
 
@@ -2630,6 +2822,7 @@ function setImageAlign(alignment) {
         img.style.float = 'right';
         img.style.margin = '0 0 16px 16px';
     }
+    updateImageResizeOverlay();
     handleEditorInput();
 }
 
@@ -3549,7 +3742,34 @@ function closeWelcomeModal() {
     const welcomeModal = document.getElementById('welcome-modal');
     if (welcomeModal) welcomeModal.style.display = 'none';
     localStorage.setItem('cybernote_welcome_dismissed', '1');
+    checkShowStarBanner();
 }
+
+// --- Onboarding & Star GitHub Notification Banner ---
+function checkShowStarBanner() {
+    if (localStorage.getItem('cybernote_star_dismissed') === 'true') return;
+    setTimeout(() => {
+        const banner = document.getElementById('github-star-banner');
+        if (banner) {
+            banner.style.display = 'block';
+        }
+    }, 1600);
+}
+
+function dismissStarBanner(clickedStar = false) {
+    const banner = document.getElementById('github-star-banner');
+    if (banner) {
+        banner.style.opacity = '0';
+        banner.style.transition = 'opacity 0.25s ease';
+        setTimeout(() => banner.style.display = 'none', 250);
+    }
+    localStorage.setItem('cybernote_star_dismissed', 'true');
+    if (clickedStar) {
+        showToast('Thank you for starring CyberNote! ⭐');
+    }
+}
+window.dismissStarBanner = dismissStarBanner;
+window.checkShowStarBanner = checkShowStarBanner;
 
 // --- Centralized Settings Hub & Bug Report ---
 function openSettingsModal(targetTab = 'tab-gdrive') {
@@ -3945,6 +4165,8 @@ function setupEventListeners() {
     document.getElementById('btn-img-align-left').onclick = () => setImageAlign('left');
     document.getElementById('btn-img-align-center').onclick = () => setImageAlign('center');
     document.getElementById('btn-img-align-right').onclick = () => setImageAlign('right');
+    const btnImgCopy = document.getElementById('btn-img-copy');
+    if (btnImgCopy) btnImgCopy.onclick = copyActiveImage;
     document.getElementById('btn-img-delete').onclick = deleteActiveImage;
 
     // Floating Table Toolbar Actions
@@ -4083,13 +4305,17 @@ function setupEventListeners() {
         applyNodeColor(hex);
     };
 
-    // Node Move Up / Down
-    document.getElementById('btn-move-up').onclick = () => moveActiveNode('up');
-    document.getElementById('btn-move-down').onclick = () => moveActiveNode('down');
+    // Node Move Up / Down (if present)
+    const btnMoveUp = document.getElementById('btn-move-up');
+    if (btnMoveUp) btnMoveUp.onclick = () => moveActiveNode('up');
+    const btnMoveDown = document.getElementById('btn-move-down');
+    if (btnMoveDown) btnMoveDown.onclick = () => moveActiveNode('down');
 
-    // Expand / Collapse all
-    document.getElementById('btn-expand-all').onclick = expandAll;
-    document.getElementById('btn-collapse-all').onclick = collapseAll;
+    // Expand / Collapse all (if present)
+    const btnExpandAll = document.getElementById('btn-expand-all');
+    if (btnExpandAll) btnExpandAll.onclick = expandAll;
+    const btnCollapseAll = document.getElementById('btn-collapse-all');
+    if (btnCollapseAll) btnCollapseAll.onclick = collapseAll;
 
     // Icon Picker
     iconPickerBtn.onclick = openIconModal;
@@ -4730,3 +4956,48 @@ function setupSlashCommandMenu() {
         }
     });
 }
+
+// ==========================================================================
+// PWA & BROWSER APK INSTALLATION & OFFLINE SERVICE WORKER
+// ==========================================================================
+let deferredInstallPrompt = null;
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+            console.log('✓ CyberNote Service Worker active:', reg.scope);
+        }).catch((err) => {
+            console.log('ServiceWorker registration note:', err);
+        });
+    });
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btnInstall = document.getElementById('btn-install-pwa');
+    if (btnInstall) {
+        btnInstall.style.display = 'inline-flex';
+    }
+});
+
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    const btnInstall = document.getElementById('btn-install-pwa');
+    if (btnInstall) btnInstall.style.display = 'none';
+    showToast('✓ CyberNote successfully installed on your device!');
+});
+
+async function triggerPwaInstall() {
+    if (!deferredInstallPrompt) {
+        showToast('To install CyberNote, use your browser menu and tap "Install App" or "Add to Home Screen".');
+        return;
+    }
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') {
+        showToast('Installing CyberNote app... 📱');
+    }
+    deferredInstallPrompt = null;
+}
+window.triggerPwaInstall = triggerPwaInstall;

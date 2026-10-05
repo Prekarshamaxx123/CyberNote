@@ -740,6 +740,15 @@ body {
     font-weight: 700;
     color: var(--text-muted);
     letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.sidebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
 }
 
 /* Sidebar Top Navigation: All Notes */
@@ -1931,19 +1940,34 @@ body {
     box-shadow: 0 0 0 3px var(--accent);
 }
 
-/* Internal Node Anchor Links */
-.wysiwyg-canvas .node-anchor-link {
-    color: var(--accent);
-    text-decoration: underline;
-    cursor: pointer;
-    font-weight: 600;
+/* Links in Editor (Item 5: Vibrant Electric Blue) */
+.wysiwyg-canvas a,
+.note-editor a,
+.node-anchor-link {
+    color: #58a6ff !important; /* Bright distinct electric blue */
+    text-decoration: underline !important;
+    text-decoration-thickness: 1.5px !important;
+    text-underline-offset: 3px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    padding: 1px 4px !important;
+    border-radius: 4px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.wysiwyg-canvas .node-anchor-link:hover {
-    color: var(--accent-hover);
+.wysiwyg-canvas a:hover,
+.note-editor a:hover,
+.node-anchor-link:hover {
+    color: #79c0ff !important;
+    background-color: rgba(88, 166, 255, 0.15) !important;
+    text-decoration-color: #79c0ff !important;
+    box-shadow: 0 0 8px rgba(88, 166, 255, 0.25) !important;
 }
 
-/* Floating Table Toolbar */
+/* Floating Table & Image Toolbars */
 .table-toolbar, .image-toolbar {
     background-color: var(--bg-header);
     border: 1px solid var(--border-color);
@@ -1956,6 +1980,57 @@ body {
     z-index: 50;
     position: sticky;
     top: 0;
+}
+
+/* Image Interactive Resize Overlay & Corner Handles */
+.image-resize-overlay {
+    position: absolute;
+    pointer-events: none;
+    border: 2px dashed var(--accent);
+    box-sizing: border-box;
+    z-index: 90;
+    transition: opacity 0.15s ease;
+}
+
+.img-resize-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background-color: var(--accent);
+    border: 2px solid #ffffff;
+    border-radius: 3px;
+    pointer-events: auto;
+    z-index: 95;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    transition: transform 0.12s ease;
+}
+
+.img-resize-handle:hover {
+    transform: scale(1.25);
+    background-color: #ffffff;
+    border-color: var(--accent);
+}
+
+.img-resize-handle.handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.img-resize-handle.handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.img-resize-handle.handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.img-resize-handle.handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+
+.img-dimension-badge {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(17, 17, 27, 0.92);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .table-tb-title, .image-tb-title {
@@ -3344,21 +3419,28 @@ body {
 .keep-section {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 18px;
+    margin-bottom: 32px;
 }
 
 .keep-section-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    margin-bottom: 4px;
 }
 
 .keep-section-title {
-    font-size: 0.76rem;
+    font-size: 0.78rem;
     font-weight: 700;
     color: var(--text-muted);
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .keep-section-badge {
@@ -3868,4 +3950,96 @@ body {
     border-color: var(--accent);
     transform: translateY(-2px);
     box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+/* Onboarding Guide & Star GitHub Floating Banner */
+.github-star-banner {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15000;
+    max-width: 680px;
+    width: calc(100% - 32px);
+    background: linear-gradient(135deg, rgba(30, 30, 46, 0.96) 0%, rgba(24, 24, 37, 0.98) 100%);
+    border: 1px solid rgba(137, 180, 250, 0.4);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 20px rgba(137, 180, 250, 0.15);
+    border-radius: 12px;
+    padding: 14px 18px;
+    backdrop-filter: blur(12px);
+    animation: bannerSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bannerSlideUp {
+    from { opacity: 0; transform: translate(-50%, 20px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.star-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.star-banner-icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    animation: starPulse 2s infinite ease-in-out;
+}
+
+@keyframes starPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px gold); }
+    50% { transform: scale(1.18); filter: drop-shadow(0 0 14px gold); }
+}
+
+.star-banner-text {
+    flex: 1;
+}
+
+.star-banner-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+}
+
+.star-banner-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.star-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.star-btn-link {
+    background: linear-gradient(135deg, #f9e2af 0%, #fab387 100%) !important;
+    color: #11111b !important;
+    font-weight: 700 !important;
+    border: none !important;
+    box-shadow: 0 2px 10px rgba(249, 226, 175, 0.3) !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none !important;
+}
+
+.star-btn-link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(249, 226, 175, 0.5) !important;
+}
+
+@media (max-width: 650px) {
+    .star-banner-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .star-banner-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
 }

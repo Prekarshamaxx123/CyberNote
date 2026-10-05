@@ -362,14 +362,43 @@ const server = http.createServer(async (req, res) => {
         });
     }
 
-    // --- Static File Serving ---
-    let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-        filePath = path.join(PUBLIC_DIR, 'index.html');
+    // --- Standalone OAuth & Policy Endpoints ---
+    let filePath;
+    if (pathname === '/home') {
+        filePath = path.join(PUBLIC_DIR, 'home.html');
+    } else if (pathname === '/privacy') {
+        filePath = path.join(PUBLIC_DIR, 'privacy.html');
+    } else if (pathname === '/terms') {
+        filePath = path.join(PUBLIC_DIR, 'terms.html');
+    } else {
+        filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
+        if (!fs.existsSync(filePath) && fs.existsSync(filePath + '.html')) {
+            filePath = filePath + '.html';
+        } else if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+            filePath = path.join(PUBLIC_DIR, 'index.html');
+        }
     }
 
     const ext = path.extname(filePath);
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+    // Production Security Headers
+    const headers = {
+        'Content-Type': contentType,
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'X-XSS-Protection': '1; mode=block',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; img-src 'self' data: blob: https://*.googleusercontent.com https://lh3.googleusercontent.com https://accounts.google.com https://ssl.gstatic.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://accounts.google.com https://apis.google.com https://www.googleapis.com https://*.googleapis.com ws: wss:; frame-src 'self' https://accounts.google.com; base-uri 'self';"
+    };
+
+    if (pathname === '/sw.js') {
+        headers['Service-Worker-Allowed'] = '/';
+        headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    } else if (ext === '.html') {
+        headers['Cache-Control'] = 'no-cache, must-revalidate';
+    }
 
     fs.readFile(filePath, (err, content) => {
         if (err) {
@@ -379,17 +408,13 @@ const server = http.createServer(async (req, res) => {
             const acceptEncoding = (req.headers && req.headers['accept-encoding']) || '';
             if (acceptEncoding.includes('gzip') && content.length > 512) {
                 const compressed = zlib.gzipSync(content);
-                res.writeHead(200, {
-                    'Content-Type': contentType,
-                    'Content-Encoding': 'gzip',
-                    'Content-Length': compressed.length
-                });
+                headers['Content-Encoding'] = 'gzip';
+                headers['Content-Length'] = compressed.length;
+                res.writeHead(200, headers);
                 res.end(compressed);
             } else {
-                res.writeHead(200, {
-                    'Content-Type': contentType,
-                    'Content-Length': content.length
-                });
+                headers['Content-Length'] = content.length;
+                res.writeHead(200, headers);
                 res.end(content);
             }
         }
