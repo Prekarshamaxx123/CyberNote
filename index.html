@@ -107,6 +107,22 @@
                 </div>
             </div>
 
+            <!-- Top Sidebar Navigation: All Notes with Keep Board -->
+            <div class="sidebar-top-nav">
+                <div class="sidebar-nav-item" id="nav-all-notes" title="All Notes Overview (Google Keep style)">
+                    <span class="sidebar-nav-icon">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                    </span>
+                    <span class="sidebar-nav-label">All Notes</span>
+                    <span class="sidebar-nav-count" id="sidebar-all-notes-count">0</span>
+                </div>
+            </div>
+
+            <!-- Sleek Divider Line separating All Notes from Tree Hierarchy -->
+            <div class="sidebar-divider"></div>
+
             <!-- Tree View Container -->
             <div class="tree-container" id="tree-container">
                 <!-- Dynamically populated hierarchical nodes with colored dots -->
@@ -123,6 +139,55 @@
                 <h2>No Note Selected</h2>
                 <p>Select a note from the tree hierarchy or create a new note to start writing.</p>
                 <button class="btn btn-primary" onclick="createNewRootNode()">+ Create Root Note</button>
+            </div>
+
+            <!-- Google Keep Style All Notes Dashboard View -->
+            <div id="all-notes-view" class="all-notes-view" style="display: none;">
+                <div class="all-notes-header">
+                    <div class="all-notes-header-left">
+                        <div class="all-notes-header-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="all-notes-title">All Notes</h1>
+                            <p class="all-notes-subtitle" id="all-notes-stats-subtitle">Overview of your notes, favorites & sub-nodes</p>
+                        </div>
+                    </div>
+                    <div class="all-notes-header-right">
+                        <button class="btn btn-primary" onclick="createNewRootNode()">
+                            <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            <span>+ New Note</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="all-notes-scroll-area">
+                    <!-- FAVORITES / PINNED SECTION (Google Keep Style) -->
+                    <div class="keep-section" id="keep-section-pinned">
+                        <div class="keep-section-header">
+                            <span class="keep-section-title">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle;margin-right:4px;"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24Z"/></svg>
+                                FAVORITES / PINNED
+                            </span>
+                            <span class="keep-section-badge" id="pinned-notes-count">0</span>
+                        </div>
+                        <div class="keep-grid" id="keep-grid-pinned"></div>
+                    </div>
+
+                    <!-- OTHERS / ALL NOTES SECTION (Google Keep Style) -->
+                    <div class="keep-section" id="keep-section-others">
+                        <div class="keep-section-header">
+                            <span class="keep-section-title">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle;margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                OTHERS / ALL NOTES
+                            </span>
+                            <span class="keep-section-badge" id="others-notes-count">0</span>
+                        </div>
+                        <div class="keep-grid" id="keep-grid-others"></div>
+                    </div>
+                </div>
             </div>
 
             <div id="note-view" class="note-view">
