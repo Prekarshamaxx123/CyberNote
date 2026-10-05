@@ -776,6 +776,201 @@ function seedDefaultLocalNotes() {
     saveLocalNodesBackup();
 }
 
+// --- Global Deep Search Engine Across All Notes, Nodes & Content ---
+let selectedSearchIndex = -1;
+
+function stripHtml(html) {
+    if (!html) return '';
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+}
+
+function normalizeQuery(str) {
+    return (str || '').normalize('NFC').toLowerCase().trim();
+}
+
+function nodeMatchesQuery(node, query) {
+    if (!node || !query) return false;
+    const q = normalizeQuery(query);
+    if (!q) return false;
+    const titleMatch = normalizeQuery(node.title).includes(q);
+    const tagsMatch = node.tags && normalizeQuery(node.tags).includes(q);
+    const plainContent = stripHtml(node.content);
+    const contentMatch = normalizeQuery(plainContent).includes(q);
+    return titleMatch || tagsMatch || contentMatch;
+}
+
+function getNodePathString(nodeId) {
+    const crumbs = [];
+    let cur = state.nodes.get(nodeId);
+    while (cur && cur.parent_id) {
+        cur = state.nodes.get(cur.parent_id);
+        if (cur) crumbs.unshift(cur.title || 'Untitled');
+    }
+    return crumbs.length ? crumbs.join(' › ') : 'Root';
+}
+
+function highlightMatchInText(text, query) {
+    if (!text || !query) return escapeHtml(text || '');
+    const normText = text.normalize('NFC').toLowerCase();
+    const normQ = query.normalize('NFC').toLowerCase();
+    const idx = normText.indexOf(normQ);
+    if (idx === -1) return escapeHtml(text);
+    const before = escapeHtml(text.substring(0, idx));
+    const match = escapeHtml(text.substring(idx, idx + query.length));
+    const after = escapeHtml(text.substring(idx + query.length));
+    return `${before}<mark class="search-match">${match}</mark>${after}`;
+}
+
+function extractSearchSnippet(plainText, query) {
+    if (!plainText || !query) return '';
+    const normText = plainText.normalize('NFC').toLowerCase();
+    const normQ = query.normalize('NFC').toLowerCase();
+    const idx = normText.indexOf(normQ);
+    if (idx === -1) {
+        const preview = plainText.trim().substring(0, 80);
+        return preview ? escapeHtml(preview) + (plainText.length > 80 ? '...' : '') : '';
+    }
+
+    const start = Math.max(0, idx - 25);
+    const end = Math.min(plainText.length, idx + query.length + 50);
+    const prefix = start > 0 ? '...' : '';
+    const suffix = end < plainText.length ? '...' : '';
+
+    const before = escapeHtml(plainText.substring(start, idx));
+    const match = escapeHtml(plainText.substring(idx, idx + query.length));
+    const after = escapeHtml(plainText.substring(idx + query.length, end));
+
+    return `${prefix}${before}<mark class="search-match">${match}</mark>${after}${suffix}`;
+}
+
+function flushActiveNoteToMemory() {
+    if (state.activeNodeId) {
+        const node = state.nodes.get(state.activeNodeId);
+        if (node) {
+            if (noteTitleInput) node.title = noteTitleInput.value;
+            if (noteEditor) node.content = noteEditor.innerHTML;
+            if (noteTagsInput) node.tags = noteTagsInput.value;
+        }
+    }
+}
+
+function performGlobalSearch(query) {
+    flushActiveNoteToMemory();
+    state.searchQuery = query;
+    renderTree();
+
+    const dropdown = document.getElementById('search-results-dropdown');
+    const list = document.getElementById('search-results-list');
+    const countEl = document.getElementById('search-results-count');
+    if (!dropdown || !list) return;
+
+    const trimmed = (query || '').trim();
+    if (!trimmed) {
+        dropdown.style.display = 'none';
+        list.innerHTML = '';
+        selectedSearchIndex = -1;
+        return;
+    }
+
+    const q = normalizeQuery(trimmed);
+    const matches = [];
+
+    for (const node of state.nodes.values()) {
+        const titleMatch = normalizeQuery(node.title).includes(q);
+        const tagsMatch = node.tags && normalizeQuery(node.tags).includes(q);
+        const plainContent = stripHtml(node.content);
+        const contentMatch = normalizeQuery(plainContent).includes(q);
+
+        if (titleMatch || tagsMatch || contentMatch) {
+            let score = 0;
+            if (titleMatch) score += 100;
+            if (tagsMatch) score += 50;
+            if (contentMatch) score += 25;
+            matches.push({
+                node,
+                plainContent,
+                titleMatch,
+                tagsMatch,
+                contentMatch,
+                score
+            });
+        }
+    }
+
+    matches.sort((a, b) => b.score - a.score);
+
+    dropdown.style.display = 'flex';
+    selectedSearchIndex = matches.length > 0 ? 0 : -1;
+
+    if (matches.length === 0) {
+        countEl.textContent = 'No Matches';
+        list.innerHTML = `<div class="search-no-results">No notes or nodes found matching "<strong>${escapeHtml(trimmed)}</strong>"</div>`;
+        return;
+    }
+
+    countEl.textContent = `Found in ${matches.length} note${matches.length === 1 ? '' : 's'}`;
+    list.innerHTML = '';
+
+    matches.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = `search-result-item ${index === 0 ? 'selected' : ''}`;
+        row.dataset.nodeId = item.node.id;
+        row.dataset.index = index;
+
+        const pathStr = getNodePathString(item.node.id);
+        const highlightedTitle = highlightMatchInText(item.node.title || 'Untitled Note', trimmed);
+        const snippetHtml = extractSearchSnippet(item.plainContent, trimmed);
+
+        row.innerHTML = `
+            <div class="search-result-top">
+                <span class="search-result-icon">${ICON_MAP[item.node.icon] || '📁'}</span>
+                <span class="search-result-title">${highlightedTitle}</span>
+                <span class="search-result-path">${escapeHtml(pathStr)}</span>
+            </div>
+            ${snippetHtml ? `<div class="search-result-snippet">${snippetHtml}</div>` : ''}
+        `;
+
+        row.onmousedown = (e) => {
+            e.preventDefault();
+            selectNode(item.node.id);
+            closeGlobalSearchDropdown();
+            highlightSearchMatchInEditor(trimmed);
+        };
+
+        list.appendChild(row);
+    });
+}
+
+function updateSelectedSearchItem(items) {
+    items.forEach((it, idx) => {
+        if (idx === selectedSearchIndex) {
+            it.classList.add('selected');
+            it.scrollIntoView({ block: 'nearest' });
+        } else {
+            it.classList.remove('selected');
+        }
+    });
+}
+
+function closeGlobalSearchDropdown() {
+    const dropdown = document.getElementById('search-results-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    selectedSearchIndex = -1;
+}
+
+function highlightSearchMatchInEditor(query) {
+    if (!query) return;
+    if (window.find) {
+        setTimeout(() => {
+            try {
+                window.find(query, false, false, true, false, false, false);
+            } catch (e) {}
+        }, 120);
+    }
+}
+
 // --- Tree Hierarchy Rendering ---
 function renderTree() {
     treeContainer.innerHTML = '';
@@ -800,14 +995,12 @@ function renderTree() {
         const children = childrenMap.get(parentId || '__root__') || [];
         for (const node of children) {
             if (state.searchQuery) {
-                const match = node.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-                              (node.tags && node.tags.toLowerCase().includes(state.searchQuery.toLowerCase())) ||
-                              (node.content && node.content.toLowerCase().includes(state.searchQuery.toLowerCase()));
+                const match = nodeMatchesQuery(node, state.searchQuery);
                 if (!match && !hasMatchingDescendant(node.id)) continue;
             }
 
             const hasKids = (childrenMap.get(node.id) || []).length > 0;
-            const isExpanded = state.expandedNodes.has(node.id) || !!state.searchQuery;
+            const isExpanded = state.expandedNodes.has(node.id) || (!!state.searchQuery && hasMatchingDescendant(node.id));
 
             const wrapper = document.createElement('div');
             wrapper.className = 'tree-node-wrapper';
@@ -839,10 +1032,27 @@ function renderTree() {
             icon.className = 'tree-icon';
             icon.textContent = ICON_MAP[node.icon] || '📁';
 
-            // Title Label
+            // Title Label with matching highlight
             const label = document.createElement('span');
             label.className = 'tree-label';
-            label.textContent = node.title || 'Untitled Note';
+            if (state.searchQuery) {
+                const q = normalizeQuery(state.searchQuery);
+                const titleMatched = normalizeQuery(node.title).includes(q);
+                if (titleMatched) {
+                    label.innerHTML = highlightMatchInText(node.title || 'Untitled Note', state.searchQuery);
+                } else {
+                    label.textContent = node.title || 'Untitled Note';
+                    if (nodeMatchesQuery(node, state.searchQuery)) {
+                        const contentBadge = document.createElement('span');
+                        contentBadge.className = 'tree-content-match-badge';
+                        contentBadge.textContent = 'text';
+                        contentBadge.title = 'Matched in note content';
+                        label.appendChild(contentBadge);
+                    }
+                }
+            } else {
+                label.textContent = node.title || 'Untitled Note';
+            }
             if (node.color) label.style.color = node.color;
 
             // Pin badge if pinned
@@ -893,7 +1103,7 @@ function renderTree() {
     function hasMatchingDescendant(id) {
         const kids = childrenMap.get(id) || [];
         for (const k of kids) {
-            if (k.title.toLowerCase().includes(state.searchQuery.toLowerCase())) return true;
+            if (nodeMatchesQuery(k, state.searchQuery)) return true;
             if (hasMatchingDescendant(k.id)) return true;
         }
         return false;
@@ -2471,8 +2681,7 @@ function renderTagChips(tagsString = '') {
             const searchInput = document.getElementById('global-search');
             if (searchInput) {
                 searchInput.value = tag;
-                state.searchQuery = tag;
-                renderTree();
+                performGlobalSearch(tag);
             }
         };
 
@@ -3147,11 +3356,61 @@ function setupEventListeners() {
         }
     });
 
-    // Search
+    // Deep Global Search across All Notes, Nodes & Content
     const searchInput = document.getElementById('global-search');
-    searchInput.addEventListener('input', (e) => {
-        state.searchQuery = e.target.value;
-        renderTree();
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            performGlobalSearch(e.target.value);
+        });
+
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.trim()) {
+                performGlobalSearch(searchInput.value);
+            }
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            const dropdown = document.getElementById('search-results-dropdown');
+            const list = document.getElementById('search-results-list');
+            if (!dropdown || dropdown.style.display === 'none') {
+                if (e.key === 'Enter') {
+                    performGlobalSearch(searchInput.value);
+                }
+                return;
+            }
+
+            const items = list.querySelectorAll('.search-result-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (items.length > 0) {
+                    selectedSearchIndex = (selectedSearchIndex + 1) % items.length;
+                    updateSelectedSearchItem(items);
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (items.length > 0) {
+                    selectedSearchIndex = (selectedSearchIndex - 1 + items.length) % items.length;
+                    updateSelectedSearchItem(items);
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (items.length > 0 && selectedSearchIndex >= 0 && selectedSearchIndex < items.length) {
+                    const targetId = items[selectedSearchIndex].dataset.nodeId;
+                    selectNode(targetId);
+                    closeGlobalSearchDropdown();
+                    highlightSearchMatchInEditor(searchInput.value.trim());
+                }
+            } else if (e.key === 'Escape') {
+                closeGlobalSearchDropdown();
+            }
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        const searchBox = document.querySelector('.header-center');
+        if (searchBox && !searchBox.contains(e.target)) {
+            closeGlobalSearchDropdown();
+        }
     });
 
     // Global keyboard shortcuts
@@ -3160,6 +3419,7 @@ function setupEventListeners() {
 
         if (e.key === 'Escape') {
             closeTreeContextMenu();
+            closeGlobalSearchDropdown();
         }
         if (isCtrl && e.key.toLowerCase() === 'f') {
             e.preventDefault();
@@ -3167,7 +3427,13 @@ function setupEventListeners() {
         }
         if (isCtrl && e.key.toLowerCase() === 'k') {
             e.preventDefault();
-            searchInput.focus();
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+                if (searchInput.value.trim()) {
+                    performGlobalSearch(searchInput.value);
+                }
+            }
         }
         if (e.altKey && e.key === 'ArrowUp') {
             e.preventDefault();
