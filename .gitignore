@@ -7,6 +7,11 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 
+# Environment & Logs
+.env
+.env.*
+*.log
+
 # OS files
 .DS_Store
 Thumbs.db
