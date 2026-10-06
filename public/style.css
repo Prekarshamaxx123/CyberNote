@@ -625,6 +625,34 @@ body {
     white-space: nowrap;
 }
 
+.btn-header-login {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: var(--bg-toolbar);
+    border: 1px solid var(--border-color);
+    padding: 3px 10px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+.btn-header-login:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(137, 180, 250, 0.2);
+}
+
+.btn-header-login svg {
+    flex-shrink: 0;
+}
+
 .drive-sync-indicator {
     font-size: 0.85rem;
 }
