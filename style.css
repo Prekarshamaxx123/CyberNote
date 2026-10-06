@@ -719,17 +719,27 @@ body {
 }
 
 .tree-password-badge {
+    margin-left: 4px;
+    margin-right: 4px;
+    color: #f9e2af;
+    background: rgba(249, 226, 175, 0.15);
+    border: 1px solid rgba(249, 226, 175, 0.35);
+    border-radius: 4px;
+    padding: 1px 4px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: 4px;
     flex-shrink: 0;
     cursor: pointer;
     vertical-align: middle;
+    transition: all 0.16s ease;
 }
 
 .tree-password-badge:hover {
+    background: rgba(249, 226, 175, 0.35);
+    border-color: #f9e2af;
     transform: scale(1.15);
+    box-shadow: 0 0 6px rgba(249, 226, 175, 0.4);
 }
 
 .shake {
