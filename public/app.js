@@ -138,6 +138,11 @@ const state = {
     }
 };
 
+// Global delta & cache collections
+const nodeSaveTimers = new Map();
+const nodePendingPatches = new Map();
+const driveFileIdCache = new Map();
+
 // --- DOM References ---
 const treeContainer = document.getElementById('tree-container');
 const noteView = document.getElementById('note-view');
@@ -452,12 +457,14 @@ function initGoogleAuth() {
 
 function updateGoogleUserUI() {
     const btnHeaderLogin = document.getElementById('btn-header-login');
+    const btnHeaderSignout = document.getElementById('btn-header-signout');
     const btnSignout = document.getElementById('btn-drive-signout');
 
     if (state.googleUser && state.googleAccessToken) {
         // Connected State
         if (btnHeaderLogin) btnHeaderLogin.style.display = 'none';
         if (btnGoogleLogin) btnGoogleLogin.style.display = 'none';
+        if (btnHeaderSignout) btnHeaderSignout.style.display = 'inline-flex';
         if (userProfileBadge) {
             userProfileBadge.style.display = 'inline-flex';
             if (userAvatar) userAvatar.src = state.googleUser.picture || '';
@@ -469,6 +476,7 @@ function updateGoogleUserUI() {
         // Disconnected / Logged Out State
         if (btnHeaderLogin) btnHeaderLogin.style.display = 'inline-flex';
         if (btnGoogleLogin) btnGoogleLogin.style.display = 'inline-flex';
+        if (btnHeaderSignout) btnHeaderSignout.style.display = 'none';
         if (userProfileBadge) userProfileBadge.style.display = 'none';
         if (userName) userName.textContent = 'Guest';
         if (userAvatar) userAvatar.src = '';
@@ -564,32 +572,138 @@ async function fetchGoogleUserProfile() {
     }
 }
 
-function signoutGoogle() {
+function clearAllLocalNotesData() {
+    // 1. Clear active debounce timers
+    if (state.driveSaveTimer) {
+        clearTimeout(state.driveSaveTimer);
+        state.driveSaveTimer = null;
+    }
+    if (state.saveTimer) {
+        clearTimeout(state.saveTimer);
+        state.saveTimer = null;
+    }
+    if (typeof localBackupSaveTimer !== 'undefined' && localBackupSaveTimer) {
+        clearTimeout(localBackupSaveTimer);
+        localBackupSaveTimer = null;
+    }
+    if (typeof nodeSaveTimers !== 'undefined' && nodeSaveTimers) {
+        for (const timer of nodeSaveTimers.values()) {
+            clearTimeout(timer);
+        }
+        nodeSaveTimers.clear();
+    }
+    if (typeof nodePendingPatches !== 'undefined' && nodePendingPatches) {
+        nodePendingPatches.clear();
+    }
+    if (typeof editorHistory !== 'undefined' && editorHistory) {
+        if (editorHistory.debounceTimer) clearTimeout(editorHistory.debounceTimer);
+        editorHistory.stack = [];
+        editorHistory.index = -1;
+        editorHistory.currentNoteId = null;
+        if (typeof updateUndoRedoUI === 'function') updateUndoRedoUI();
+    }
+
+    // 2. Clear in-memory node state collections
+    state.nodes.clear();
+    state.activeNodeId = null;
+    state.unlockedNotes.clear();
+    state.expandedNodes.clear();
+    if (state.deletedNodeIds) state.deletedNodeIds.clear();
+    if (state.pendingUploadNodeIds) state.pendingUploadNodeIds.clear();
+    if (typeof driveFileIdCache !== 'undefined' && driveFileIdCache) {
+        driveFileIdCache.clear();
+    }
+    state.driveFolderId = null;
+    state.isSyncing = false;
+
+    // 3. Clear all related localStorage entries
+    localStorage.removeItem('cybernote_active');
+    localStorage.removeItem('cybernote_local_raw_nodes');
+    localStorage.removeItem('cybernote_local_db');
+    localStorage.removeItem('cybernote_drive_folder_id');
+    localStorage.removeItem('cybernote_pending_uploads');
+    localStorage.removeItem('cybernote_last_drive_sync');
+    localStorage.removeItem('cybernote_deleted_nodes');
+    localStorage.removeItem('cybernote_expanded');
+    localStorage.removeItem('treekeep_active');
+    localStorage.removeItem('treekeep_local_db');
+    localStorage.removeItem('treekeep_expanded');
+
+    try {
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('cybernote_node_') || key.startsWith('treekeep_node_'))) {
+                toRemove.push(key);
+            }
+        }
+        for (const k of toRemove) {
+            localStorage.removeItem(k);
+        }
+    } catch (e) {
+        console.warn('Error clearing localStorage note keys:', e);
+    }
+
+    // 4. Reset Editor & UI elements
+    if (noteTitleInput) noteTitleInput.value = '';
+    if (noteEditor) noteEditor.innerHTML = '';
+    if (noteTagsInput) noteTagsInput.value = '';
+    renderTagChips('');
+
+    selectNode(null);
+    renderTree();
+
+    if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
+        renderAllNotesView();
+    }
+}
+
+async function signoutGoogle() {
     clearTimeout(tokenRefreshTimer);
+    if (state.driveSaveTimer) {
+        clearTimeout(state.driveSaveTimer);
+        state.driveSaveTimer = null;
+    }
+
     const token = state.googleAccessToken;
-    if (token && window.google?.accounts?.oauth2?.revoke) {
+    if (token) {
         try {
-            google.accounts.oauth2.revoke(token, () => {
-                console.log('Google OAuth token revoked on signout');
-            });
-        } catch (e) {
-            console.warn('Revoke token error:', e);
+            if (state.activeNodeId) {
+                flushEditorToState();
+                await uploadSingleNodeToDrive(state.activeNodeId, true).catch(() => {});
+            }
+        } catch (e) {}
+
+        if (window.google?.accounts?.oauth2?.revoke) {
+            try {
+                google.accounts.oauth2.revoke(token, () => {
+                    console.log('Google OAuth token revoked on signout');
+                });
+            } catch (e) {
+                console.warn('Revoke token error:', e);
+            }
         }
     }
+
     if (window.google?.accounts?.id?.disableAutoSelect) {
         try {
             window.google.accounts.id.disableAutoSelect();
         } catch (e) {}
     }
+
     state.googleAccessToken = null;
     state.googleUser = null;
     localStorage.removeItem('cybernote_google_token');
     localStorage.removeItem('cybernote_google_token_expiry');
     localStorage.removeItem('cybernote_user');
+
+    // Completely wipe all local notes so another user or account cannot see or backup them!
+    clearAllLocalNotesData();
+
     updateGoogleUserUI();
     closeDriveModal();
     setSyncStatus('live', 'Signed out from Google Drive');
-    showToast('Signed out from Google Account', 'info');
+    showToast('Signed out. Local notes cleared.', 'info');
 }
 
 // --- Cloud Sync Animation Overlay Controller ---
@@ -682,8 +796,7 @@ function markNodeDeleted(nodeId) {
 // Files:  'cn_{nodeId}.json' for each note
 // ============================================================
 
-// Memory cache of Drive file IDs: nodeId -> fileId
-const driveFileIdCache = new Map();
+// Memory cache of Drive file IDs: nodeId -> fileId (initialized above)
 
 // Flush current editor content into state.nodes immediately before any Drive op
 function flushEditorToState() {
@@ -1139,12 +1252,17 @@ async function downloadAllNotesFromDrive(silent = false) {
         const driveFiles = await listDriveCyberNoteFiles(folderId);
 
         if (driveFiles.length === 0) {
-            setSyncStatus('live', 'Drive has no notes yet');
+            setSyncStatus('live', 'Drive connected (0 notes)');
             if (!silent) {
-                if (logDiv) logDiv.innerHTML = `<span style="color:var(--text-muted);">No notes found on Google Drive. Save some notes first!</span>`;
+                if (logDiv) logDiv.innerHTML = `<span style="color:var(--text-muted);">No notes found in Google Drive CyberNote folder yet.</span>`;
                 hideSyncOverlay();
             }
-            showToast('No notes in Drive yet. Use Save to upload first.');
+            if (state.nodes.size === 0) {
+                seedDefaultLocalNotes();
+                renderTree();
+                selectNode('welcome-root');
+            }
+            showToast('Google Drive connected! Notebook ready.');
             state.isSyncing = false;
             return;
         }
@@ -1196,6 +1314,9 @@ async function downloadAllNotesFromDrive(silent = false) {
         if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
             const isUserTyping = (document.activeElement === noteEditor || document.activeElement === noteTitleInput);
             if (!isUserTyping) selectNode(state.activeNodeId);
+        } else if (state.nodes.size > 0) {
+            const firstId = state.nodes.keys().next().value;
+            selectNode(firstId);
         }
 
         state.lastDriveSyncTime = Date.now();
@@ -1247,6 +1368,7 @@ async function syncWithGoogleDrive({ silent = false, forcePull = false, forcePus
 }
 
 async function autoRestoreFromDriveOnSignIn() {
+    clearAllLocalNotesData();
     return downloadAllNotesFromDrive(false);
 }
 
@@ -2920,8 +3042,7 @@ function updateBreadcrumbs(id) {
 }
 
 // --- Delta Sync Logic with Transparent On-The-Fly GZIP Compression ---
-const nodeSaveTimers = new Map();
-const nodePendingPatches = new Map();
+// (nodeSaveTimers & nodePendingPatches initialized at top)
 
 async function sendDeltaPatch(nodeId, partialUpdate) {
     if (!nodeId) return;
@@ -7178,6 +7299,8 @@ function setupEventListeners() {
     // Google Sign-In & Settings Hub
     const btnHeaderLogin = document.getElementById('btn-header-login');
     if (btnHeaderLogin) btnHeaderLogin.onclick = requestGoogleLogin;
+    const btnHeaderSignout = document.getElementById('btn-header-signout');
+    if (btnHeaderSignout) btnHeaderSignout.onclick = signoutGoogle;
     if (btnGoogleLogin) btnGoogleLogin.onclick = requestGoogleLogin;
     if (userProfileBadge) userProfileBadge.onclick = () => openSettingsModal('tab-gdrive');
     const btnOpenSettings = document.getElementById('btn-open-settings');
