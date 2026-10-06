@@ -6849,6 +6849,7 @@ function hideFloatingToolbars() {
     if (imageToolbar) imageToolbar.style.display = 'none';
     hideTableResizeOverlay();
     hideImageToolbar();
+    closeEditorContextMenu();
 }
 
 // --- Canvas Auto-Crop & Transparency Helpers ---
@@ -8264,6 +8265,545 @@ function saveGitHubSettingsFromTab() {
     connectAndSyncGitHub();
 }
 
+// ==========================================================================
+// SMART TAB ENGINE (Column Tab Stops, Table Navigation & Multi-line Indent)
+// ==========================================================================
+function getCursorLineColumnOffset(range) {
+    try {
+        let block = range.startContainer;
+        while (block && block !== noteEditor) {
+            if (block.nodeType === 1) {
+                const disp = window.getComputedStyle(block).display;
+                if (disp === 'block' || disp === 'flex' || disp === 'table-row' || disp === 'table-cell' || disp === 'list-item') {
+                    break;
+                }
+            }
+            block = block.parentElement;
+        }
+        if (!block) block = noteEditor;
+
+        const preRange = document.createRange();
+        preRange.selectNodeContents(block);
+        preRange.setEnd(range.startContainer, range.startOffset);
+
+        const text = preRange.toString();
+        const lastNl = Math.max(text.lastIndexOf('\n'), text.lastIndexOf('\r'));
+        const lineText = lastNl >= 0 ? text.slice(lastNl + 1) : text;
+
+        let col = 0;
+        for (let i = 0; i < lineText.length; i++) {
+            if (lineText[i] === '\t') {
+                col += (8 - (col % 8));
+            } else {
+                col += 1;
+            }
+        }
+        return col;
+    } catch (err) {
+        console.warn('Tab column calculation fallback:', err);
+        return 0;
+    }
+}
+
+function focusCell(cell) {
+    if (!cell) return;
+    const editableTarget = cell.querySelector('.cyber-term-pill') || cell;
+    const range = document.createRange();
+    const sel = window.getSelection();
+    range.selectNodeContents(editableTarget);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    editableTarget.focus();
+}
+
+function handleCellTabNavigation(currentCell, isShift) {
+    const container = currentCell.closest('.cyber-aligned-columns, table');
+    if (!container) return;
+
+    const cells = Array.from(container.querySelectorAll('.aligned-cell, td, th')).filter(el => {
+        return !el.classList.contains('aligned-col-sep');
+    });
+    const currentIndex = cells.indexOf(currentCell);
+
+    if (currentIndex === -1) return;
+
+    if (isShift) {
+        if (currentIndex > 0) {
+            focusCell(cells[currentIndex - 1]);
+        }
+    } else {
+        if (currentIndex < cells.length - 1) {
+            focusCell(cells[currentIndex + 1]);
+        } else {
+            // Append a new row at the bottom
+            if (container.classList.contains('cyber-aligned-columns')) {
+                const newRow = document.createElement('div');
+                newRow.className = 'aligned-row';
+                newRow.innerHTML = `
+                    <div class="aligned-cell aligned-col-term" contenteditable="true"><span class="cyber-term-pill">cmd</span></div>
+                    <div class="aligned-cell aligned-col-sep" contenteditable="false">—</div>
+                    <div class="aligned-cell aligned-col-desc" contenteditable="true">description</div>
+                `;
+                container.appendChild(newRow);
+                handleEditorInput();
+                const termCell = newRow.querySelector('.aligned-col-term');
+                if (termCell) focusCell(termCell);
+            } else if (container.tagName === 'TABLE') {
+                const row = currentCell.closest('tr');
+                if (row && row.parentElement) {
+                    const colCount = row.children.length;
+                    const newTr = document.createElement('tr');
+                    for (let c = 0; c < colCount; c++) {
+                        const newTd = document.createElement('td');
+                        newTd.innerHTML = '&nbsp;';
+                        newTr.appendChild(newTd);
+                    }
+                    row.parentElement.appendChild(newTr);
+                    handleEditorInput();
+                    focusCell(newTr.children[0]);
+                }
+            }
+        }
+    }
+}
+
+function handleMultiLineTabIndent(range, isShift) {
+    const selectedText = range.toString();
+    const lines = selectedText.split('\n');
+    let modifiedLines;
+
+    if (isShift) {
+        modifiedLines = lines.map(line => {
+            if (line.startsWith('\t')) return line.slice(1);
+            if (line.startsWith('    ')) return line.slice(4);
+            return line.replace(/^ {1,3}/, '');
+        });
+    } else {
+        modifiedLines = lines.map(line => '    ' + line);
+    }
+
+    const newText = modifiedLines.join('\n');
+    document.execCommand('insertText', false, newText);
+    handleEditorInput();
+}
+
+function handleEditorTabKey(e) {
+    if (state.isReadOnly) return;
+
+    // Handle Enter inside .aligned-cell to insert new aligned row
+    if (e.key === 'Enter' && !e.shiftKey) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const currentCell = range.startContainer.parentElement?.closest('.aligned-cell');
+            if (currentCell) {
+                e.preventDefault();
+                const currentRow = currentCell.closest('.aligned-row');
+                const container = currentCell.closest('.cyber-aligned-columns');
+                if (currentRow && container) {
+                    const newRow = document.createElement('div');
+                    newRow.className = 'aligned-row';
+                    newRow.innerHTML = `
+                        <div class="aligned-cell aligned-col-term" contenteditable="true"><span class="cyber-term-pill">cmd</span></div>
+                        <div class="aligned-cell aligned-col-sep" contenteditable="false">—</div>
+                        <div class="aligned-cell aligned-col-desc" contenteditable="true">description</div>
+                    `;
+                    currentRow.after(newRow);
+                    handleEditorInput();
+                    const firstCell = newRow.querySelector('.aligned-col-term');
+                    if (firstCell) focusCell(firstCell);
+                    return;
+                }
+            }
+        }
+    }
+
+    if (e.key !== 'Tab') return;
+
+    e.preventDefault();
+
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+
+    // 1. Table or Aligned Column cell navigation
+    const currentCell = range.startContainer.parentElement?.closest('.aligned-cell, td, th');
+    if (currentCell) {
+        handleCellTabNavigation(currentCell, e.shiftKey);
+        return;
+    }
+
+    // 2. Multi-line selection: indent or outdent
+    if (!range.collapsed && range.toString().includes('\n')) {
+        handleMultiLineTabIndent(range, e.shiftKey);
+        return;
+    }
+
+    // 3. Shift+Tab on single line
+    if (e.shiftKey) {
+        document.execCommand('outdent');
+        handleEditorInput();
+        return;
+    }
+
+    // 4. Normal Tab key: Smart Column Tab Stop snapping (8-character tab stops)
+    const col = getCursorLineColumnOffset(range);
+    const tabStop = 8;
+    const spacesNeeded = tabStop - (col % tabStop);
+    const spaceStr = '&nbsp;'.repeat(spacesNeeded);
+
+    document.execCommand('insertHTML', false, spaceStr);
+    handleEditorInput();
+}
+
+// ==========================================================================
+// AUTO STYLE ENGINE (Smart Column Alignment, Command Badges & Grid Tables)
+// ==========================================================================
+function extractLinesFromRangeOrElement(range) {
+    if (!range) return [];
+    try {
+        const fragment = range.cloneContents();
+        const tempDiv = document.createElement('div');
+        tempDiv.appendChild(fragment);
+
+        tempDiv.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode('\n')));
+        tempDiv.querySelectorAll('div, p, li, tr').forEach(block => {
+            block.prepend(document.createTextNode('\n'));
+        });
+
+        const rawText = tempDiv.textContent || tempDiv.innerText || '';
+        const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length > 0) return lines;
+    } catch (e) {
+        console.warn('extractLinesFromRangeOrElement error, using fallback:', e);
+    }
+    return range.toString().split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+}
+
+function parseTextForAutoStyle(text) {
+    if (!text) return [];
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    const rows = [];
+
+    for (const line of lines) {
+        // 1. Check for ' - ' or ' — ' or ' – '
+        const dashMatch = line.match(/^([^\s—–\-].*?)\s+([—–\-])\s+(.*)$/);
+        if (dashMatch) {
+            rows.push({ term: dashMatch[1].trim(), sep: '—', desc: dashMatch[3].trim() });
+            continue;
+        }
+
+        // 2. Check for ' -> ' or ' => '
+        const arrowMatch = line.match(/^([^\s\-=>].*?)\s+(->|=>)\s+(.*)$/);
+        if (arrowMatch) {
+            rows.push({ term: arrowMatch[1].trim(), sep: '→', desc: arrowMatch[3].trim() });
+            continue;
+        }
+
+        // 3. Check for ' : ' or ':'
+        const colonMatch = line.match(/^([^:]+?)\s*:\s*(.*)$/);
+        if (colonMatch) {
+            rows.push({ term: colonMatch[1].trim(), sep: ':', desc: colonMatch[2].trim() });
+            continue;
+        }
+
+        // 4. Check for ' = '
+        const eqMatch = line.match(/^([^=]+?)\s*=\s*(.*)$/);
+        if (eqMatch) {
+            rows.push({ term: eqMatch[1].trim(), sep: '=', desc: eqMatch[2].trim() });
+            continue;
+        }
+
+        // 5. Check for tab '\t'
+        if (line.includes('\t')) {
+            const parts = line.split('\t').map(p => p.trim()).filter(p => p.length > 0);
+            if (parts.length >= 2) {
+                rows.push({ term: parts[0], sep: '—', desc: parts.slice(1).join(' ') });
+                continue;
+            }
+        }
+
+        // 6. Check for multiple consecutive spaces (2 or more spaces)
+        const multiSpaceMatch = line.match(/^(\S.*?)\s{2,}(.*)$/);
+        if (multiSpaceMatch) {
+            rows.push({ term: multiSpaceMatch[1].trim(), sep: '—', desc: multiSpaceMatch[2].trim() });
+            continue;
+        }
+
+        // 7. Single space separator or single word
+        const firstSpaceIdx = line.indexOf(' ');
+        if (firstSpaceIdx > 0) {
+            rows.push({ term: line.slice(0, firstSpaceIdx).trim(), sep: '—', desc: line.slice(firstSpaceIdx + 1).trim() });
+        } else {
+            rows.push({ term: line, sep: '—', desc: '' });
+        }
+    }
+
+    return rows;
+}
+
+function generateSmartColumnsHtml(rows) {
+    let rowsHtml = '';
+    for (const r of rows) {
+        const safeTerm = escapeHtml(r.term);
+        const safeSep = escapeHtml(r.sep || '—');
+        const safeDesc = escapeHtml(r.desc || '');
+        rowsHtml += `
+            <div class="aligned-row">
+                <div class="aligned-cell aligned-col-term" contenteditable="true"><span class="cyber-term-pill">${safeTerm}</span></div>
+                <div class="aligned-cell aligned-col-sep" contenteditable="false">${safeSep}</div>
+                <div class="aligned-cell aligned-col-desc" contenteditable="true">${safeDesc}</div>
+            </div>`;
+    }
+    return `<div class="cyber-aligned-columns" contenteditable="true">${rowsHtml}</div><p><br></p>`;
+}
+
+function generateBadgesHtml(rows) {
+    let rowsHtml = '';
+    for (const r of rows) {
+        const safeTerm = escapeHtml(r.term);
+        const safeSep = r.sep === '→' ? '→' : '→';
+        const safeDesc = escapeHtml(r.desc || '');
+        rowsHtml += `
+            <div class="ref-badge-row">
+                <code class="ref-badge-code" contenteditable="true">${safeTerm}</code>
+                <span class="ref-badge-arrow" contenteditable="false">${safeSep}</span>
+                <span class="ref-badge-desc" contenteditable="true">${safeDesc}</span>
+            </div>`;
+    }
+    return `<div class="cyber-ref-badges" contenteditable="true">${rowsHtml}</div><p><br></p>`;
+}
+
+function generateTableHtml(rows) {
+    let rowsHtml = '';
+    for (const r of rows) {
+        const safeTerm = escapeHtml(r.term);
+        const safeDesc = escapeHtml(r.desc || '');
+        rowsHtml += `
+            <tr>
+                <td style="font-weight: 600;"><code>${safeTerm}</code></td>
+                <td>${safeDesc}</td>
+            </tr>`;
+    }
+    return `
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Command / Term</th>
+                    <th>Description / Details</th>
+                </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+        </table><p><br></p>`;
+}
+
+function generateCodeBoxHtml(rows) {
+    const maxTermLen = Math.max(...rows.map(r => r.term.length), 4);
+    let codeText = '';
+    for (const r of rows) {
+        const paddedTerm = r.term.padEnd(maxTermLen + 2, ' ');
+        const sep = r.sep || '—';
+        codeText += `${paddedTerm}${sep}  ${r.desc}\n`;
+    }
+    const safeCode = escapeHtml(codeText.trimEnd());
+    return `
+        <div class="code-box">
+            <div class="code-box-header">
+                <span>TERMINAL REFERENCE</span>
+                <button class="btn-copy-code" onclick="copyCodeBoxContent(this)">Copy</button>
+            </div>
+            <pre contenteditable="true">${safeCode}</pre>
+        </div><p><br></p>`;
+}
+
+function applyAutoStyle(mode = 'smart') {
+    if (state.isReadOnly) {
+        showToast('🔒 Editor is in Read-Only mode');
+        return;
+    }
+
+    const sel = window.getSelection();
+    let targetRange = null;
+
+    if (savedEditorRange) {
+        targetRange = savedEditorRange;
+    } else if (sel && sel.rangeCount > 0 && noteEditor.contains(sel.anchorNode)) {
+        targetRange = sel.getRangeAt(0);
+    }
+
+    let lines = [];
+    if (targetRange && !targetRange.collapsed) {
+        lines = extractLinesFromRangeOrElement(targetRange);
+    } else if (targetRange) {
+        let block = targetRange.startContainer;
+        while (block && block !== noteEditor) {
+            if (block.nodeType === 1 && (block.tagName === 'P' || block.tagName === 'DIV' || block.tagName === 'PRE' || block.tagName === 'LI')) {
+                break;
+            }
+            block = block.parentElement;
+        }
+        if (block && block !== noteEditor) {
+            targetRange = document.createRange();
+            targetRange.selectNode(block);
+            lines = extractLinesFromRangeOrElement(targetRange);
+        }
+    }
+
+    if (!lines || lines.length === 0) {
+        showToast('ℹ️ Please select lines to Auto Style');
+        return;
+    }
+
+    // Save snapshot to history for instant Undo (Ctrl+Z)
+    pushHistorySnapshot(true);
+
+    const parsedRows = [];
+    for (const line of lines) {
+        const rows = parseTextForAutoStyle(line);
+        if (rows.length) parsedRows.push(...rows);
+    }
+
+    if (parsedRows.length === 0) {
+        showToast('⚠️ No content could be aligned');
+        return;
+    }
+
+    let generatedHtml = '';
+    if (mode === 'smart') {
+        generatedHtml = generateSmartColumnsHtml(parsedRows);
+    } else if (mode === 'badges') {
+        generatedHtml = generateBadgesHtml(parsedRows);
+    } else if (mode === 'table') {
+        generatedHtml = generateTableHtml(parsedRows);
+    } else if (mode === 'codebox') {
+        generatedHtml = generateCodeBoxHtml(parsedRows);
+    }
+
+    // Restore target range before execCommand
+    if (targetRange) {
+        sel.removeAllRanges();
+        sel.addRange(targetRange);
+    }
+
+    document.execCommand('insertHTML', false, generatedHtml);
+    handleEditorInput();
+    pushHistorySnapshot(true);
+    savedEditorRange = null;
+
+    showToast(`✨ Auto Style (${mode}) applied!`);
+}
+
+// ==========================================================================
+// EDITOR CONTEXT MENU (Right-Click Auto Style & Clipboard)
+// ==========================================================================
+let savedEditorRange = null;
+
+function setupEditorContextMenu() {
+    const editorMenu = document.getElementById('editor-context-menu');
+    if (!editorMenu) return;
+
+    noteEditor.addEventListener('contextmenu', (e) => {
+        if (state.isReadOnly) return;
+        if (e.target.closest('img')) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        closeTreeContextMenu();
+
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && noteEditor.contains(sel.anchorNode)) {
+            savedEditorRange = sel.getRangeAt(0).cloneRange();
+        } else {
+            savedEditorRange = null;
+        }
+
+        editorMenu.style.display = 'flex';
+        const menuWidth = editorMenu.offsetWidth || 230;
+        const menuHeight = editorMenu.offsetHeight || 280;
+
+        let x = e.clientX;
+        let y = e.clientY;
+
+        if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 12;
+        if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 12;
+
+        editorMenu.style.left = `${Math.max(10, x)}px`;
+        editorMenu.style.top = `${Math.max(10, y)}px`;
+    });
+
+    const bindCtx = (id, fn) => {
+        const el = document.getElementById(id);
+        if (el) el.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeEditorContextMenu();
+            fn();
+        };
+    };
+
+    bindCtx('ctx-editor-autostyle-smart', () => applyAutoStyle('smart'));
+    bindCtx('ctx-editor-autostyle-badges', () => applyAutoStyle('badges'));
+    bindCtx('ctx-editor-autostyle-table', () => applyAutoStyle('table'));
+    bindCtx('ctx-editor-autostyle-codebox', () => applyAutoStyle('codebox'));
+
+    bindCtx('ctx-editor-cut', () => {
+        if (savedEditorRange) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedEditorRange);
+        }
+        document.execCommand('cut');
+        handleEditorInput();
+    });
+
+    bindCtx('ctx-editor-copy', () => {
+        if (savedEditorRange) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedEditorRange);
+        }
+        document.execCommand('copy');
+        showToast('📋 Copied to clipboard');
+    });
+
+    bindCtx('ctx-editor-paste', async () => {
+        if (savedEditorRange) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedEditorRange);
+        }
+        try {
+            if (navigator.clipboard && navigator.clipboard.readText) {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    document.execCommand('insertText', false, text);
+                    handleEditorInput();
+                    showToast('📝 Pasted from clipboard');
+                    return;
+                }
+            }
+        } catch (err) {
+            // fallback
+        }
+        document.execCommand('paste');
+        handleEditorInput();
+    });
+
+    bindCtx('ctx-editor-select-all', () => {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(noteEditor);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    });
+}
+
+function closeEditorContextMenu() {
+    const editorMenu = document.getElementById('editor-context-menu');
+    if (editorMenu) editorMenu.style.display = 'none';
+}
+
 // --- Setup All Event Listeners ---
 function setupEventListeners() {
     // Theme toggle
@@ -8519,15 +9059,8 @@ function setupEventListeners() {
     noteEditor.addEventListener('input', handleEditorInput);
     noteEditor.addEventListener('paste', handleClipboardPaste);
 
-    // Tab key indent in editor
-    noteEditor.addEventListener('keydown', (e) => {
-        if (state.isReadOnly) return;
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
-            handleEditorInput();
-        }
-    });
+    // Tab & Enter key handling in editor (Smart Column Tab Stop, Table Navigation & Multi-line Indent)
+    noteEditor.addEventListener('keydown', handleEditorTabKey);
 
     // Undo / Redo (Targets all undo/redo buttons in header and ribbon)
     document.querySelectorAll('.btn-undo-target, #btn-undo, #btn-header-undo, #btn-ribbon-undo').forEach(btn => {
@@ -8720,6 +9253,9 @@ function setupEventListeners() {
         if (!e.target.closest('#tree-context-menu')) {
             closeTreeContextMenu();
         }
+        if (!e.target.closest('#editor-context-menu')) {
+            closeEditorContextMenu();
+        }
     });
 
     document.addEventListener('click', (e) => {
@@ -8729,18 +9265,26 @@ function setupEventListeners() {
         if (!e.target.closest('#tree-context-menu')) {
             closeTreeContextMenu();
         }
+        if (!e.target.closest('#editor-context-menu')) {
+            closeEditorContextMenu();
+        }
     });
 
-    window.addEventListener('resize', closeAllRibbonPopovers);
-    window.addEventListener('scroll', (e) => {
-        if (e.target && e.target.closest && e.target.closest('.ribbon-popover-menu')) return;
+    window.addEventListener('resize', () => {
         closeAllRibbonPopovers();
+        closeEditorContextMenu();
+    });
+    window.addEventListener('scroll', (e) => {
+        if (e.target && e.target.closest && e.target.closest('.ribbon-popover-menu, #editor-context-menu')) return;
+        closeAllRibbonPopovers();
+        closeEditorContextMenu();
     }, true);
 
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeAllRibbonPopovers();
             closeTreeContextMenu();
+            closeEditorContextMenu();
         }
     });
 
@@ -9068,6 +9612,10 @@ function setupEventListeners() {
         if (ctxMenu && ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) {
             closeTreeContextMenu();
         }
+        const editorCtxMenu = document.getElementById('editor-context-menu');
+        if (editorCtxMenu && editorCtxMenu.style.display !== 'none' && !editorCtxMenu.contains(e.target)) {
+            closeEditorContextMenu();
+        }
     });
 
     // Deep Global Search across All Notes, Nodes & Content
@@ -9133,6 +9681,7 @@ function setupEventListeners() {
 
         if (e.key === 'Escape') {
             closeTreeContextMenu();
+            closeEditorContextMenu();
             closeGlobalSearchDropdown();
         }
         if (isCtrl && e.key.toLowerCase() === 'f') {
@@ -9195,6 +9744,7 @@ function setupEventListeners() {
 
     setupSelectionBubble();
     setupSlashCommandMenu();
+    setupEditorContextMenu();
 }
 
 // ==========================================================================
@@ -9273,6 +9823,7 @@ function setupSelectionBubble() {
     bindBubbleBtn('bubble-h2', () => handleHeadingChange('h2'));
     bindBubbleBtn('bubble-quote', () => execFormat('formatBlock', '<blockquote>'));
     bindBubbleBtn('bubble-link', () => insertHyperlink());
+    bindBubbleBtn('bubble-auto-style', () => applyAutoStyle('smart'));
 
     const bubbleTextColor = document.getElementById('bubble-text-color');
     if (bubbleTextColor) {
@@ -9299,6 +9850,14 @@ const slashMenu = document.getElementById('slash-menu');
 const slashItemsList = document.getElementById('slash-items-list');
 
 const SLASH_COMMANDS = [
+    {
+        id: 'autostyle',
+        icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+        name: 'Auto Style (Smart Align Columns)',
+        desc: 'Format text into laser-aligned columns, commands, or reference list',
+        action: () => applyAutoStyle('smart'),
+        keywords: ['autostyle', 'align', 'format', 'columns', 'pretty', 'style', 'table']
+    },
     {
         id: 'paint',
         icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>',
