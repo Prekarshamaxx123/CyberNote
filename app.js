@@ -560,6 +560,7 @@ function clearAllLocalNotesData() {
     }
     state.driveFolderId = null;
     state.isSyncing = false;
+    if (typeof idbClearAll === 'function') idbClearAll();
 
     // 3. Clear all related localStorage entries
     localStorage.removeItem('cybernote_active');
@@ -733,6 +734,8 @@ function markNodeDeleted(nodeId) {
         localStorage.removeItem(`cybernote_node_${nodeId}`);
         localStorage.setItem('cybernote_deleted_nodes', JSON.stringify(Array.from(state.deletedNodeIds).slice(-500)));
     } catch (e) {}
+    if (typeof idbDeleteNote === 'function') idbDeleteNote(nodeId);
+    if (typeof idbEnqueueSync === 'function') idbEnqueueSync(nodeId, 'delete');
 }
 
 // --- True Two-Way Cloud Sync with Google Drive (Multi-Device Auto-Sync) ---
@@ -1247,6 +1250,7 @@ async function uploadPendingNotesToDrive() {
             if (node) {
                 await uploadNodeToDrive(folderId, node);
                 state.pendingUploadNodeIds.delete(nodeId);
+                if (typeof idbDequeueSync === 'function') idbDequeueSync(nodeId);
                 count++;
             }
         }
@@ -1883,6 +1887,160 @@ function setSyncStatus(status, text) {
     if (label) label.textContent = text;
 }
 
+// --- IndexedDB Local Storage & Offline Database Engine ---
+const IDB_NAME = 'CyberNoteDB';
+const IDB_VERSION = 1;
+let idbInstance = null;
+
+function openCyberNoteIDB() {
+    if (idbInstance) return Promise.resolve(idbInstance);
+    return new Promise((resolve) => {
+        if (!window.indexedDB) return resolve(null);
+        try {
+            const request = window.indexedDB.open(IDB_NAME, IDB_VERSION);
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('notes')) {
+                    db.createObjectStore('notes', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('sync_queue')) {
+                    db.createObjectStore('sync_queue', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('metadata')) {
+                    db.createObjectStore('metadata', { keyPath: 'key' });
+                }
+            };
+            request.onsuccess = (e) => {
+                idbInstance = e.target.result;
+                resolve(idbInstance);
+            };
+            request.onerror = (e) => {
+                console.warn('IndexedDB open notice:', e);
+                resolve(null);
+            };
+        } catch (err) {
+            console.warn('IndexedDB initialization notice:', err);
+            resolve(null);
+        }
+    });
+}
+
+async function idbPutNote(node) {
+    if (!node || !node.id) return;
+    try {
+        const db = await openCyberNoteIDB();
+        if (!db) return;
+        return new Promise((resolve) => {
+            const tx = db.transaction('notes', 'readwrite');
+            tx.objectStore('notes').put(node);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch (e) {
+        console.warn('idbPutNote notice:', e);
+    }
+}
+
+async function idbPutAllNotes(nodesArray) {
+    if (!Array.isArray(nodesArray) || nodesArray.length === 0) return;
+    try {
+        const db = await openCyberNoteIDB();
+        if (!db) return;
+        return new Promise((resolve) => {
+            const tx = db.transaction('notes', 'readwrite');
+            const store = tx.objectStore('notes');
+            for (const n of nodesArray) {
+                if (n && n.id) store.put(n);
+            }
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch (e) {
+        console.warn('idbPutAllNotes notice:', e);
+    }
+}
+
+async function idbDeleteNote(nodeId) {
+    if (!nodeId) return;
+    try {
+        const db = await openCyberNoteIDB();
+        if (!db) return;
+        return new Promise((resolve) => {
+            const tx = db.transaction('notes', 'readwrite');
+            tx.objectStore('notes').delete(nodeId);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch (e) {
+        console.warn('idbDeleteNote notice:', e);
+    }
+}
+
+async function idbGetAllNotes() {
+    try {
+        const db = await openCyberNoteIDB();
+        if (!db) return null;
+        return new Promise((resolve) => {
+            const tx = db.transaction('notes', 'readonly');
+            const req = tx.objectStore('notes').getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve(null);
+        });
+    } catch (e) {
+        console.warn('idbGetAllNotes notice:', e);
+        return null;
+    }
+}
+
+async function idbClearAll() {
+    try {
+        const db = await openCyberNoteIDB();
+        if (!db) return;
+        return new Promise((resolve) => {
+            const tx = db.transaction(['notes', 'sync_queue', 'metadata'], 'readwrite');
+            tx.objectStore('notes').clear();
+            tx.objectStore('sync_queue').clear();
+            tx.objectStore('metadata').clear();
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch (e) {
+        console.warn('idbClearAll notice:', e);
+    }
+}
+
+async function idbEnqueueSync(nodeId, action = 'update') {
+    if (!nodeId) return;
+    try {
+        const db = await openCyberNoteIDB();
+        if (!db) return;
+        return new Promise((resolve) => {
+            const tx = db.transaction('sync_queue', 'readwrite');
+            tx.objectStore('sync_queue').put({ id: nodeId, action, timestamp: Date.now() });
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch (e) {
+        console.warn('idbEnqueueSync notice:', e);
+    }
+}
+
+async function idbDequeueSync(nodeId) {
+    if (!nodeId) return;
+    try {
+        const db = await openCyberNoteIDB();
+        if (!db) return;
+        return new Promise((resolve) => {
+            const tx = db.transaction('sync_queue', 'readwrite');
+            tx.objectStore('sync_queue').delete(nodeId);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch (e) {
+        console.warn('idbDequeueSync notice:', e);
+    }
+}
+
 // --- Data Fetching & Local Persistence ---
 function persistActiveNodeImmediately(nodeId, fields = {}) {
     if (!nodeId) return;
@@ -1902,8 +2060,12 @@ function persistActiveNodeImmediately(nodeId, fields = {}) {
         console.warn('Immediate local persistence write error:', e);
     }
 
+    // Persist to IndexedDB
+    idbPutNote(node);
+
     if (state.pendingUploadNodeIds) {
         state.pendingUploadNodeIds.add(nodeId);
+        idbEnqueueSync(nodeId, 'update');
         try {
             localStorage.setItem('cybernote_pending_uploads', JSON.stringify(Array.from(state.pendingUploadNodeIds)));
         } catch (e) {}
@@ -1923,8 +2085,10 @@ function saveLocalNodesBackup() {
                 localStorage.setItem('cybernote_local_raw_nodes', raw);
             } catch (e) {}
 
+            // Persist entire notebook into IndexedDB asynchronously
+            idbPutAllNotes(list);
+
             // Ultra-compact GZIP compression for local storage
-            // Compresses 4MB scripts down to ~15KB (< 0.05 bytes per character)
             if (raw.length > 250) {
                 const compressed = await compressStringToBase64(raw);
                 localStorage.setItem('cybernote_local_db', compressed);
@@ -1988,6 +2152,26 @@ async function loadLocalNodes() {
             }
         }
     } catch (e) {}
+
+    // 4. Asynchronously supplement/hydrate from IndexedDB for robust large note offline recovery
+    idbGetAllNotes().then((idbNotes) => {
+        if (Array.isArray(idbNotes) && idbNotes.length > 0) {
+            let changed = false;
+            for (const n of idbNotes) {
+                if (n && n.id && (!state.deletedNodeIds || !state.deletedNodeIds.has(n.id))) {
+                    const existing = state.nodes.get(n.id);
+                    if (!existing || (n.updated_at && n.updated_at > (existing.updated_at || 0))) {
+                        state.nodes.set(n.id, n);
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) {
+                deduplicateNodes();
+                renderTree();
+            }
+        }
+    }).catch(e => console.warn('IDB startup hydration notice:', e));
 
     // Prune any deleted nodes that might linger in localStorage
     if (state.deletedNodeIds && state.deletedNodeIds.size > 0) {
@@ -9028,10 +9212,10 @@ let deferredInstallPrompt = null;
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then((reg) => {
+        navigator.serviceWorker.register('./sw.js').then((reg) => {
             console.log('✓ CyberNote Service Worker active:', reg.scope);
         }).catch((err) => {
-            console.log('ServiceWorker registration note:', err);
+            console.warn('ServiceWorker registration note:', err);
         });
     });
 }
