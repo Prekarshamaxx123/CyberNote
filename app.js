@@ -1976,13 +1976,13 @@ function renderTree() {
             }
             if (node.color) label.style.color = node.color;
 
-            // Lock badge if read-only
+            // Read-Only badge if read-only
             let lockBadge = null;
             if (node.is_readonly) {
                 lockBadge = document.createElement('span');
                 lockBadge.className = 'tree-lock-badge';
-                lockBadge.title = 'Locked (Click to Unlock)';
-                lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+                lockBadge.title = 'Read-Only (Click to make editable)';
+                lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
                 lockBadge.onclick = (e) => {
                     e.stopPropagation();
                     toggleReadOnlyMode(node.id);
@@ -2204,12 +2204,12 @@ function openTreeContextMenu(e, nodeId) {
 
         if (ctxReadonly) {
             const readonlyText = document.getElementById('ctx-readonly-text');
-            if (readonlyText) readonlyText.textContent = isReadOnly ? 'Unlock Note' : 'Lock Note';
+            if (readonlyText) readonlyText.textContent = isReadOnly ? 'Disable Read-Only' : 'Read Only';
             const readonlySvg = document.getElementById('ctx-readonly-svg');
             if (readonlySvg) {
                 readonlySvg.innerHTML = isReadOnly 
-                    ? `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>`
-                    : `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`;
+                    ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`
+                    : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
             }
             ctxReadonly.style.display = 'flex';
         }
@@ -2428,9 +2428,9 @@ function createKeepCard(node) {
     if (node.is_readonly) {
         const lockBadge = document.createElement('span');
         lockBadge.className = 'tree-lock-badge keep-card-lock-badge';
-        lockBadge.title = 'Locked (Click to Unlock)';
+        lockBadge.title = 'Read-Only (Click to make editable)';
         lockBadge.style.display = 'inline-flex';
-        lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Locked</span>`;
+        lockBadge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>Read Only</span>`;
         lockBadge.onclick = (e) => {
             e.stopPropagation();
             toggleReadOnlyMode(node.id);
@@ -3346,7 +3346,7 @@ function toggleReadOnlyMode(targetNodeId = null) {
     if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
         renderAllNotesView();
     }
-    showToast(newStatus ? '🔒 Note locked (Read-Only mode)' : '🔓 Note unlocked (Editable mode)', newStatus ? 'warning' : 'success');
+    showToast(newStatus ? '👁️ Note set to Read-Only mode' : '✏️ Note set to Editable mode', newStatus ? 'warning' : 'success');
 }
 
 function applyReadOnlyState(isReadOnly) {
@@ -3435,22 +3435,22 @@ function applyReadOnlyState(isReadOnly) {
         titleColorDot.style.pointerEvents = isReadOnly ? 'none' : '';
     }
 
-    // 6. Header Lock/Unlock Button State
+    // 6. Header Read-Only Button State
     const btn = document.getElementById('btn-toggle-readonly');
     if (btn) {
-        const lockSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
-        const unlockSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`;
-        btn.innerHTML = `${isReadOnly ? lockSvg : unlockSvg}<span>${isReadOnly ? 'Unlock Note' : 'Lock Note'}</span>`;
+        const eyeSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+        const editSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+        btn.innerHTML = `${isReadOnly ? editSvg : eyeSvg}<span>${isReadOnly ? 'Make Editable' : 'Read Only'}</span>`;
         btn.className = `btn btn-sm note-lock-btn ${isReadOnly ? 'btn-danger' : 'btn-secondary'}`;
-        btn.title = isReadOnly ? 'Note is Locked. Click to unlock and edit.' : 'Note is Editable. Click to lock (Read-Only).';
+        btn.title = isReadOnly ? 'Read-Only Mode active. Click to make editable.' : 'Set note to Read-Only mode.';
     }
 
-    // 7. Ribbon Lock Button State (in Tools tab)
+    // 7. Ribbon Read-Only Button State (in Tools tab)
     const ribbonLockBtn = document.getElementById('btn-ribbon-lock');
     if (ribbonLockBtn) {
         const badgeLabel = ribbonLockBtn.querySelector('.badge-label');
-        if (badgeLabel) badgeLabel.textContent = isReadOnly ? 'Unlock Note' : 'Lock Note';
-        ribbonLockBtn.title = isReadOnly ? 'Unlock Note for editing' : 'Lock Note (Make Read-Only)';
+        if (badgeLabel) badgeLabel.textContent = isReadOnly ? 'Make Editable' : 'Read Only';
+        ribbonLockBtn.title = isReadOnly ? 'Enable editing for note' : 'Set note to Read-Only mode';
     }
 }
 
