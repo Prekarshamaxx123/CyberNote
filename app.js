@@ -1369,9 +1369,106 @@ async function syncWithGoogleDrive({ silent = false, forcePull = false, forcePus
     if (state.activeNodeId) return uploadSingleNodeToDrive(state.activeNodeId, true);
 }
 
+function openSyncConflictModal(localCount, cloudCount) {
+    const modal = document.getElementById('drive-sync-conflict-modal');
+    if (!modal) return;
+    const localCountEl = document.getElementById('sync-conflict-local-count');
+    const cloudCountEl = document.getElementById('sync-conflict-cloud-count');
+    const emailEl = document.getElementById('sync-conflict-email');
+
+    if (localCountEl) localCountEl.textContent = localCount.toString();
+    if (cloudCountEl) cloudCountEl.textContent = cloudCount.toString();
+    if (emailEl) emailEl.textContent = state.googleUser?.email || 'Google Drive';
+
+    modal.style.display = 'flex';
+}
+
+function closeSyncConflictModal() {
+    const modal = document.getElementById('drive-sync-conflict-modal');
+    if (modal) modal.style.display = 'none';
+}
+
 async function autoRestoreFromDriveOnSignIn() {
-    clearAllLocalNotesData();
-    return downloadAllNotesFromDrive(false);
+    // Collect local notes (excluding the default welcome note if that's all there is)
+    const localNotes = Array.from(state.nodes.values()).filter(n => n.id !== 'welcome-root');
+    const hasMeaningfulLocalNotes = localNotes.length > 0;
+
+    // If user has NO meaningful local notes (e.g. clean logged out state or brand new session):
+    if (!hasMeaningfulLocalNotes) {
+        clearAllLocalNotesData();
+        return downloadAllNotesFromDrive(false);
+    }
+
+    // Local offline notes exist! Check the user's Google Drive folder
+    setSyncStatus('syncing', 'Connecting to Google Drive...');
+    try {
+        const folderId = await ensureDriveCyberNoteFolder();
+        const driveFiles = await listDriveCyberNoteFiles(folderId);
+
+        if (driveFiles.length === 0) {
+            // Fresh / Empty Drive: upload local notes directly
+            setSyncStatus('syncing', 'Uploading notes to Drive...');
+            showSyncOverlay('Connected to Drive!', `Uploading your ${localNotes.length} local notes to Google Drive...`);
+            await saveAllNotesToDrive(false);
+            hideSyncOverlay();
+            showToast(`✓ Google Drive connected! Uploaded ${localNotes.length} notes to Drive.`, 'success');
+        } else {
+            // Both local notes and Drive notes exist! Prompt user with Conflict Modal
+            openSyncConflictModal(localNotes.length, driveFiles.length);
+        }
+    } catch (err) {
+        console.error('Error during auto-restore check:', err);
+        downloadAllNotesFromDrive(false);
+    }
+}
+
+// Two-way sync: merges cloud updates and uploads local notes
+async function triggerTwoWaySync(silent = false) {
+    if (!state.googleAccessToken) {
+        if (!silent) {
+            showToast('Sign in with Google to sync notes with Google Drive', 'info');
+            requestGoogleLogin();
+        }
+        return;
+    }
+    if (state.isSyncing) return;
+
+    const syncBtns = [
+        document.getElementById('btn-header-sync'),
+        document.getElementById('btn-sidebar-sync'),
+        document.getElementById('btn-settings-sync-now')
+    ].filter(Boolean);
+
+    syncBtns.forEach(b => {
+        b.classList.add('syncing');
+        const svg = b.querySelector('svg');
+        if (svg) svg.classList.add('spinning');
+    });
+
+    try {
+        flushEditorToState();
+        setSyncStatus('syncing', 'Syncing with Drive...');
+        if (!silent) showSyncOverlay('Syncing with Google Drive...', 'Synchronizing notes two-way...');
+        await downloadAllNotesFromDrive(silent);
+        await saveAllNotesToDrive(silent);
+        if (!silent) hideSyncOverlay();
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setSyncStatus('live', `Synced (${nowStr})`);
+        if (!silent) showToast('✓ Notes synced with Google Drive!', 'success');
+    } catch (err) {
+        console.error('Two-way sync error:', err);
+        setSyncStatus('error', 'Sync Error');
+        if (!silent) {
+            hideSyncOverlay();
+            showToast(`Sync Error: ${err.message}`, 'error');
+        }
+    } finally {
+        syncBtns.forEach(b => {
+            b.classList.remove('syncing');
+            const svg = b.querySelector('svg');
+            if (svg) svg.classList.remove('spinning');
+        });
+    }
 }
 
 // Debounced auto-save to Drive (fires 1.8 seconds after editing pauses on active note)
@@ -1389,6 +1486,12 @@ function scheduleDriveAutoBackup() {
 
 // ---- Header "Save" Button Handler ----
 async function triggerDriveSave() {
+    if (!state.googleAccessToken) {
+        showToast('Sign in with Google to save notes to Google Drive', 'info');
+        requestGoogleLogin();
+        return;
+    }
+
     const btn = document.getElementById('btn-drive-save');
     const svg = document.getElementById('drive-save-svg');
     const txt = document.getElementById('drive-save-text');
@@ -1418,6 +1521,12 @@ async function triggerDriveSave() {
 
 // ---- Header "Download" Button Handler ----
 async function triggerDriveDownload() {
+    if (!state.googleAccessToken) {
+        showToast('Sign in with Google to download notes from Google Drive', 'info');
+        requestGoogleLogin();
+        return;
+    }
+
     const btn = document.getElementById('btn-drive-download');
     const svg = document.getElementById('drive-download-svg');
     const txt = document.getElementById('drive-download-text');
@@ -7352,6 +7461,48 @@ function setupEventListeners() {
     if (btnSettingsRestore) btnSettingsRestore.onclick = () => downloadAllNotesFromDrive(false);
     const btnSettingsSignout = document.getElementById('btn-settings-signout');
     if (btnSettingsSignout) btnSettingsSignout.onclick = signoutGoogle;
+
+    // Header & Sidebar Two-Way Sync Buttons
+    const btnHeaderSync = document.getElementById('btn-header-sync');
+    if (btnHeaderSync) btnHeaderSync.onclick = () => triggerTwoWaySync(false);
+    const btnSidebarSync = document.getElementById('btn-sidebar-sync');
+    if (btnSidebarSync) btnSidebarSync.onclick = () => triggerTwoWaySync(false);
+    const btnSettingsSync = document.getElementById('btn-settings-sync-now');
+    if (btnSettingsSync) btnSettingsSync.onclick = () => triggerTwoWaySync(false);
+
+    // Sync Conflict / Merge Modal Actions
+    const btnSyncMerge = document.getElementById('btn-sync-merge');
+    if (btnSyncMerge) {
+        btnSyncMerge.onclick = async () => {
+            closeSyncConflictModal();
+            showSyncOverlay('Merging with Google Drive...', 'Combining your local notes with Google Drive notes...');
+            await downloadAllNotesFromDrive(false);
+            await saveAllNotesToDrive(false);
+            hideSyncOverlay();
+            showToast('✓ Successfully merged local notes with Google Drive!', 'success');
+        };
+    }
+    const btnSyncPullOnly = document.getElementById('btn-sync-pull-only');
+    if (btnSyncPullOnly) {
+        btnSyncPullOnly.onclick = async () => {
+            closeSyncConflictModal();
+            showSyncOverlay('Downloading from Drive...', 'Loading notes from Google Drive...');
+            clearAllLocalNotesData();
+            await downloadAllNotesFromDrive(false);
+            hideSyncOverlay();
+            showToast('✓ Loaded notes from Google Drive.', 'info');
+        };
+    }
+    const btnSyncPushOnly = document.getElementById('btn-sync-push-only');
+    if (btnSyncPushOnly) {
+        btnSyncPushOnly.onclick = async () => {
+            closeSyncConflictModal();
+            showSyncOverlay('Uploading to Drive...', 'Overwriting Drive with local notes...');
+            await saveAllNotesToDrive(false);
+            hideSyncOverlay();
+            showToast('✓ Uploaded local notes to Google Drive.', 'success');
+        };
+    }
 
     const btnDriveBackup = document.getElementById('btn-drive-backup-now');
     if (btnDriveBackup) btnDriveBackup.onclick = () => saveAllNotesToDrive(false);
