@@ -3495,12 +3495,30 @@ body {
     cursor: pointer;
     text-align: center;
     font-size: 0.9rem;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.icon-opt svg, .icon-opt span {
+    pointer-events: none;
 }
 
 .icon-opt:hover {
     background-color: var(--accent);
     color: #111;
+    border-color: var(--accent);
 }
+
+.icon-opt:hover svg {
+    stroke: #111 !important;
+}
+
+.icon-opt.selected-icon-opt {
+    border-color: var(--accent) !important;
+    background-color: rgba(137, 180, 250, 0.18) !important;
+    box-shadow: 0 0 10px rgba(137, 180, 250, 0.35);
+}
+
 
 .nodelink-list {
     max-height: 220px;
