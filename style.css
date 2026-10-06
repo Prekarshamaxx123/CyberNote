@@ -2413,6 +2413,8 @@ body {
     width: 100%;
     max-width: 100%;
     padding: 6px 12px 140px 12px;
+    tab-size: 8;
+    -moz-tab-size: 8;
 }
 
 .wysiwyg-canvas:empty::before {
@@ -5968,4 +5970,209 @@ body.zen-mode-active .editor-scroll-area {
     background: #181825 !important;
     border: 1px solid rgba(137, 180, 250, 0.28) !important;
 }
+
+/* ==========================================================================
+   EDITOR CONTEXT MENU (Right-Click Auto Style & Clipboard)
+   ========================================================================== */
+.editor-context-menu {
+    position: fixed;
+    z-index: 10001;
+    min-width: 220px;
+    background-color: var(--bg-header);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 6px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    user-select: none;
+    animation: ctxFadeIn 0.12s ease-out;
+}
+
+.ctx-shortcut {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding-left: 12px;
+}
+
+.bubble-btn-autostyle {
+    color: var(--accent) !important;
+    font-weight: 600 !important;
+    gap: 4px !important;
+    padding: 3px 8px !important;
+}
+
+.bubble-btn-autostyle svg {
+    color: var(--accent);
+}
+
+/* ==========================================================================
+   CYBER ALIGNED COLUMNS (Auto Style Smart Column Engine)
+   ========================================================================== */
+.cyber-aligned-columns {
+    display: table;
+    width: 100%;
+    margin: 1.2em 0;
+    border-collapse: separate;
+    border-spacing: 0 5px;
+    font-family: var(--font-sans);
+    background-color: rgba(30, 30, 46, 0.45);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+    user-select: text;
+}
+
+.cyber-aligned-columns .aligned-row {
+    display: table-row;
+    transition: background-color 0.12s ease;
+}
+
+.cyber-aligned-columns .aligned-row:hover {
+    background-color: rgba(255, 255, 255, 0.035);
+}
+
+.cyber-aligned-columns .aligned-cell {
+    display: table-cell;
+    vertical-align: middle;
+    padding: 6px 10px;
+    outline: none;
+    transition: background-color 0.15s ease;
+}
+
+.cyber-aligned-columns .aligned-cell:focus,
+.cyber-aligned-columns .aligned-cell:focus-within {
+    background-color: rgba(137, 180, 250, 0.08);
+}
+
+.cyber-aligned-columns .aligned-col-term {
+    width: 1%;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.cyber-aligned-columns .cyber-term-pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--accent);
+    background-color: rgba(137, 180, 250, 0.12);
+    border: 1px solid rgba(137, 180, 250, 0.28);
+    border-radius: 5px;
+    padding: 2px 8px;
+    line-height: 1.35;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.cyber-aligned-columns .aligned-col-term:focus-within .cyber-term-pill {
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(137, 180, 250, 0.35);
+}
+
+.cyber-aligned-columns .aligned-col-sep {
+    width: 28px;
+    text-align: center;
+    color: var(--accent);
+    font-weight: 700;
+    user-select: none;
+    font-family: var(--font-mono);
+    opacity: 0.85;
+}
+
+.cyber-aligned-columns .aligned-col-desc {
+    color: var(--text-primary);
+    line-height: 1.55;
+    font-size: 0.96rem;
+    width: 99%;
+    outline: none;
+}
+
+/* Light Theme Overrides for Cyber Aligned Columns */
+body.light-theme .cyber-aligned-columns {
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+body.light-theme .cyber-aligned-columns .cyber-term-pill {
+    background-color: #e0f2fe;
+    border-color: #bae6fd;
+    color: #0284c7;
+}
+
+body.light-theme .cyber-aligned-columns .aligned-col-sep {
+    color: #64748b;
+}
+
+/* ==========================================================================
+   CYBER REFERENCE BADGES (Command Reference List)
+   ========================================================================== */
+.cyber-ref-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 1.2em 0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: rgba(30, 30, 46, 0.4);
+    user-select: text;
+}
+
+.cyber-ref-badges .ref-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: background-color 0.12s ease;
+}
+
+.cyber-ref-badges .ref-badge-row:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.cyber-ref-badges .ref-badge-code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    font-weight: 600;
+    color: #a6e3a1;
+    background-color: rgba(166, 227, 161, 0.12);
+    border: 1px solid rgba(166, 227, 161, 0.3);
+    border-radius: 5px;
+    padding: 3px 9px;
+    min-width: 75px;
+    text-align: center;
+    outline: none;
+}
+
+.cyber-ref-badges .ref-badge-arrow {
+    color: var(--accent);
+    font-weight: bold;
+    user-select: none;
+}
+
+.cyber-ref-badges .ref-badge-desc {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    flex: 1;
+    outline: none;
+}
+
+body.light-theme .cyber-ref-badges {
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+body.light-theme .cyber-ref-badges .ref-badge-code {
+    background-color: #dcfce7;
+    border-color: #bbf7d0;
+    color: #15803d;
+}
+
 
