@@ -539,6 +539,7 @@ async function handleGoogleTokenResponse(tokenResponse) {
     localStorage.setItem('cybernote_google_token', tokenResponse.access_token);
     const expiresIn = tokenResponse.expires_in || 3600;
     localStorage.setItem('cybernote_google_token_expiry', (Date.now() + (expiresIn * 1000)).toString());
+    localStorage.removeItem('cybernote_logged_out');
 
     // Schedule auto-refresh before expiry
     scheduleTokenRefresh(expiresIn);
@@ -696,6 +697,7 @@ async function signoutGoogle() {
     localStorage.removeItem('cybernote_google_token');
     localStorage.removeItem('cybernote_google_token_expiry');
     localStorage.removeItem('cybernote_user');
+    localStorage.setItem('cybernote_logged_out', '1');
 
     // Completely wipe all local notes so another user or account cannot see or backup them!
     clearAllLocalNotesData();
@@ -1703,7 +1705,7 @@ async function loadLocalNodes() {
 
     deduplicateNodes();
 
-    if (state.nodes.size === 0) {
+    if (state.nodes.size === 0 && !localStorage.getItem('cybernote_logged_out')) {
         seedDefaultLocalNotes();
     }
 
@@ -2184,6 +2186,30 @@ function renderTree() {
     }
 
     buildBranch(null, treeContainer);
+
+    if (state.nodes.size === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'tree-empty-state';
+        emptyDiv.style.cssText = 'padding: 30px 16px; text-align: center; color: var(--text-muted); font-size: 0.82rem; line-height: 1.5;';
+        if (!state.googleAccessToken) {
+            emptyDiv.innerHTML = `
+                <div style="margin-bottom: 10px; opacity: 0.5;">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </div>
+                <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">No Notes Loaded</div>
+                <div>Sign in with Google to load your cloud notes, or click <b>+ Note</b> to start writing.</div>
+            `;
+        } else {
+            emptyDiv.innerHTML = `
+                <div style="margin-bottom: 10px; opacity: 0.5;">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                </div>
+                <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Notebook Empty</div>
+                <div>Click <b>+ Note</b> to create your first note in Google Drive.</div>
+            `;
+        }
+        treeContainer.appendChild(emptyDiv);
+    }
 
     // Update All Notes count badge in sidebar
     const allNotesCountEl = document.getElementById('sidebar-all-notes-count');
@@ -3227,6 +3253,7 @@ document.addEventListener('visibilitychange', () => {
 
 // --- CRUD Node Operations ---
 async function createNewRootNode(type = 'note') {
+    localStorage.removeItem('cybernote_logged_out');
     const isFolder = type === 'folder';
     const now = Date.now();
     const newId = 'node-' + Math.random().toString(36).substring(2, 10) + '-' + now;
@@ -3273,6 +3300,7 @@ async function createNewRootNode(type = 'note') {
 }
 
 async function createSubNode(parentId, type = 'note') {
+    localStorage.removeItem('cybernote_logged_out');
     const parentNode = state.nodes.get(parentId);
     if (parentNode && parentNode.is_readonly) {
         showToast('🔒 Cannot add sub-nodes to a locked note. Unlock it first.', 'warning');
