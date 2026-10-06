@@ -48,10 +48,12 @@ const SVG_ICON_COLORS = {
 };
 
 function getNodeIconSvg(iconKey, customColor = null, isFolder = false, isExpanded = false, size = 16) {
-    const key = iconKey || (isFolder ? 'folder' : 'file-text');
+    // If an explicit iconKey is selected (other than 'folder'), always use that specific icon, even for folders!
+    // If iconKey is 'folder', or if no iconKey is set and it's a folder, display the folder icon.
+    const key = (iconKey && iconKey !== 'folder') ? iconKey : (iconKey === 'folder' || isFolder ? 'folder' : 'file-text');
     const color = customColor || SVG_ICON_COLORS[key] || '#89b4fa';
     
-    if (key === 'folder' || isFolder) {
+    if (key === 'folder') {
         if (isExpanded) {
             return `<svg class="node-svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polygon points="2 10 22 10 20 21 4 21 2 10" fill="${color}" fill-opacity="0.18"/></svg>`;
         }
@@ -7338,8 +7340,16 @@ function applyNodeColor(color) {
 
     node.color = color;
     updateNodeColorDot(color);
+    const isFolder = !!(node.is_folder || node.icon === 'folder');
+    if (iconPickerBtn) {
+        iconPickerBtn.innerHTML = getNodeIconSvg(node.icon, color, isFolder, false, 18);
+    }
     sendDeltaPatch(state.activeNodeId, { color });
     renderTree();
+    if (isFolder) {
+        renderFolderExplorerView(state.activeNodeId);
+    }
+    scheduleManifestUploadToDrive();
     closeNodeColorModal();
 }
 
@@ -7661,18 +7671,35 @@ function openIconModal() {
     if (state.isReadOnly) return;
     const modal = document.getElementById('icon-modal');
     if (!modal) return;
-    
+
+    const activeNode = state.activeNodeId ? state.nodes.get(state.activeNodeId) : null;
+    const currentIcon = activeNode ? (activeNode.icon || (activeNode.is_folder || activeNode.icon === 'folder' ? 'folder' : 'file-text')) : '';
+
     // Style icon options with vector SVG icons
     const iconGrid = document.getElementById('icon-grid');
-    if (iconGrid && !iconGrid.dataset.svgInitialized) {
-        iconGrid.dataset.svgInitialized = 'true';
+    if (iconGrid) {
+        if (!iconGrid.dataset.svgInitialized) {
+            iconGrid.dataset.svgInitialized = 'true';
+            iconGrid.querySelectorAll('.icon-opt').forEach(opt => {
+                const iconKey = opt.dataset.icon;
+                const label = opt.textContent.replace(/^[^\w\s]+/, '').trim();
+                opt.innerHTML = `${getNodeIconSvg(iconKey, null, false, false, 18)} <span>${label}</span>`;
+                opt.style.display = 'inline-flex';
+                opt.style.alignItems = 'center';
+                opt.style.gap = '8px';
+            });
+        }
+
+        // Highlight current icon & bind click handler reliably
         iconGrid.querySelectorAll('.icon-opt').forEach(opt => {
             const iconKey = opt.dataset.icon;
-            const label = opt.textContent.replace(/^[^\w\s]+/, '').trim();
-            opt.innerHTML = `${getNodeIconSvg(iconKey, null, iconKey === 'folder', false, 18)} <span>${label}</span>`;
-            opt.style.display = 'inline-flex';
-            opt.style.alignItems = 'center';
-            opt.style.gap = '8px';
+            const isSelected = iconKey === currentIcon;
+            opt.classList.toggle('selected-icon-opt', isSelected);
+            opt.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectIcon(iconKey);
+            };
         });
     }
     modal.style.display = 'flex';
@@ -7685,12 +7712,27 @@ function closeIconModal() {
 function selectIcon(iconName) {
     if (!state.activeNodeId || state.isReadOnly) return;
     const node = state.nodes.get(state.activeNodeId);
-    if (node) node.icon = iconName;
-    const isFolder = node ? (node.is_folder || iconName === 'folder') : false;
-    iconPickerBtn.innerHTML = getNodeIconSvg(iconName, node?.color, isFolder, false, 18);
+    if (!node) return;
+
+    const wasFolder = !!(node.is_folder || node.icon === 'folder');
+    node.icon = iconName;
+    if (wasFolder) {
+        node.is_folder = 1; // Preserve folder status even when icon is changed
+    }
+
+    if (iconPickerBtn) {
+        iconPickerBtn.innerHTML = getNodeIconSvg(iconName, node.color, wasFolder, false, 18);
+    }
     closeIconModal();
-    sendDeltaPatch(state.activeNodeId, { icon: iconName });
+    sendDeltaPatch(state.activeNodeId, { icon: iconName, is_folder: wasFolder ? 1 : 0 });
     renderTree();
+
+    if (wasFolder) {
+        renderFolderExplorerView(state.activeNodeId);
+    }
+
+    scheduleManifestUploadToDrive();
+    showToast(`✓ Icon set to "${iconName}"`);
 }
 
 // ==========================================================================
@@ -9507,13 +9549,17 @@ function setupEventListeners() {
     // Node Color
     const btnNodeColor = document.getElementById('btn-node-color');
     if (btnNodeColor) btnNodeColor.onclick = openNodeColorModal;
+    if (titleColorDot) titleColorDot.onclick = openNodeColorModal;
     document.querySelectorAll('.node-color-choice').forEach(btn => {
         btn.onclick = () => applyNodeColor(btn.dataset.color);
     });
-    document.getElementById('btn-apply-custom-node-color').onclick = () => {
-        const hex = document.getElementById('node-custom-color-input').value;
-        applyNodeColor(hex);
-    };
+    const btnApplyCustomColor = document.getElementById('btn-apply-custom-node-color');
+    if (btnApplyCustomColor) {
+        btnApplyCustomColor.onclick = () => {
+            const hex = document.getElementById('node-custom-color-input').value;
+            applyNodeColor(hex);
+        };
+    }
 
     // Node Move Up / Down (if present)
     const btnMoveUp = document.getElementById('btn-move-up');
@@ -9528,7 +9574,7 @@ function setupEventListeners() {
     if (btnCollapseAll) btnCollapseAll.onclick = collapseAll;
 
     // Icon Picker
-    iconPickerBtn.onclick = openIconModal;
+    if (iconPickerBtn) iconPickerBtn.onclick = openIconModal;
     document.querySelectorAll('.icon-opt').forEach(opt => {
         opt.onclick = () => selectIcon(opt.dataset.icon);
     });
