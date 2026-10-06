@@ -957,6 +957,35 @@ async function _ensureDriveCyberNoteFolderInternal() {
     return folderId;
 }
 
+// --- HTML Tag Unescape & Auto-Repair Engine ---
+function hasEscapedHtmlTags(str) {
+    if (!str || typeof str !== 'string') return false;
+    return /&(?:amp;)*(?:lt|#60|#x3c);\s*\/?(?:div|span|p|b|i|u|s|h[1-6]|table|thead|tbody|tr|td|th|ul|ol|li|code|pre|blockquote|hr|br|img|mark|kbd|input|button|a|svg|path|rect|circle|details|summary|section|header|footer)\b/i.test(str);
+}
+
+function repairEscapedHtml(content) {
+    if (!content || typeof content !== 'string') return content;
+    if (!hasEscapedHtmlTags(content)) return content;
+
+    let cur = content;
+    for (let iter = 0; iter < 10; iter++) {
+        const prev = cur;
+        cur = cur
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'")
+            .replace(/&#39;/g, "'")
+            .replace(/&#60;/g, '<')
+            .replace(/&#62;/g, '>');
+
+        if (cur === prev) break;
+        if (!hasEscapedHtmlTags(cur)) break;
+    }
+    return cur;
+}
+
 // Clean and import loose CyberNote_Backup.json at Google Drive root into the primary folder
 async function cleanAndImportRootBackup(folderId) {
     if (!state.googleAccessToken || !folderId) return;
@@ -983,6 +1012,9 @@ async function cleanAndImportRootBackup(folderId) {
                                 let importedCount = 0;
                                 for (const n of importedList) {
                                     if (!n || !n.id) continue;
+                                    if (n.content && hasEscapedHtmlTags(n.content)) {
+                                        n.content = repairEscapedHtml(n.content);
+                                    }
                                     n._contentLoaded = true;
                                     const existing = state.nodes.get(n.id);
                                     if (!existing || (n.updated_at || 0) >= (existing.updated_at || 0)) {
@@ -1169,6 +1201,9 @@ async function checkAndRestoreLegacyDriveBackup(folderId) {
 
         for (const n of importedNodes) {
             if (!n || !n.id) continue;
+            if (n.content && hasEscapedHtmlTags(n.content)) {
+                n.content = repairEscapedHtml(n.content);
+            }
             n._contentLoaded = true;
             const existing = state.nodes.get(n.id);
             if (!existing || (n.updated_at || 0) >= (existing.updated_at || 0)) {
@@ -1234,6 +1269,9 @@ async function listDriveCyberNoteFiles(folderId) {
 
 // Upload a single note to Drive using reliable 2-step REST (POST metadata + PATCH payload)
 async function uploadNodeToDrive(folderId, node) {
+    if (node && node.content && hasEscapedHtmlTags(node.content)) {
+        node.content = repairEscapedHtml(node.content);
+    }
     const fileName = `cn_${node.id}.json`;
     const payload = JSON.stringify(node);
 
@@ -1520,7 +1558,14 @@ async function downloadSingleNoteFromDrive(nodeId, { silent = false } = {}) {
         const cloudNode = await dlRes.json();
         if (!cloudNode || !cloudNode.id) throw new Error('Invalid note data received from Drive');
 
+        if (cloudNode.content && hasEscapedHtmlTags(cloudNode.content)) {
+            cloudNode.content = repairEscapedHtml(cloudNode.content);
+        }
+
         const localNode = state.nodes.get(nodeId);
+        if (localNode && localNode.content && hasEscapedHtmlTags(localNode.content)) {
+            localNode.content = repairEscapedHtml(localNode.content);
+        }
         const cloudTime = cloudNode.updated_at || cloudNode.created_at || 0;
         const localTime = localNode ? (localNode.updated_at || localNode.created_at || 0) : 0;
 
@@ -2586,6 +2631,10 @@ async function loadLocalNodes() {
             let changed = false;
             for (const n of idbNotes) {
                 if (n && n.id && (!state.deletedNodeIds || !state.deletedNodeIds.has(n.id))) {
+                    if (n.content && hasEscapedHtmlTags(n.content)) {
+                        n.content = repairEscapedHtml(n.content);
+                        idbPutNote(n);
+                    }
                     const existing = state.nodes.get(n.id);
                     if (!existing || (n.updated_at && n.updated_at > (existing.updated_at || 0))) {
                         state.nodes.set(n.id, n);
@@ -2611,6 +2660,23 @@ async function loadLocalNodes() {
     }
 
     deduplicateNodes();
+
+    // Auto-repair any local notes that suffered from HTML entity corruption
+    let anyRepaired = false;
+    for (const n of state.nodes.values()) {
+        if (n && n.content && hasEscapedHtmlTags(n.content)) {
+            n.content = repairEscapedHtml(n.content);
+            idbPutNote(n);
+            try { localStorage.setItem(`cybernote_node_${n.id}`, JSON.stringify(n)); } catch (e) {}
+            anyRepaired = true;
+        }
+    }
+    if (anyRepaired) {
+        saveLocalNodesBackup();
+        if (typeof scheduleDriveAutoBackup === 'function') {
+            scheduleDriveAutoBackup();
+        }
+    }
 
     if (state.nodes.size === 0 && !localStorage.getItem('cybernote_logged_out')) {
         seedDefaultLocalNotes();
@@ -3929,19 +3995,47 @@ function setEditorContent(content) {
     }
 
     let processed = content;
-    // Replace any legacy emoji in copy buttons with crisp SVG
+    let wasRepaired = false;
+
+    // 1. Auto-repair any escaped HTML tags (e.g. from prior double-escaping or markdown pass)
+    if (hasEscapedHtmlTags(processed)) {
+        processed = repairEscapedHtml(processed);
+        wasRepaired = true;
+    }
+
+    // 2. Replace any legacy emoji in copy buttons with crisp SVG
     if (processed.includes('📋')) {
         processed = processed.replace(/📋\s*Copy Code/g, '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code');
         processed = processed.replace(/📋/g, '');
     }
 
-    // Convert raw markdown if existing
-    if (processed.includes('```') || processed.includes('# ') || processed.includes('- [ ]') || processed.includes('| --- |')) {
+    // 3. Convert raw markdown ONLY if the content is pure markdown and not already rich HTML
+    const isAlreadyHtml = /<\s*\/?(?:div|span|p|b|i|u|s|h[1-6]|table|thead|tbody|tr|td|th|ul|ol|li|code|pre|blockquote|hr|br|img|mark|kbd|input|button|a|svg)\b/i.test(processed);
+    if (!isAlreadyHtml && (processed.includes('```') || processed.includes('# ') || processed.includes('- [ ]') || processed.includes('| --- |'))) {
         noteEditor.innerHTML = convertMarkdownToHtml(processed);
     } else {
         noteEditor.innerHTML = processed;
     }
+
     initEditorHistory(state.activeNodeId, noteEditor.innerHTML);
+
+    // 4. If the note had corrupted escaped tags, immediately persist the clean repaired version
+    if (wasRepaired && state.activeNodeId) {
+        const activeNode = state.nodes.get(state.activeNodeId);
+        if (activeNode) {
+            activeNode.content = noteEditor.innerHTML;
+            activeNode.updated_at = Date.now();
+            if (typeof idbPutNote === 'function') idbPutNote(activeNode);
+            try {
+                localStorage.setItem(`cybernote_node_${state.activeNodeId}`, JSON.stringify(activeNode));
+                const list = Array.from(state.nodes.values());
+                localStorage.setItem('cybernote_local_raw_nodes', JSON.stringify(list));
+            } catch (e) {}
+            if (typeof scheduleDriveAutoBackup === 'function') {
+                scheduleDriveAutoBackup();
+            }
+        }
+    }
 }
 
 function updateNodeColorDot(color) {
@@ -4111,7 +4205,10 @@ function flushActiveNodeBeforeUnload() {
     const cur = state.nodes.get(activeId);
     if (!cur) return;
 
-    const curContent = noteEditor ? noteEditor.innerHTML : cur.content;
+    let curContent = noteEditor ? noteEditor.innerHTML : cur.content;
+    if (curContent && hasEscapedHtmlTags(curContent)) {
+        curContent = repairEscapedHtml(curContent);
+    }
     const curTitle = noteTitleInput ? noteTitleInput.value : cur.title;
     const curTags = noteTagsInput ? noteTagsInput.value : cur.tags;
     const now = Date.now();
@@ -7950,7 +8047,9 @@ function updateWordStats() {
 
 // --- Markdown to HTML Converter for Legacy / Imported Notes ---
 function convertMarkdownToHtml(md) {
-    let html = escapeHtml(md);
+    if (!md) return '';
+    const isHtml = /<\s*\/?(?:div|span|p|b|i|u|s|h[1-6]|table|thead|tbody|tr|td|th|ul|ol|li|code|pre|blockquote|hr|br|img|mark|kbd|input|button|a|svg)\b/i.test(md);
+    let html = isHtml ? md : escapeHtml(md);
 
     html = html.replace(/```([a-zA-Z0-9_\-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
         const language = lang || 'code';
