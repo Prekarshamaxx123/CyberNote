@@ -9428,6 +9428,56 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// --- Mobile App Download / PWA Install Prompt (Android & Apple iOS) ---
+function checkAndShowMobileInstallPrompt() {
+    // 1. Detect device platform: Only show on Android or Apple (iOS) mobile devices. NEVER on PC / Desktop.
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    const isAndroid = /Android/i.test(ua);
+    const isMobile = isIOS || isAndroid || (/webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua));
+
+    // If on PC / Desktop, do NOT show the popup
+    if (!isMobile) return;
+
+    // 2. Do NOT show if the app is already installed and opened in standalone mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true
+        || document.referrer.includes('android-app://');
+
+    if (isStandalone) return;
+
+    // 3. Do NOT show if the user dismissed recently (within 3 days)
+    const dismissedAt = parseInt(localStorage.getItem('cybernote_mobile_install_dismissed') || '0', 10);
+    if (Date.now() - dismissedAt < 3 * 24 * 60 * 60 * 1000) return;
+
+    // 4. Show customized popup based on Android vs Apple iOS
+    const modal = document.getElementById('mobile-install-popup');
+    if (!modal) return;
+
+    const androidView = document.getElementById('android-install-view');
+    const iosView = document.getElementById('ios-install-view');
+    const badge = document.getElementById('mobile-install-badge');
+
+    if (isIOS) {
+        if (badge) badge.textContent = 'Apple iOS';
+        if (iosView) iosView.style.display = 'flex';
+        if (androidView) androidView.style.display = 'none';
+    } else {
+        if (badge) badge.textContent = 'Android';
+        if (androidView) androidView.style.display = 'flex';
+        if (iosView) iosView.style.display = 'none';
+    }
+
+    modal.style.display = 'flex';
+}
+
+function dismissMobileInstallPrompt() {
+    const modal = document.getElementById('mobile-install-popup');
+    if (modal) modal.style.display = 'none';
+    localStorage.setItem('cybernote_mobile_install_dismissed', Date.now().toString());
+}
+window.dismissMobileInstallPrompt = dismissMobileInstallPrompt;
+
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
@@ -9435,25 +9485,33 @@ window.addEventListener('beforeinstallprompt', (e) => {
     if (btnInstall) {
         btnInstall.style.display = 'inline-flex';
     }
+    // Check if on mobile device to show install popup
+    setTimeout(checkAndShowMobileInstallPrompt, 1200);
 });
 
 window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
+    dismissMobileInstallPrompt();
     const btnInstall = document.getElementById('btn-install-pwa');
     if (btnInstall) btnInstall.style.display = 'none';
     showToast('✓ CyberNote successfully installed on your device!');
 });
 
 async function triggerPwaInstall() {
-    if (!deferredInstallPrompt) {
-        showToast('To install CyberNote, use your browser menu and tap "Install App" or "Add to Home Screen".');
-        return;
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+            showToast('Installing CyberNote app... 📱');
+            dismissMobileInstallPrompt();
+        }
+        deferredInstallPrompt = null;
+    } else {
+        // Fallback for Android browsers if event not captured or already fired
+        showToast('To install, tap your browser menu (⋮) and tap "Install app" or "Add to Home screen" 📱', 'info');
     }
-    deferredInstallPrompt.prompt();
-    const { outcome } = await deferredInstallPrompt.userChoice;
-    if (outcome === 'accepted') {
-        showToast('Installing CyberNote app... 📱');
-    }
-    deferredInstallPrompt = null;
 }
 window.triggerPwaInstall = triggerPwaInstall;
+
+// Trigger check shortly after page load on mobile devices (e.g. for iOS Safari or if beforeinstallprompt already fired)
+setTimeout(checkAndShowMobileInstallPrompt, 2000);
