@@ -2018,7 +2018,9 @@ function renderTree() {
             const actions = document.createElement('div');
             actions.className = 'tree-actions';
             actions.innerHTML = `
+                <button class="tree-btn" title="Note Lock (Password)" onclick="event.stopPropagation(); openPasswordLockModal('${node.id}')">🔒</button>
                 <button class="tree-btn" title="Add Sub-Note" onclick="event.stopPropagation(); createSubNode('${node.id}', 'note')">+</button>
+                <button class="tree-btn" title="More Options" onclick="event.stopPropagation(); openTreeContextMenu(event, '${node.id}')">⋮</button>
                 <button class="tree-btn" title="Delete" onclick="event.stopPropagation(); deleteNode('${node.id}')">✕</button>
             `;
 
