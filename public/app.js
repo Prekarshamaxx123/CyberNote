@@ -120,6 +120,7 @@ const state = {
     pendingUploadNodeIds: new Set(JSON.parse(localStorage.getItem('cybernote_pending_uploads') || '[]')),
     lastDriveSyncTime: parseInt(localStorage.getItem('cybernote_last_drive_sync') || '0', 10),
     lastDriveSyncAttempt: 0,
+    unlockedNotes: new Set(),
     // Paint Studio State
     paintTool: 'signature',
     paintColor: '#00ffff',
@@ -1719,8 +1720,9 @@ function nodeMatchesQuery(node, query) {
     if (!q) return false;
     const titleMatch = normalizeQuery(node.title).includes(q);
     const tagsMatch = node.tags && normalizeQuery(node.tags).includes(q);
-    const plainContent = stripHtml(node.content);
-    const contentMatch = normalizeQuery(plainContent).includes(q);
+    const isLocked = !!(node.password_hash && !state.unlockedNotes.has(node.id));
+    const plainContent = isLocked ? '' : stripHtml(node.content);
+    const contentMatch = !isLocked && normalizeQuery(plainContent).includes(q);
     return titleMatch || tagsMatch || contentMatch;
 }
 
@@ -1987,6 +1989,22 @@ function renderTree() {
                 };
             }
 
+            // Password lock badge if password protected
+            let passwordBadge = null;
+            if (node.password_hash) {
+                const isUnlocked = state.unlockedNotes.has(node.id);
+                passwordBadge = document.createElement('span');
+                passwordBadge.className = 'tree-password-badge';
+                passwordBadge.title = isUnlocked ? 'Password Protected (Unlocked)' : 'Password Locked (Requires Password)';
+                passwordBadge.innerHTML = isUnlocked
+                    ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a6e3a1" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`
+                    : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5"/></svg>`;
+                passwordBadge.onclick = (e) => {
+                    e.stopPropagation();
+                    openPasswordLockModal(node.id);
+                };
+            }
+
             // Pin badge if pinned
             let pinBadge = null;
             if (node.is_pinned) {
@@ -2008,6 +2026,7 @@ function renderTree() {
             item.appendChild(icon);
             item.appendChild(label);
             if (lockBadge) item.appendChild(lockBadge);
+            if (passwordBadge) item.appendChild(passwordBadge);
             if (pinBadge) item.appendChild(pinBadge);
             item.appendChild(actions);
 
@@ -2193,6 +2212,20 @@ function openTreeContextMenu(e, nodeId) {
             ctxReadonly.style.display = 'flex';
         }
 
+        const ctxPasswordLock = document.getElementById('ctx-password-lock');
+        if (ctxPasswordLock) {
+            const pwdText = document.getElementById('ctx-password-lock-text');
+            if (pwdText) {
+                if (node.password_hash) {
+                    const isUnlocked = state.unlockedNotes.has(node.id);
+                    pwdText.textContent = isUnlocked ? 'Note Lock (Lock / Edit)' : 'Note Lock (Unlock / Edit)';
+                } else {
+                    pwdText.textContent = 'Note Lock (Password)';
+                }
+            }
+            ctxPasswordLock.style.display = 'flex';
+        }
+
         if (ctxNewRoot) ctxNewRoot.style.display = 'flex';
         if (ctxNewFolder) ctxNewFolder.style.display = 'flex';
         if (ctxSubnode) ctxSubnode.style.display = 'flex';
@@ -2219,6 +2252,8 @@ function openTreeContextMenu(e, nodeId) {
         if (ctxIcon) ctxIcon.style.display = 'none';
         if (ctxDuplicate) ctxDuplicate.style.display = 'none';
         if (ctxReadonly) ctxReadonly.style.display = 'none';
+        const ctxPasswordLock = document.getElementById('ctx-password-lock');
+        if (ctxPasswordLock) ctxPasswordLock.style.display = 'none';
         if (ctxExpandAll) ctxExpandAll.style.display = 'flex';
         if (ctxCollapseAll) ctxCollapseAll.style.display = 'flex';
         if (ctxDivider2) ctxDivider2.style.display = 'none';
@@ -2228,7 +2263,7 @@ function openTreeContextMenu(e, nodeId) {
     // Position menu with window boundary checks
     menu.style.display = 'flex';
     const menuWidth = 200;
-    const menuHeight = 340;
+    const menuHeight = 380;
     let x = e.clientX;
     let y = e.clientY;
 
@@ -2401,6 +2436,18 @@ function createKeepCard(node) {
         titleGroup.appendChild(lockBadge);
     }
 
+    if (node.password_hash) {
+        const isUnlocked = state.unlockedNotes.has(node.id);
+        const pwdBadge = document.createElement('span');
+        pwdBadge.className = 'tree-password-badge keep-card-lock-badge';
+        pwdBadge.title = isUnlocked ? 'Password Protected (Unlocked)' : 'Password Locked';
+        pwdBadge.style.display = 'inline-flex';
+        pwdBadge.innerHTML = isUnlocked
+            ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a6e3a1" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg><span>Unlocked</span>`
+            : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5"/></svg><span>Password</span>`;
+        titleGroup.appendChild(pwdBadge);
+    }
+
     const pinBtn = document.createElement('button');
     pinBtn.className = `keep-card-pin-btn ${node.is_pinned ? 'pinned' : ''}`;
     pinBtn.title = node.is_pinned ? 'Unpin note' : 'Pin to favorites';
@@ -2425,12 +2472,22 @@ function createKeepCard(node) {
     }
 
     // Snippet content
-    const plainText = stripHtml(node.content || '').trim();
-    if (plainText) {
+    const isLockedNote = !!(node.password_hash && !state.unlockedNotes.has(node.id));
+    if (isLockedNote) {
         const contentEl = document.createElement('div');
         contentEl.className = 'keep-card-content';
-        contentEl.textContent = plainText;
+        contentEl.style.fontStyle = 'italic';
+        contentEl.style.opacity = '0.7';
+        contentEl.textContent = '🔒 Password protected note (click to unlock)';
         card.appendChild(contentEl);
+    } else {
+        const plainText = stripHtml(node.content || '').trim();
+        if (plainText) {
+            const contentEl = document.createElement('div');
+            contentEl.className = 'keep-card-content';
+            contentEl.textContent = plainText;
+            card.appendChild(contentEl);
+        }
     }
 
     // Tags
@@ -2702,28 +2759,89 @@ function selectNode(id) {
     const scrollArea = document.getElementById('editor-scroll-area');
     const folderViewEl = document.getElementById('folder-explorer-view');
     const btnToggleRo = document.getElementById('btn-toggle-readonly');
+    const btnTogglePwd = document.getElementById('btn-toggle-password-lock');
+    const pwdLockedView = document.getElementById('note-password-locked-view');
+    const titleContainer = document.querySelector('.title-container');
 
-    if (isFolder) {
+    const isPasswordLocked = !!(node.password_hash && !state.unlockedNotes.has(id));
+
+    if (isPasswordLocked) {
+        if (pwdLockedView) {
+            pwdLockedView.style.display = 'flex';
+            const titleEl = document.getElementById('note-locked-title');
+            if (titleEl) {
+                titleEl.textContent = node.title ? `"${node.title}" is Locked` : 'This Note is Password Locked';
+            }
+            const hintEl = document.getElementById('note-unlock-hint');
+            if (hintEl) {
+                if (node.password_hint) {
+                    hintEl.style.display = 'block';
+                    hintEl.textContent = `Hint: ${node.password_hint}`;
+                } else {
+                    hintEl.style.display = 'none';
+                }
+            }
+            const pwdInput = document.getElementById('note-unlock-password-input');
+            if (pwdInput) {
+                pwdInput.value = '';
+                setTimeout(() => pwdInput.focus(), 60);
+            }
+            const errEl = document.getElementById('note-unlock-error');
+            if (errEl) errEl.style.display = 'none';
+        }
+        if (titleContainer) titleContainer.style.display = 'none';
         if (ribbonEl) ribbonEl.style.display = 'none';
         if (tagsEl) tagsEl.style.display = 'none';
         if (scrollArea) scrollArea.style.display = 'none';
-        if (folderViewEl) folderViewEl.style.display = 'flex';
-        if (btnToggleRo) btnToggleRo.style.display = 'none';
-        noteTitleInput.placeholder = 'Folder Name...';
-        renderFolderExplorerView(id);
-    } else {
         if (folderViewEl) folderViewEl.style.display = 'none';
-        if (tagsEl) tagsEl.style.display = 'flex';
-        if (scrollArea) scrollArea.style.display = 'flex';
-        if (ribbonEl) ribbonEl.style.display = node.is_readonly ? 'none' : '';
-        if (btnToggleRo) btnToggleRo.style.display = 'inline-flex';
-        noteTitleInput.placeholder = 'Note Title...';
-        setEditorContent(node.content || '');
-    }
+        if (btnToggleRo) btnToggleRo.style.display = 'none';
+        if (btnTogglePwd) {
+            btnTogglePwd.style.display = 'inline-flex';
+            btnTogglePwd.className = 'btn btn-sm btn-warning note-lock-btn active';
+            const labelEl = document.getElementById('password-lock-btn-label');
+            if (labelEl) labelEl.textContent = 'Unlock Note';
+            btnTogglePwd.title = 'This note is locked with a password.';
+        }
+    } else {
+        if (pwdLockedView) pwdLockedView.style.display = 'none';
+        if (titleContainer) titleContainer.style.display = 'flex';
 
-    // On-demand: check Google Drive for the latest version of this note
-    if (state.googleAccessToken && id && !isFolder) {
-        downloadSingleNoteFromDrive(id, { silent: true });
+        if (btnTogglePwd) {
+            btnTogglePwd.style.display = isFolder ? 'none' : 'inline-flex';
+            const labelEl = document.getElementById('password-lock-btn-label');
+            if (node.password_hash) {
+                btnTogglePwd.className = 'btn btn-sm btn-warning note-lock-btn active';
+                if (labelEl) labelEl.textContent = 'Lock Note';
+                btnTogglePwd.title = 'Password Protected (Unlocked). Click to lock note.';
+            } else {
+                btnTogglePwd.className = 'btn btn-sm btn-secondary note-lock-btn';
+                if (labelEl) labelEl.textContent = 'Note Lock';
+                btnTogglePwd.title = 'Lock Note with Password';
+            }
+        }
+
+        if (isFolder) {
+            if (ribbonEl) ribbonEl.style.display = 'none';
+            if (tagsEl) tagsEl.style.display = 'none';
+            if (scrollArea) scrollArea.style.display = 'none';
+            if (folderViewEl) folderViewEl.style.display = 'flex';
+            if (btnToggleRo) btnToggleRo.style.display = 'none';
+            noteTitleInput.placeholder = 'Folder Name...';
+            renderFolderExplorerView(id);
+        } else {
+            if (folderViewEl) folderViewEl.style.display = 'none';
+            if (tagsEl) tagsEl.style.display = 'flex';
+            if (scrollArea) scrollArea.style.display = 'flex';
+            if (ribbonEl) ribbonEl.style.display = node.is_readonly ? 'none' : '';
+            if (btnToggleRo) btnToggleRo.style.display = 'inline-flex';
+            noteTitleInput.placeholder = 'Note Title...';
+            setEditorContent(node.content || '');
+        }
+
+        // On-demand: check Google Drive for the latest version of this note
+        if (state.googleAccessToken && id && !isFolder) {
+            downloadSingleNoteFromDrive(id, { silent: true });
+        }
     }
 
     updateBreadcrumbs(id);
@@ -3135,6 +3253,10 @@ async function deleteNode(id) {
         showToast('🔒 Note is locked. Unlock it first before deleting.', 'warning');
         return;
     }
+    if (targetNode && targetNode.password_hash && !state.unlockedNotes.has(id)) {
+        showToast('🔒 Note is password locked. Unlock it first before deleting.', 'warning');
+        return;
+    }
 
     if (!confirm('Are you sure you want to delete this note and its sub-nodes?')) return;
 
@@ -3327,6 +3449,301 @@ function applyReadOnlyState(isReadOnly) {
         const badgeLabel = ribbonLockBtn.querySelector('.badge-label');
         if (badgeLabel) badgeLabel.textContent = isReadOnly ? 'Unlock Note' : 'Lock Note';
         ribbonLockBtn.title = isReadOnly ? 'Unlock Note for editing' : 'Lock Note (Make Read-Only)';
+    }
+}
+
+// --- Password Lock Feature ---
+async function hashNotePassword(password) {
+    const salt = 'cybernote_pwd_salt_v1';
+    if (window.crypto && window.crypto.subtle && window.crypto.subtle.digest) {
+        try {
+            const enc = new TextEncoder();
+            const data = enc.encode(password + salt);
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) {
+            console.warn('crypto.subtle digest error, fallback to polyfill:', e);
+        }
+    }
+    // Fallback zero-dependency hash
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    const str = password + salt;
+    for (let i = 0; i < str.length; i++) {
+        const ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+}
+
+function openPasswordLockModal(targetNodeId = null) {
+    const nodeId = (typeof targetNodeId === 'string' && targetNodeId) ? targetNodeId : state.activeNodeId;
+    if (!nodeId || !state.nodes.has(nodeId)) return;
+    const node = state.nodes.get(nodeId);
+
+    state.modalLockNodeId = nodeId;
+    const modal = document.getElementById('password-lock-modal');
+    if (!modal) return;
+
+    const modalTitle = document.getElementById('pwd-modal-title');
+    const modalDesc = document.getElementById('pwd-modal-desc');
+    const setFields = document.getElementById('pwd-modal-set-fields');
+    const removeFields = document.getElementById('pwd-modal-remove-fields');
+    const errorEl = document.getElementById('modal-pwd-error');
+    const btnSave = document.getElementById('btn-save-password-modal');
+    const btnRemove = document.getElementById('btn-remove-password-modal');
+    const btnLockNow = document.getElementById('btn-lock-now-password-modal');
+
+    // Reset inputs
+    document.getElementById('modal-new-password').value = '';
+    document.getElementById('modal-confirm-password').value = '';
+    document.getElementById('modal-password-hint').value = node.password_hint || '';
+    if (document.getElementById('modal-current-password')) {
+        document.getElementById('modal-current-password').value = '';
+    }
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+
+    const hasPassword = !!node.password_hash;
+    const isUnlocked = state.unlockedNotes.has(nodeId);
+
+    if (!hasPassword) {
+        modalTitle.textContent = 'Password Lock Note';
+        modalDesc.textContent = `Set a secret password to lock "${node.title || 'this note'}":`;
+        setFields.style.display = 'block';
+        if (removeFields) removeFields.style.display = 'none';
+        btnSave.style.display = 'inline-flex';
+        btnSave.textContent = 'Set Password';
+        btnRemove.style.display = 'none';
+        if (btnLockNow) btnLockNow.style.display = 'none';
+    } else {
+        modalTitle.textContent = 'Manage Note Password Lock';
+        if (isUnlocked) {
+            modalDesc.textContent = `"${node.title || 'This note'}" is currently unlocked. You can lock it now, change the password, or remove protection:`;
+            setFields.style.display = 'block';
+            if (removeFields) removeFields.style.display = 'none';
+            btnSave.style.display = 'inline-flex';
+            btnSave.textContent = 'Change Password';
+            btnRemove.style.display = 'inline-flex';
+            btnRemove.textContent = 'Remove Lock';
+            if (btnLockNow) btnLockNow.style.display = 'inline-flex';
+        } else {
+            modalDesc.textContent = `Enter current password to manage or remove lock for "${node.title || 'this note'}":`;
+            setFields.style.display = 'block';
+            if (removeFields) removeFields.style.display = 'block';
+            btnSave.style.display = 'inline-flex';
+            btnSave.textContent = 'Change Password';
+            btnRemove.style.display = 'inline-flex';
+            btnRemove.textContent = 'Remove Lock';
+            if (btnLockNow) btnLockNow.style.display = 'none';
+        }
+    }
+
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        if (!hasPassword || isUnlocked) {
+            const newPwdInput = document.getElementById('modal-new-password');
+            if (newPwdInput) newPwdInput.focus();
+        } else if (removeFields) {
+            const curPwdInput = document.getElementById('modal-current-password');
+            if (curPwdInput) curPwdInput.focus();
+        }
+    }, 60);
+}
+
+function closePasswordLockModal() {
+    const modal = document.getElementById('password-lock-modal');
+    if (modal) modal.style.display = 'none';
+    state.modalLockNodeId = null;
+}
+
+async function savePasswordModal() {
+    const nodeId = state.modalLockNodeId;
+    if (!nodeId || !state.nodes.has(nodeId)) return;
+    const node = state.nodes.get(nodeId);
+
+    const errorEl = document.getElementById('modal-pwd-error');
+    const newPwd = document.getElementById('modal-new-password').value;
+    const confirmPwd = document.getElementById('modal-confirm-password').value;
+    const hint = document.getElementById('modal-password-hint').value.trim();
+
+    // If node already has password and is not unlocked in session, verify current password first
+    if (node.password_hash && !state.unlockedNotes.has(nodeId)) {
+        const curPwd = document.getElementById('modal-current-password').value;
+        if (!curPwd) {
+            errorEl.textContent = 'Please enter your current password.';
+            errorEl.style.display = 'block';
+            return;
+        }
+        const curHash = await hashNotePassword(curPwd);
+        if (curHash !== node.password_hash) {
+            errorEl.textContent = 'Current password does not match.';
+            errorEl.style.display = 'block';
+            return;
+        }
+    }
+
+    if (!newPwd) {
+        errorEl.textContent = 'Password cannot be empty.';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    if (newPwd !== confirmPwd) {
+        errorEl.textContent = 'Passwords do not match. Please verify.';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    const newHash = await hashNotePassword(newPwd);
+    node.password_hash = newHash;
+    node.password_hint = hint || '';
+    node.updated_at = Date.now();
+
+    // Lock note by default upon setting password
+    state.unlockedNotes.delete(nodeId);
+
+    persistActiveNodeImmediately(nodeId, {
+        password_hash: node.password_hash,
+        password_hint: node.password_hint
+    });
+    uploadSingleNodeToDrive(nodeId, true);
+
+    closePasswordLockModal();
+    if (state.activeNodeId === nodeId) {
+        selectNode(nodeId);
+    }
+    renderTree();
+    if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
+        renderAllNotesView();
+    }
+    showToast('🔐 Note password set and locked!', 'success');
+}
+
+async function removePasswordModal() {
+    const nodeId = state.modalLockNodeId;
+    if (!nodeId || !state.nodes.has(nodeId)) return;
+    const node = state.nodes.get(nodeId);
+
+    const errorEl = document.getElementById('modal-pwd-error');
+
+    // If not unlocked in this session, require current password
+    if (node.password_hash && !state.unlockedNotes.has(nodeId)) {
+        const curPwd = document.getElementById('modal-current-password').value;
+        if (!curPwd) {
+            errorEl.textContent = 'Please enter current password to remove lock.';
+            errorEl.style.display = 'block';
+            return;
+        }
+        const curHash = await hashNotePassword(curPwd);
+        if (curHash !== node.password_hash) {
+            errorEl.textContent = 'Current password does not match.';
+            errorEl.style.display = 'block';
+            return;
+        }
+    }
+
+    delete node.password_hash;
+    delete node.password_hint;
+    node.updated_at = Date.now();
+    state.unlockedNotes.delete(nodeId);
+
+    persistActiveNodeImmediately(nodeId, {
+        password_hash: null,
+        password_hint: null
+    });
+    uploadSingleNodeToDrive(nodeId, true);
+
+    closePasswordLockModal();
+    if (state.activeNodeId === nodeId) {
+        selectNode(nodeId);
+    }
+    renderTree();
+    if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
+        renderAllNotesView();
+    }
+    showToast('🔓 Password lock removed from note.', 'info');
+}
+
+function lockNowModal() {
+    const nodeId = state.modalLockNodeId;
+    if (!nodeId || !state.nodes.has(nodeId)) return;
+    state.unlockedNotes.delete(nodeId);
+    closePasswordLockModal();
+    if (state.activeNodeId === nodeId) {
+        selectNode(nodeId);
+    }
+    renderTree();
+    if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
+        renderAllNotesView();
+    }
+    showToast('🔒 Note locked.', 'info');
+}
+
+async function submitUnlockPassword() {
+    const nodeId = state.activeNodeId;
+    if (!nodeId || !state.nodes.has(nodeId)) return;
+    const node = state.nodes.get(nodeId);
+    if (!node || !node.password_hash) return;
+
+    const input = document.getElementById('note-unlock-password-input');
+    const errorEl = document.getElementById('note-unlock-error');
+    if (!input) return;
+
+    const entered = input.value;
+    if (!entered) {
+        if (errorEl) {
+            errorEl.textContent = 'Please enter your password.';
+            errorEl.style.display = 'block';
+        }
+        input.classList.add('shake');
+        setTimeout(() => input.classList.remove('shake'), 400);
+        return;
+    }
+
+    const hashed = await hashNotePassword(entered);
+    if (hashed === node.password_hash) {
+        state.unlockedNotes.add(nodeId);
+        input.value = '';
+        if (errorEl) errorEl.style.display = 'none';
+        showToast('🔓 Note unlocked successfully!', 'success');
+        selectNode(nodeId);
+        renderTree();
+        if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
+            renderAllNotesView();
+        }
+    } else {
+        if (errorEl) {
+            errorEl.textContent = 'Incorrect password. Please try again.';
+            errorEl.style.display = 'block';
+        }
+        input.classList.add('shake');
+        setTimeout(() => input.classList.remove('shake'), 400);
+        input.select();
+    }
+}
+
+function handleTogglePasswordLockClick() {
+    if (!state.activeNodeId || !state.nodes.has(state.activeNodeId)) return;
+    const node = state.nodes.get(state.activeNodeId);
+    if (!node) return;
+
+    if (!node.password_hash) {
+        openPasswordLockModal(state.activeNodeId);
+    } else if (state.unlockedNotes.has(state.activeNodeId)) {
+        state.unlockedNotes.delete(state.activeNodeId);
+        selectNode(state.activeNodeId);
+        renderTree();
+        if (typeof isAllNotesViewActive === 'function' && isAllNotesViewActive()) {
+            renderAllNotesView();
+        }
+        showToast('🔒 Note locked with password.', 'info');
+    } else {
+        const input = document.getElementById('note-unlock-password-input');
+        if (input) input.focus();
     }
 }
 
@@ -7241,6 +7658,14 @@ function setupEventListeners() {
     if (btnDup) btnDup.onclick = duplicateCurrentNode;
     const btnToggleRo = document.getElementById('btn-toggle-readonly');
     if (btnToggleRo) btnToggleRo.onclick = () => toggleReadOnlyMode();
+    const btnTogglePwd = document.getElementById('btn-toggle-password-lock');
+    if (btnTogglePwd) {
+        btnTogglePwd.onclick = () => handleTogglePasswordLockClick();
+        btnTogglePwd.oncontextmenu = (e) => {
+            e.preventDefault();
+            if (state.activeNodeId) openPasswordLockModal(state.activeNodeId);
+        };
+    }
     const btnDel = document.getElementById('btn-delete-node');
     if (btnDel) btnDel.onclick = () => {
         if (state.activeNodeId) deleteNode(state.activeNodeId);
@@ -7249,6 +7674,48 @@ function setupEventListeners() {
     if (readonlyBadge) readonlyBadge.onclick = () => toggleReadOnlyMode();
     const btnRibbonLock = document.getElementById('btn-ribbon-lock');
     if (btnRibbonLock) btnRibbonLock.onclick = () => toggleReadOnlyMode();
+
+    // Password unlock view & Password Modal Listeners
+    const btnSubmitUnlock = document.getElementById('btn-submit-unlock-password');
+    if (btnSubmitUnlock) btnSubmitUnlock.onclick = submitUnlockPassword;
+    const unlockPwdInput = document.getElementById('note-unlock-password-input');
+    if (unlockPwdInput) {
+        unlockPwdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitUnlockPassword();
+            }
+        });
+    }
+
+    const btnCancelPwdModal = document.getElementById('btn-cancel-password-modal');
+    if (btnCancelPwdModal) btnCancelPwdModal.onclick = closePasswordLockModal;
+
+    const btnSavePwdModal = document.getElementById('btn-save-password-modal');
+    if (btnSavePwdModal) btnSavePwdModal.onclick = savePasswordModal;
+
+    const btnRemovePwdModal = document.getElementById('btn-remove-password-modal');
+    if (btnRemovePwdModal) btnRemovePwdModal.onclick = removePasswordModal;
+
+    const btnLockNowModal = document.getElementById('btn-lock-now-password-modal');
+    if (btnLockNowModal) btnLockNowModal.onclick = lockNowModal;
+
+    const pwdModal = document.getElementById('password-lock-modal');
+    if (pwdModal) {
+        pwdModal.addEventListener('click', (e) => {
+            if (e.target === pwdModal) closePasswordLockModal();
+        });
+    }
+
+    const modalConfirmPwd = document.getElementById('modal-confirm-password');
+    if (modalConfirmPwd) {
+        modalConfirmPwd.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                savePasswordModal();
+            }
+        });
+    }
 
     // Tree Right-Click Context Menu Actions
     const ctxNewRoot = document.getElementById('ctx-new-root');
@@ -7315,6 +7782,14 @@ function setupEventListeners() {
         closeTreeContextMenu();
         if (tid) {
             toggleReadOnlyMode(tid);
+        }
+    };
+    const ctxPasswordLock = document.getElementById('ctx-password-lock');
+    if (ctxPasswordLock) ctxPasswordLock.onclick = () => {
+        const tid = activeContextMenuNodeId || state.activeNodeId;
+        closeTreeContextMenu();
+        if (tid) {
+            openPasswordLockModal(tid);
         }
     };
     const ctxExpandAll = document.getElementById('ctx-expand-all');
