@@ -1989,16 +1989,16 @@ function renderTree() {
                 };
             }
 
-            // Password lock badge if password protected
+            // Password lock badge if password protected (Hidden Preview)
             let passwordBadge = null;
             if (node.password_hash) {
                 const isUnlocked = state.unlockedNotes.has(node.id);
                 passwordBadge = document.createElement('span');
                 passwordBadge.className = 'tree-password-badge';
-                passwordBadge.title = isUnlocked ? 'Password Protected (Unlocked)' : 'Password Locked (Requires Password)';
+                passwordBadge.title = isUnlocked ? 'Content Unlocked (Click to Lock)' : 'Hidden / Password Protected (Click to Unlock)';
                 passwordBadge.innerHTML = isUnlocked
-                    ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a6e3a1" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`
-                    : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5"/></svg>`;
+                    ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a6e3a1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+                    : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
                 passwordBadge.onclick = (e) => {
                     e.stopPropagation();
                     openPasswordLockModal(node.id);
@@ -2018,7 +2018,6 @@ function renderTree() {
             const actions = document.createElement('div');
             actions.className = 'tree-actions';
             actions.innerHTML = `
-                <button class="tree-btn" title="Note Lock (Password)" onclick="event.stopPropagation(); openPasswordLockModal('${node.id}')">🔒</button>
                 <button class="tree-btn" title="Add Sub-Note" onclick="event.stopPropagation(); createSubNode('${node.id}', 'note')">+</button>
                 <button class="tree-btn" title="More Options" onclick="event.stopPropagation(); openTreeContextMenu(event, '${node.id}')">⋮</button>
                 <button class="tree-btn" title="Delete" onclick="event.stopPropagation(); deleteNode('${node.id}')">✕</button>
@@ -2445,8 +2444,8 @@ function createKeepCard(node) {
         pwdBadge.title = isUnlocked ? 'Password Protected (Unlocked)' : 'Password Locked';
         pwdBadge.style.display = 'inline-flex';
         pwdBadge.innerHTML = isUnlocked
-            ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a6e3a1" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg><span>Unlocked</span>`
-            : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5"/></svg><span>Password</span>`;
+            ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a6e3a1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>Unlocked</span>`
+            : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg><span>Hidden</span>`;
         titleGroup.appendChild(pwdBadge);
     }
 
