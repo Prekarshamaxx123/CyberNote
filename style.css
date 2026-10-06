@@ -653,6 +653,101 @@ body {
     flex-shrink: 0;
 }
 
+/* Password Locked Note Screen */
+.note-password-locked-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    flex: 1;
+    min-height: 380px;
+}
+
+.lock-shield-icon {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(249, 226, 175, 0.15), rgba(250, 179, 135, 0.10));
+    border: 1px solid rgba(249, 226, 175, 0.35);
+    color: #f9e2af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 20px rgba(249, 226, 175, 0.12);
+}
+
+.lock-input-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    max-width: 360px;
+    width: 100%;
+}
+
+.lock-pwd-input {
+    flex: 1;
+    padding: 8px 14px;
+    background-color: var(--bg-toolbar);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    outline: none;
+    transition: var(--transition);
+}
+
+.lock-pwd-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
+}
+
+.lock-error-msg {
+    color: #f38ba8;
+    font-size: 0.82rem;
+    margin-top: 10px;
+    font-weight: 500;
+}
+
+.lock-hint-msg {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 6px;
+    font-style: italic;
+}
+
+.tree-password-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.tree-password-badge:hover {
+    transform: scale(1.15);
+}
+
+.shake {
+    animation: shakeAnim 0.4s ease-in-out;
+}
+
+@keyframes shakeAnim {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+}
+
+.note-password-lock-btn.active {
+    background-color: rgba(249, 226, 175, 0.15) !important;
+    color: #f9e2af !important;
+    border-color: rgba(249, 226, 175, 0.4) !important;
+}
+
 .drive-sync-indicator {
     font-size: 0.85rem;
 }
