@@ -251,7 +251,8 @@ async function initApp() {
             setupSSE();
             await loadTree();
             if (state.googleAccessToken) {
-                syncWithGoogleDrive({ silent: true }).catch(console.warn);
+                downloadAllNotesFromDrive(true).catch(console.warn);
+                uploadPendingNotesToDrive().catch(console.warn);
             }
             return;
         }
@@ -265,7 +266,8 @@ async function initApp() {
     checkShowStarBanner();
 
     if (state.googleAccessToken) {
-        syncWithGoogleDrive({ silent: true }).catch(console.warn);
+        downloadAllNotesFromDrive(true).catch(console.warn);
+        uploadPendingNotesToDrive().catch(console.warn);
     }
 }
 
@@ -805,78 +807,135 @@ async function driveApiFetch(url, options = {}) {
     return res;
 }
 
-// Ensure CyberNote/ folder exists on Google Drive, return its folder ID
+// Concurrency lock to prevent race conditions during folder discovery/creation
+let folderEnsuringPromise = null;
+let driveBackupFileId = null;
+
+// Ensure CyberNote/ folder exists on Google Drive, return its folder ID (STRICT SINGLE-FOLDER GUARANTEE)
 async function ensureDriveCyberNoteFolder() {
-    let cachedFolderId = localStorage.getItem('cybernote_drive_folder_id');
-    if (cachedFolderId) {
-        try {
-            // Verify write/list access into this cached folder
-            const testQ = `'${cachedFolderId}' in parents and trashed = false`;
-            const chk = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(testQ)}&pageSize=10&fields=files(id,name)`);
-            if (chk.ok) {
-                const chkData = await chk.json();
-                const files = chkData.files || [];
-                // If this cached folder actually has note files or manifest, keep it!
-                const hasNotes = files.some(f => f.name.startsWith('cn_') || f.name === 'CyberNote_Backup.json');
-                if (hasNotes) {
-                    state.driveFolderId = cachedFolderId;
-                    return cachedFolderId;
-                }
-                // If cached folder has 0 note files, search other candidates below to ensure notes aren't in another CyberNote folder
-            }
-        } catch (e) {
-            localStorage.removeItem('cybernote_drive_folder_id');
-            cachedFolderId = null;
+    if (folderEnsuringPromise) {
+        return folderEnsuringPromise;
+    }
+    folderEnsuringPromise = _ensureDriveCyberNoteFolderInternal().finally(() => {
+        folderEnsuringPromise = null;
+    });
+    return folderEnsuringPromise;
+}
+
+async function _ensureDriveCyberNoteFolderInternal() {
+    let cachedFolderId = localStorage.getItem('cybernote_drive_folder_id') || state.driveFolderId;
+
+    // 1. Search for existing CyberNote folder(s) on Google Drive (sorted by newest modifiedTime)
+    const q = "name = 'CyberNote' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+    const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)&pageSize=30`);
+
+    if (!searchRes.ok) {
+        // If search failed (e.g. temporary network error or rate limit), NEVER CREATE A NEW FOLDER!
+        if (cachedFolderId) {
+            state.driveFolderId = cachedFolderId;
+            return cachedFolderId;
         }
+        const errTxt = await searchRes.text();
+        throw new Error(`Google Drive folder search error (${searchRes.status})`);
     }
 
-    // Search for existing CyberNote folder(s) on Google Drive (sorted by newest modifiedTime)
-    try {
-        const q = "name = 'CyberNote' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
-        const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)&pageSize=25`);
-        if (searchRes.ok) {
-            const sd = await searchRes.json();
-            const candidates = sd.files || [];
-            if (candidates.length > 0) {
-                let bestFolderId = null;
-                let maxNoteCount = -1;
+    const sd = await searchRes.json();
+    const candidates = sd.files || [];
 
-                // Inspect candidate CyberNote folders: find the one that actually contains note files
-                for (const candidate of candidates) {
-                    try {
-                        const testQ = `'${candidate.id}' in parents and trashed = false`;
-                        const testRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(testQ)}&pageSize=50&fields=files(id,name)`);
-                        if (testRes.ok) {
-                            const data = await testRes.json();
-                            const files = data.files || [];
-                            const noteFiles = files.filter(f => f.name.startsWith('cn_') || f.name === 'CyberNote_Backup.json');
-                            if (noteFiles.length > maxNoteCount) {
-                                maxNoteCount = noteFiles.length;
-                                bestFolderId = candidate.id;
-                            }
-                        }
-                    } catch (e) {}
+    // CASE A: Candidate folder(s) already exist on Drive!
+    if (candidates.length > 0) {
+        let bestFolderId = null;
+        let bestFolderIndex = -1;
+        let maxFilesCount = -1;
+        const candidateDetails = [];
+
+        // Inspect candidate folders: choose the one with the most notes as primary
+        for (let i = 0; i < candidates.length; i++) {
+            const candidate = candidates[i];
+            try {
+                const testQ = `'${candidate.id}' in parents and trashed = false`;
+                const testRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(testQ)}&pageSize=100&fields=files(id,name)`);
+                if (testRes.ok) {
+                    const data = await testRes.json();
+                    const files = data.files || [];
+                    candidateDetails.push({ folder: candidate, files });
+                    const noteFiles = files.filter(f => f.name.startsWith('cn_') || f.name === 'CyberNote_Backup.json');
+                    if (noteFiles.length > maxFilesCount) {
+                        maxFilesCount = noteFiles.length;
+                        bestFolderId = candidate.id;
+                        bestFolderIndex = i;
+                    }
+                } else {
+                    candidateDetails.push({ folder: candidate, files: [] });
                 }
+            } catch (e) {
+                candidateDetails.push({ folder: candidate, files: [] });
+            }
+        }
 
-                if (bestFolderId) {
-                    if (maxNoteCount > 0 || !cachedFolderId) {
-                        localStorage.setItem('cybernote_drive_folder_id', bestFolderId);
-                        state.driveFolderId = bestFolderId;
-                        return bestFolderId;
+        if (!bestFolderId) {
+            bestFolderId = candidates[0].id;
+            bestFolderIndex = 0;
+        }
+
+        // AUTO-DEDUPLICATION & CONSOLIDATION:
+        // If more than 1 'CyberNote' folder exists on Google Drive, merge files and DELETE duplicates!
+        if (candidates.length > 1) {
+            console.log(`[CyberNote] Found ${candidates.length} folders named "CyberNote". Consolidating into primary folder: ${bestFolderId}`);
+            for (let i = 0; i < candidates.length; i++) {
+                if (i === bestFolderIndex || candidates[i].id === bestFolderId) continue;
+                const dupFolder = candidates[i];
+                const dupFiles = candidateDetails[i]?.files || [];
+
+                // Move any files in duplicate folder into the primary folder
+                for (const file of dupFiles) {
+                    try {
+                        await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${file.id}?addParents=${encodeURIComponent(bestFolderId)}&removeParents=${encodeURIComponent(dupFolder.id)}`, {
+                            method: 'PATCH'
+                        });
+                        console.log(`[CyberNote] Moved file "${file.name}" to primary CyberNote folder.`);
+                    } catch (moveErr) {
+                        console.warn(`[CyberNote] Move file ${file.name} warning:`, moveErr);
                     }
                 }
+
+                // Delete the duplicate empty folder from Google Drive
+                try {
+                    await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${dupFolder.id}`, { method: 'DELETE' });
+                    console.log(`[CyberNote] Successfully deleted duplicate folder: ${dupFolder.id}`);
+                } catch (delErr) {
+                    // Fallback to setting trashed: true
+                    try {
+                        await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${dupFolder.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ trashed: true })
+                        });
+                    } catch (tErr) {}
+                }
             }
         }
-    } catch (e) {
-        console.warn('Folder search error:', e);
+
+        localStorage.setItem('cybernote_drive_folder_id', bestFolderId);
+        state.driveFolderId = bestFolderId;
+        return bestFolderId;
     }
 
+    // CASE B: Zero CyberNote folders exist on Google Drive!
+    // Check if cachedFolderId is still accessible
     if (cachedFolderId) {
-        state.driveFolderId = cachedFolderId;
-        return cachedFolderId;
+        try {
+            const chkQ = `'${cachedFolderId}' in parents and trashed = false`;
+            const chk = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(chkQ)}&pageSize=1&fields=files(id)`);
+            if (chk.ok) {
+                state.driveFolderId = cachedFolderId;
+                return cachedFolderId;
+            }
+        } catch (e) {}
     }
 
-    // Create new CyberNote folder only if zero candidate folders exist
+    // Create new CyberNote folder ONLY when exactly zero candidate folders exist
+    console.log('[CyberNote] Zero CyberNote folders found. Creating exactly ONE CyberNote folder...');
     const createRes = await driveApiFetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -894,6 +953,144 @@ async function ensureDriveCyberNoteFolder() {
     localStorage.setItem('cybernote_drive_folder_id', folderId);
     state.driveFolderId = folderId;
     return folderId;
+}
+
+// Clean and import loose CyberNote_Backup.json at Google Drive root into the primary folder
+async function cleanAndImportRootBackup(folderId) {
+    if (!state.googleAccessToken || !folderId) return;
+    try {
+        const q = "(name = 'CyberNote_Backup.json' or name = 'cybernote-backup.json') and trashed = false";
+        const res = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents,modifiedTime)&pageSize=10`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const files = data.files || [];
+
+        for (const file of files) {
+            const isInsidePrimaryFolder = file.parents && file.parents.includes(folderId);
+            if (!isInsidePrimaryFolder) {
+                // 1. Read notes from loose root backup and merge missing notes
+                try {
+                    const dlRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`);
+                    if (dlRes.ok) {
+                        const raw = await dlRes.text();
+                        let parsed = null;
+                        try { parsed = JSON.parse(raw); } catch (e) {}
+                        if (parsed) {
+                            const importedList = Array.isArray(parsed) ? parsed : (parsed.nodes || []);
+                            if (importedList.length > 0) {
+                                let importedCount = 0;
+                                for (const n of importedList) {
+                                    if (!n || !n.id) continue;
+                                    n._contentLoaded = true;
+                                    const existing = state.nodes.get(n.id);
+                                    if (!existing || (n.updated_at || 0) >= (existing.updated_at || 0)) {
+                                        state.nodes.set(n.id, n);
+                                        importedCount++;
+                                    }
+                                }
+                                if (importedCount > 0) {
+                                    deduplicateNodes();
+                                    saveLocalNodesBackup();
+                                    renderTree();
+                                }
+                            }
+                        }
+                    }
+                } catch (readErr) {
+                    console.warn('[CyberNote] Loose backup import warning:', readErr);
+                }
+
+                // 2. Move loose root backup into CyberNote folder or delete root file
+                try {
+                    await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${file.id}?addParents=${encodeURIComponent(folderId)}&removeParents=root`, {
+                        method: 'PATCH'
+                    });
+                    console.log('[CyberNote] Moved root CyberNote_Backup.json into CyberNote folder.');
+                } catch (moveErr) {
+                    await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, { method: 'DELETE' }).catch(() => {});
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('cleanAndImportRootBackup warning:', e);
+    }
+}
+
+// Maintain a single consolidated CyberNote_Backup.json inside the CyberNote folder
+async function saveConsolidatedBackupToDriveFolder(folderId) {
+    if (!state.googleAccessToken || !folderId) return null;
+    try {
+        const deletedIds = state.deletedNodeIds || new Set();
+        const allNodes = Array.from(state.nodes.values()).filter(n => !deletedIds.has(n.id));
+        const payload = JSON.stringify({
+            app: 'CyberNote',
+            version: 2,
+            exported_at: Date.now(),
+            count: allNodes.length,
+            nodes: allNodes
+        });
+
+        const fileName = 'CyberNote_Backup.json';
+        if (!driveBackupFileId) {
+            const q = `'${folderId}' in parents and name = '${fileName}' and trashed = false`;
+            const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=10`);
+            if (searchRes.ok) {
+                const sData = await searchRes.json();
+                if (sData.files && sData.files.length > 0) {
+                    driveBackupFileId = sData.files[0].id;
+                    // Delete any duplicate backup files inside folder
+                    for (let i = 1; i < sData.files.length; i++) {
+                        deleteNodeFromDrive(sData.files[i].id);
+                    }
+                }
+            }
+        }
+
+        if (driveBackupFileId) {
+            const patchRes = await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveBackupFileId}?uploadType=media`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload
+            });
+            if (patchRes.ok) return driveBackupFileId;
+            if (patchRes.status === 404) driveBackupFileId = null;
+        }
+
+        // Create single CyberNote_Backup.json inside folder
+        const metaRes = await driveApiFetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: fileName,
+                parents: [folderId],
+                mimeType: 'application/json'
+            })
+        });
+        if (metaRes.ok) {
+            const meta = await metaRes.json();
+            driveBackupFileId = meta.id;
+            await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveBackupFileId}?uploadType=media`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload
+            });
+        }
+        return driveBackupFileId;
+    } catch (e) {
+        console.warn('saveConsolidatedBackupToDriveFolder warning:', e);
+        return null;
+    }
+}
+
+// Warm up in-memory cache of note file IDs in 1 single API call (prevents 403/429 rate limits)
+async function warmDriveFileCache(folderId) {
+    if (!state.googleAccessToken || !folderId) return [];
+    try {
+        return await listDriveCyberNoteFiles(folderId);
+    } catch (e) {
+        console.warn('warmDriveFileCache notice:', e);
+        return [];
+    }
 }
 
 // Search for legacy single-file backup on Google Drive
@@ -1002,8 +1199,8 @@ async function listDriveCyberNoteFiles(folderId) {
     const q = `'${folderId}' in parents and trashed = false`;
     let res = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&pageSize=1000`);
     if (!res.ok) {
-        // If 404 or 403, folder might have been deleted or inaccessible; re-ensure folder once
-        if (res.status === 404 || res.status === 403) {
+        // If 404, folder might have been deleted; re-ensure folder once
+        if (res.status === 404) {
             localStorage.removeItem('cybernote_drive_folder_id');
             const newFolderId = await ensureDriveCyberNoteFolder();
             const retryQ = `'${newFolderId}' in parents and trashed = false`;
@@ -1019,6 +1216,10 @@ async function listDriveCyberNoteFiles(folderId) {
     const manifestFile = allFiles.find(f => f.name === 'cn_manifest.json');
     if (manifestFile) {
         driveManifestFileId = manifestFile.id;
+    }
+    const backupFile = allFiles.find(f => f.name === 'CyberNote_Backup.json');
+    if (backupFile) {
+        driveBackupFileId = backupFile.id;
     }
     const files = allFiles.filter(f => f.name.startsWith('cn_') && f.name.endsWith('.json') && f.name !== 'cn_manifest.json');
     // Populate driveFileIdCache
@@ -1039,12 +1240,16 @@ async function uploadNodeToDrive(folderId, node) {
     // If fileId not in cache, search on Drive
     if (!fileId) {
         const q = `'${folderId}' in parents and name = '${fileName}' and trashed = false`;
-        const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+        const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=10`);
         if (searchRes.ok) {
             const data = await searchRes.json();
             if (data.files && data.files.length > 0) {
                 fileId = data.files[0].id;
                 driveFileIdCache.set(node.id, fileId);
+                // Clean up any extra duplicate files for this same note
+                for (let i = 1; i < data.files.length; i++) {
+                    deleteNodeFromDrive(data.files[i].id);
+                }
             }
         }
     }
@@ -1149,11 +1354,15 @@ async function uploadTreeManifestToDrive() {
         const fileName = 'cn_manifest.json';
         if (!driveManifestFileId) {
             const q = `'${folderId}' in parents and name = '${fileName}' and trashed = false`;
-            const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+            const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=10`);
             if (searchRes.ok) {
                 const sData = await searchRes.json();
                 if (sData.files && sData.files.length > 0) {
                     driveManifestFileId = sData.files[0].id;
+                    // Delete any duplicate manifest files
+                    for (let i = 1; i < sData.files.length; i++) {
+                        deleteNodeFromDrive(sData.files[i].id);
+                    }
                 }
             }
         }
@@ -1396,6 +1605,8 @@ async function uploadPendingNotesToDrive() {
             }
         }
         localStorage.setItem('cybernote_pending_uploads', JSON.stringify(Array.from(state.pendingUploadNodeIds)));
+        scheduleManifestUploadToDrive();
+        saveConsolidatedBackupToDriveFolder(folderId).catch(() => {});
         const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setSyncStatus('live', `Drive Synced (${nowStr})`);
         if (count > 0) showToast(`✓ Online: Synced ${count} offline notes to Drive!`);
@@ -1425,6 +1636,7 @@ async function saveAllNotesToDrive(silent = false) {
     try {
         if (!silent) updateSyncProgress(20, 'Step 1/3: Preparing...', 'Ensuring CyberNote folder on Google Drive...');
         const folderId = await ensureDriveCyberNoteFolder();
+        await cleanAndImportRootBackup(folderId);
 
         if (!silent) updateSyncProgress(40, 'Step 2/3: Checking Drive...', 'Listing files in Drive folder...');
         const driveFiles = await listDriveCyberNoteFiles(folderId);
@@ -1462,6 +1674,8 @@ async function saveAllNotesToDrive(silent = false) {
 
         // Upload manifest to keep hierarchy synced
         await uploadTreeManifestToDrive();
+        // Also maintain consolidated single backup file inside CyberNote folder
+        await saveConsolidatedBackupToDriveFolder(folderId);
 
         state.lastDriveSyncTime = Date.now();
         localStorage.setItem('cybernote_last_drive_sync', state.lastDriveSyncTime.toString());
@@ -1535,6 +1749,8 @@ async function downloadAllNotesFromDrive(silent = false) {
     try {
         if (!silent) updateSyncProgress(15, 'Step 1/3: Connecting...', 'Finding CyberNote folder on Google Drive...');
         const folderId = await ensureDriveCyberNoteFolder();
+        await cleanAndImportRootBackup(folderId);
+        await warmDriveFileCache(folderId);
 
         // 1. Fast Manifest Path: load entire hierarchy in 1 single request without downloading 50+ files
         if (!silent) updateSyncProgress(35, 'Step 2/3: Checking notebook manifest...', 'Reading notebook tree structure...');
@@ -1773,6 +1989,7 @@ async function autoRestoreFromDriveOnSignIn() {
 
     try {
         const folderId = await ensureDriveCyberNoteFolder();
+        await cleanAndImportRootBackup(folderId);
 
         // Check what exists on Drive: manifest, per-node files, or legacy backup
         const manifest = await downloadTreeManifestFromDrive();
@@ -3685,10 +3902,6 @@ function selectNode(id) {
                 downloadSingleNoteFromDrive(id, { silent: true });
             } else {
                 setEditorContent(node.content || '');
-                // Silent background freshness check if already cached
-                if (state.googleAccessToken && id) {
-                    downloadSingleNoteFromDrive(id, { silent: true });
-                }
             }
         }
     }
@@ -4113,10 +4326,12 @@ async function deleteNode(id) {
 
     if (!confirm('Are you sure you want to delete this note and its sub-nodes?')) return;
 
+    const branchIds = [];
     if (state.isServerMode) {
         try {
             await fetch(`${API_BASE}/api/nodes/${id}`, { method: 'DELETE' });
             markNodeDeleted(id);
+            branchIds.push(id);
             state.nodes.delete(id);
             if (state.activeNodeId === id) selectNode(null);
             renderTree();
@@ -4125,6 +4340,7 @@ async function deleteNode(id) {
         }
     } else {
         function removeBranch(nodeId) {
+            branchIds.push(nodeId);
             markNodeDeleted(nodeId);
             state.nodes.delete(nodeId);
             for (const [k, n] of state.nodes.entries()) {
@@ -4137,8 +4353,36 @@ async function deleteNode(id) {
         renderTree();
     }
     if (isAllNotesViewActive()) renderAllNotesView();
-    scheduleDriveAutoBackup();
     scheduleManifestUploadToDrive();
+
+    // Directly delete note files from Google Drive
+    if (state.googleAccessToken && branchIds.length > 0) {
+        (async () => {
+            try {
+                const folderId = await ensureDriveCyberNoteFolder();
+                for (const bId of branchIds) {
+                    let fileId = driveFileIdCache.get(bId);
+                    if (!fileId) {
+                        const fileName = `cn_${bId}.json`;
+                        const q = `'${folderId}' in parents and name = '${fileName}' and trashed = false`;
+                        const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=5`);
+                        if (searchRes.ok) {
+                            const d = await searchRes.json();
+                            if (d.files && d.files.length > 0) fileId = d.files[0].id;
+                        }
+                    }
+                    if (fileId) {
+                        await deleteNodeFromDrive(fileId);
+                        driveFileIdCache.delete(bId);
+                    }
+                }
+                await uploadTreeManifestToDrive();
+                await saveConsolidatedBackupToDriveFolder(folderId);
+            } catch (delErr) {
+                console.warn('Drive note deletion sync warning:', delErr);
+            }
+        })();
+    }
 }
 
 // --- Node Position Reordering ---
