@@ -1677,6 +1677,59 @@
         </div>
     </div>
 
+    <!-- Mobile App Download / PWA Install Popup (Android & Apple iOS) -->
+    <div id="mobile-install-popup" class="modal" style="display: none; align-items: flex-end; padding-bottom: 24px; z-index: 100000;">
+        <div class="modal-content mobile-install-card" style="max-width: 440px; width: 92%; margin: 0 auto; border-radius: 18px; padding: 20px 22px; text-align: left; box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 1px rgba(255,255,255,0.25); border: 1px solid rgba(137, 180, 250, 0.28); animation: slideUpSheet 0.35s cubic-bezier(0.16, 1, 0.3, 1);">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <img src="./icons/icon-192.png" alt="CyberNote" style="width: 48px; height: 48px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;" />
+                    <div>
+                        <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                            <span>CyberNote</span>
+                            <span id="mobile-install-badge" style="font-size: 0.68rem; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: rgba(137, 180, 250, 0.15); color: var(--accent); border: 1px solid rgba(137, 180, 250, 0.3);">App</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Offline Cloud Notes</div>
+                    </div>
+                </div>
+                <button class="icon-btn-header" onclick="dismissMobileInstallPrompt()" title="Close" style="font-size: 1.1rem; padding: 4px 8px;">✕</button>
+            </div>
+
+            <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.45; margin: 0 0 14px 0;">
+                Install CyberNote to your phone for <b>100% offline access</b>, full-screen editing, and instant notes!
+            </p>
+
+            <!-- Android Specific View -->
+            <div id="android-install-view" style="display: none; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-mobile-install-now" class="btn btn-primary" onclick="triggerPwaInstall()" style="flex: 1; padding: 11px 16px; font-weight: 600; font-size: 0.9rem; justify-content: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="12" x2="12" y2="21"/></svg>
+                        <span>Download / Install App</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="dismissMobileInstallPrompt()" style="padding: 11px 14px; font-size: 0.85rem;">Not now</button>
+                </div>
+                <div style="font-size: 0.74rem; color: var(--text-muted); text-align: center;">Or tap browser menu (⋮) → "Install app"</div>
+            </div>
+
+            <!-- Apple iOS (iPhone/iPad) Specific View -->
+            <div id="ios-install-view" style="display: none; flex-direction: column; gap: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">
+                <div style="font-size: 0.84rem; color: var(--text-primary); font-weight: 600; margin-bottom: 2px;">
+                    How to install on iPhone / iPad:
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: var(--text-secondary);">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: rgba(137, 180, 250, 0.18); color: var(--accent); flex-shrink: 0; font-weight: 600;">1</span>
+                    <span>Tap the Safari <b>Share</b> button <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align: middle; margin: 0 2px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> (at the bottom)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: var(--text-secondary);">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: rgba(137, 180, 250, 0.18); color: var(--accent); flex-shrink: 0; font-weight: 600;">2</span>
+                    <span>Scroll down and tap <b>"Add to Home Screen"</b> <span style="font-size: 1rem; vertical-align: middle;">➕</span></span>
+                </div>
+                <button class="btn btn-primary" onclick="dismissMobileInstallPrompt()" style="margin-top: 4px; padding: 10px 14px; font-weight: 600; font-size: 0.86rem; justify-content: center;">
+                    Got it! 👍
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- About CyberNote & Developer Modal (Prekarshamaxx123 Support) -->
     <div id="about-modal" class="modal" style="display: none;">
         <div class="modal-content about-modal-content">

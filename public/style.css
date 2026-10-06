@@ -5951,3 +5951,21 @@ body.zen-mode-active .editor-scroll-area {
     color: #11111b;
     font-weight: 700;
 }
+
+/* Mobile PWA Install Bottom Sheet Animation & Styling */
+@keyframes slideUpSheet {
+    from {
+        opacity: 0;
+        transform: translateY(45px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.mobile-install-card {
+    background: #181825 !important;
+    border: 1px solid rgba(137, 180, 250, 0.28) !important;
+}
+
