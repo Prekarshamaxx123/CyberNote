@@ -3648,6 +3648,9 @@ body {
     .sync-badge .sync-text {
         display: none;
     }
+    #btn-header-sync span, #btn-header-signout span {
+        display: none;
+    }
     #user-profile-badge {
         padding: 2px;
     }
