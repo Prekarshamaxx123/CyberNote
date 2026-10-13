@@ -860,8 +860,9 @@ body {
 /* Sidebar */
 .sidebar {
     width: 290px;
-    min-width: 220px;
-    max-width: 500px;
+    min-width: 170px;
+    max-width: 82vw;
+    flex-shrink: 0;
     background-color: var(--bg-sidebar);
     border-right: 1px solid var(--border-color);
     display: flex;
@@ -870,6 +871,11 @@ body {
     overflow: hidden;
     position: relative;
     z-index: 5;
+}
+
+.sidebar.resizing {
+    transition: none !important;
+    user-select: none !important;
 }
 
 .sidebar.collapsed {
@@ -1150,13 +1156,30 @@ body {
 /* Resizer Handle */
 .resizer {
     width: 4px;
+    flex-shrink: 0;
     cursor: col-resize;
     background-color: transparent;
-    transition: background var(--transition);
+    transition: background var(--transition), box-shadow var(--transition);
+    position: relative;
+    z-index: 30;
+    touch-action: none;
+    user-select: none;
+}
+
+/* Wide invisible grab zone so mouse & touch can easily grab the divider line */
+.resizer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -7px;
+    right: -7px;
+    cursor: col-resize;
 }
 
 .resizer:hover, .resizer.dragging {
     background-color: var(--accent);
+    box-shadow: 0 0 8px rgba(137, 180, 250, 0.55);
 }
 
 /* Editor Pane */
@@ -3616,6 +3639,7 @@ body {
         top: 52px;
         left: 0;
         bottom: 26px;
+        max-width: 92vw;
         z-index: 20;
         box-shadow: 4px 0 12px rgba(0, 0, 0, 0.5);
         transform: translateX(-100%);
@@ -3626,6 +3650,20 @@ body {
     }
     .resizer {
         display: none;
+    }
+    .sidebar.open + .resizer {
+        display: block;
+        position: absolute;
+        top: 52px;
+        bottom: 0;
+        left: var(--sidebar-width, 290px);
+        width: 4px;
+        z-index: 9610;
+        background-color: rgba(137, 180, 250, 0.45);
+    }
+    .sidebar.open + .resizer::after {
+        left: -12px;
+        right: -12px;
     }
     .content-split-wrapper {
         flex-direction: column;
