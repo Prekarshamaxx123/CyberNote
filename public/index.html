@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>CyberNote - Secure Hierarchical Cloud Notes</title>
     <meta name="google-site-verification" content="7-8ESzy_QOUR_sHuEBY-WPd0aFVT4u_AmjKsFRLDsYE" />
-    <link rel="stylesheet" href="style.css?v=20261013_sidebar_resizer_v2">
+    <link rel="stylesheet" href="style.css?v=20261013_themes_mobile_ui_v3">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e1e2e">
     <meta name="mobile-web-app-capable" content="yes">
@@ -57,7 +57,7 @@
             </div>
         </div>
 
-        <div class="header-center">
+        <div class="header-center" id="header-center-search">
             <div class="search-box">
                 <span class="search-icon">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -77,6 +77,11 @@
         </div>
 
         <div class="header-right">
+            <!-- Mobile Search Toggle Button -->
+            <button id="btn-mobile-search" class="icon-btn-header mobile-search-btn" title="Search All Notes">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+
             <!-- Google Drive Cloud / Live Sync Status Badge -->
             <div class="sync-badge" id="sync-status" title="Google Drive Cloud Sync Status (Click to open Settings)">
                 <span class="sync-status-icon" id="sync-status-icon">
@@ -128,9 +133,9 @@
                 <span>About</span>
             </button>
 
-            <!-- Theme Toggle -->
-            <button id="btn-theme" class="icon-btn-header" title="Toggle Light/Dark Theme">
-                <svg id="theme-icon-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <!-- Theme Picker Button -->
+            <button id="btn-theme" class="icon-btn-header" title="Choose Theme & Colors">
+                <svg id="theme-icon-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg>
             </button>
 
             <!-- Centralized Settings Button (Gear Icon) -->
@@ -177,6 +182,9 @@
                 <!-- Dynamically populated hierarchical nodes with colored dots -->
             </div>
         </aside>
+
+        <!-- Mobile Sidebar Backdrop Overlay -->
+        <div class="mobile-sidebar-backdrop" id="mobile-sidebar-backdrop"></div>
 
         <!-- Resizer Handle -->
         <div class="resizer" id="resizer"></div>
@@ -1273,8 +1281,20 @@
                         <!-- Drawer 3: Tools, Export & Protection (⋯) -->
                         <div id="m-drawer-tools" class="m-drawer-pane" style="display: none;">
                             <div class="m-drawer-header">
-                                <span class="m-drawer-title">Tools, Export &amp; Security</span>
+                                <span class="m-drawer-title">Themes, Tools &amp; Export</span>
                                 <button type="button" class="m-drawer-close" onclick="closeMobileToolbarDrawer()">✕</button>
+                            </div>
+                            <!-- Quick Theme Picker Row inside Mobile Tools Drawer -->
+                            <div class="m-drawer-subrow">
+                                <span class="m-subrow-label">Theme:</span>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="dark" onclick="applyTheme('dark')">🌑 Cyber</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="cyberpunk" onclick="applyTheme('cyberpunk')">⚡ Neon</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="ocean" onclick="applyTheme('ocean')">🌊 Ocean</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="emerald" onclick="applyTheme('emerald')">🌲 Matrix</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="dracula" onclick="applyTheme('dracula')">🔮 Purple</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="sunset" onclick="applyTheme('sunset')">🌹 Sunset</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="sepia" onclick="applyTheme('sepia')">📜 Sepia</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="light" onclick="applyTheme('light')">☀️ Light</button>
                             </div>
                             <div class="m-drawer-grid">
                                 <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); applyAutoStyle('smart');">
@@ -1285,17 +1305,17 @@
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                                     <span>Find in Note</span>
                                 </button>
-                                <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); toggleZenMode();">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-                                    <span>Focus Mode</span>
+                                <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); document.getElementById('btn-drive-save')?.click();">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/></svg>
+                                    <span>Cloud Save</span>
+                                </button>
+                                <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); document.getElementById('btn-drive-download')?.click();">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="16" x2="12" y2="7"/></svg>
+                                    <span>Cloud Pull</span>
                                 </button>
                                 <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); handlePrintNote();">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                                     <span>Print / PDF</span>
-                                </button>
-                                <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); document.getElementById('btn-toggle-readonly')?.click();">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                                    <span>Read-Only</span>
                                 </button>
                                 <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); exportNoteAs('md');">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1305,9 +1325,9 @@
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                     <span>Export .HTML</span>
                                 </button>
-                                <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); exportNoteAs('txt');">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                    <span>Export .TXT</span>
+                                <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); document.getElementById('btn-about')?.click();">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                    <span>About App</span>
                                 </button>
                             </div>
                         </div>
@@ -2632,9 +2652,83 @@
         </div>
     </div>
 
+    <!-- Theme Picker Popover Menu -->
+    <div id="theme-picker-popover" class="theme-picker-popover" style="display: none;">
+        <div class="theme-picker-header">
+            <span class="theme-picker-title">🎨 Select App Theme</span>
+            <button type="button" class="theme-picker-close" onclick="closeThemePickerPopover()">✕</button>
+        </div>
+        <div class="theme-picker-grid">
+            <button type="button" class="theme-option-card" data-theme="dark" onclick="applyTheme('dark'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" style="background: #0f1120;"></span>
+                    <span class="swatch-editor" style="background: #1e1f30;"></span>
+                    <span class="swatch-accent" style="background: #89b4fa;"></span>
+                </span>
+                <span class="theme-option-name">Cyber Dark</span>
+            </button>
+            <button type="button" class="theme-option-card" data-theme="cyberpunk" onclick="applyTheme('cyberpunk'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" style="background: #090518;"></span>
+                    <span class="swatch-editor" style="background: #171033;"></span>
+                    <span class="swatch-accent" style="background: #00f0ff;"></span>
+                </span>
+                <span class="theme-option-name">Neon Cyber</span>
+            </button>
+            <button type="button" class="theme-option-card" data-theme="ocean" onclick="applyTheme('ocean'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" style="background: #071422;"></span>
+                    <span class="swatch-editor" style="background: #102338;"></span>
+                    <span class="swatch-accent" style="background: #38bdf8;"></span>
+                </span>
+                <span class="theme-option-name">Ocean Abyss</span>
+            </button>
+            <button type="button" class="theme-option-card" data-theme="emerald" onclick="applyTheme('emerald'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" style="background: #071510;"></span>
+                    <span class="swatch-editor" style="background: #11261e;"></span>
+                    <span class="swatch-accent" style="background: #34d399;"></span>
+                </span>
+                <span class="theme-option-name">Matrix Green</span>
+            </button>
+            <button type="button" class="theme-option-card" data-theme="dracula" onclick="applyTheme('dracula'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" style="background: #130e21;"></span>
+                    <span class="swatch-editor" style="background: #221936;"></span>
+                    <span class="swatch-accent" style="background: #c084fc;"></span>
+                </span>
+                <span class="theme-option-name">Royal Purple</span>
+            </button>
+            <button type="button" class="theme-option-card" data-theme="sunset" onclick="applyTheme('sunset'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" style="background: #170c10;"></span>
+                    <span class="swatch-editor" style="background: #28171d;"></span>
+                    <span class="swatch-accent" style="background: #fb7185;"></span>
+                </span>
+                <span class="theme-option-name">Crimson Sunset</span>
+            </button>
+            <button type="button" class="theme-option-card" data-theme="sepia" onclick="applyTheme('sepia'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" style="background: #e2d3b9;"></span>
+                    <span class="swatch-editor" style="background: #fdf9f1;"></span>
+                    <span class="swatch-accent" style="background: #b45309;"></span>
+                </span>
+                <span class="theme-option-name">Warm Sepia</span>
+            </button>
+            <button type="button" class="theme-option-card" data-theme="light" onclick="applyTheme('light'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" style="background: #dbe4f0;"></span>
+                    <span class="swatch-editor" style="background: #ffffff;"></span>
+                    <span class="swatch-accent" style="background: #2563eb;"></span>
+                </span>
+                <span class="theme-option-name">Clean Light</span>
+            </button>
+        </div>
+    </div>
+
     <!-- Toast Notification Container -->
     <div id="cybernote-toast" class="cybernote-toast"></div>
 
-    <script src="app.js?v=20261013_sidebar_resizer_v2"></script>
+    <script src="app.js?v=20261013_themes_mobile_ui_v3"></script>
 </body>
 </html>
