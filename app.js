@@ -399,7 +399,64 @@ function isGoogleSessionValid() {
     return Boolean(token && expiry > Date.now());
 }
 
+function preserveOfflineNotesBeforeLogout() {
+    try {
+        const pendingIds = state.pendingUploadNodeIds ? Array.from(state.pendingUploadNodeIds) : [];
+        const toPreserve = [];
+        if (state.nodes && state.nodes.size > 0) {
+            for (const node of state.nodes.values()) {
+                if (!node || !node.id || node.id === 'welcome-root') continue;
+                if (pendingIds.includes(node.id) || node._offlineEdited) {
+                    toPreserve.push(node);
+                }
+            }
+        }
+        if (toPreserve.length > 0) {
+            localStorage.setItem('cybernote_offline_sync_pending', JSON.stringify(toPreserve));
+            console.log(`[CyberNote] Safely preserved ${toPreserve.length} offline notes before session logout.`);
+        }
+    } catch (e) {
+        console.warn('Failed to preserve offline notes:', e);
+    }
+}
+
+function restorePreservedOfflineNotes() {
+    try {
+        const raw = localStorage.getItem('cybernote_offline_sync_pending');
+        if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list) && list.length > 0) {
+                if (!state.pendingUploadNodeIds) state.pendingUploadNodeIds = new Set();
+                for (const node of list) {
+                    if (node && node.id) {
+                        state.nodes.set(node.id, node);
+                        state.pendingUploadNodeIds.add(node.id);
+                        if (typeof idbPutNote === 'function') idbPutNote(node);
+                        try {
+                            localStorage.setItem(`cybernote_node_${node.id}`, JSON.stringify(node));
+                        } catch (e2) {}
+                    }
+                }
+                localStorage.removeItem('cybernote_offline_sync_pending');
+                localStorage.setItem('cybernote_pending_uploads', JSON.stringify(Array.from(state.pendingUploadNodeIds)));
+                saveLocalNodesBackup();
+                console.log(`[CyberNote] Successfully restored ${list.length} offline notes on sign-in.`);
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to restore preserved offline notes:', e);
+    }
+}
+
 function handleExpiredGoogleSession({ silent = false } = {}) {
+    // CRITICAL OFFLINE GUARANTEE: If device is offline (e.g. mobile app with no internet),
+    // NEVER wipe local notes or log out! The user cannot re-authenticate without internet.
+    // Allow the user to view and edit their notes offline in cache memory.
+    if (!navigator.onLine) {
+        setSyncStatus('offline', 'Offline (Saved locally)');
+        return;
+    }
+
     if (tokenRefreshTimer) {
         clearTimeout(tokenRefreshTimer);
         tokenRefreshTimer = null;
@@ -413,6 +470,9 @@ function handleExpiredGoogleSession({ silent = false } = {}) {
         state.driveSaveTimer = null;
     }
 
+    // Safely preserve any offline-edited notes before clearing session
+    preserveOfflineNotesBeforeLogout();
+
     state.googleAccessToken = null;
     state.googleUser = null;
     state.driveFolderVerified = false;
@@ -422,7 +482,7 @@ function handleExpiredGoogleSession({ silent = false } = {}) {
     localStorage.removeItem('cybernote_user');
     localStorage.setItem('cybernote_logged_out', '1');
 
-    // Completely wipe all local notes and hide note view when session expires
+    // Wipe local notes from UI view when session expires so unauthorized users cannot view them
     clearAllLocalNotesData();
 
     updateGoogleUserUI();
@@ -435,7 +495,12 @@ function handleExpiredGoogleSession({ silent = false } = {}) {
     const now = Date.now();
     if (!silent && now - lastSessionExpiryNoticeTime > 4000) {
         lastSessionExpiryNoticeTime = now;
-        showToast('Session expired. Logged out — please Sign In again to view your notes.', 'warning');
+        const hasPreserved = Boolean(localStorage.getItem('cybernote_offline_sync_pending'));
+        if (hasPreserved) {
+            showToast('Session expired. Sign in with Google to sync your offline notes.', 'warning');
+        } else {
+            showToast('Session expired. Logged out — please Sign In again to view your notes.', 'warning');
+        }
     }
 }
 
@@ -480,6 +545,7 @@ function setupSessionExpiryListeners() {
     sessionListenersAttached = true;
 
     const checkExpiryOnWake = () => {
+        if (!navigator.onLine) return;
         const hadSessionData = Boolean(
             state.googleAccessToken ||
             state.googleUser ||
@@ -497,6 +563,22 @@ function setupSessionExpiryListeners() {
         if (document.visibilityState === 'visible') {
             checkExpiryOnWake();
         }
+    });
+
+    window.addEventListener('online', async () => {
+        setSyncStatus('syncing', 'Internet restored...');
+        if (!isGoogleSessionValid()) {
+            preserveOfflineNotesBeforeLogout();
+            handleExpiredGoogleSession({ silent: false });
+        } else {
+            setSyncStatus('live', 'Online — Syncing...');
+            await uploadPendingNotesToDrive().catch(() => {});
+            await downloadAllNotesFromDrive(true).catch(() => {});
+        }
+    });
+
+    window.addEventListener('offline', () => {
+        setSyncStatus('offline', 'Offline (Saved locally)');
     });
 }
 
@@ -650,6 +732,9 @@ async function handleGoogleTokenResponse(tokenResponse) {
     const expiresIn = tokenResponse.expires_in || 3600;
     localStorage.setItem('cybernote_google_token_expiry', (Date.now() + (expiresIn * 1000)).toString());
     localStorage.removeItem('cybernote_logged_out');
+
+    // Restore any offline notes preserved when session expired
+    restorePreservedOfflineNotes();
 
     scheduleSessionExpiryWatch();
 
@@ -1572,7 +1657,7 @@ function scheduleManifestUploadToDrive() {
     if (manifestUploadTimer) clearTimeout(manifestUploadTimer);
     manifestUploadTimer = setTimeout(() => {
         uploadTreeManifestToDrive().catch(e => console.warn('Manifest upload warning:', e));
-    }, 1800);
+    }, 800);
 }
 
 // Upload lightweight notebook hierarchy manifest (cn_manifest.json) to Drive
@@ -2042,7 +2127,7 @@ async function prefetchAllNoteContentsInBackground() {
     }
 }
 
-// Download all notes from Drive (Instant Manifest Hierarchy + On-Demand Lazy Note Loading)
+// Download all notes from Drive (100% Real, Complete Content Download)
 async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true } = {}) {
     if (state.isSyncing) return;
     if (!isGoogleSessionValid()) {
@@ -2068,82 +2153,42 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
         await cleanAndImportRootBackup(folderId);
         await warmDriveFileCache(folderId);
 
-        // 1. Fast Manifest Path: load entire hierarchy in 1 single request without downloading 50+ files
-        if (!silent) updateSyncProgress(35, 'Step 2/3: Checking notebook manifest...', 'Reading notebook tree structure...');
-        const manifest = await downloadTreeManifestFromDrive();
+        // Fetch manifest and drive files in parallel
+        if (!silent) updateSyncProgress(30, 'Step 2/3: Scanning notes on Drive...', 'Checking all note files on Google Drive...');
+        const [manifest, driveFiles] = await Promise.all([
+            downloadTreeManifestFromDrive().catch(() => null),
+            listDriveCyberNoteFiles(folderId).catch(() => [])
+        ]);
 
-        if (manifest && Array.isArray(manifest.nodes) && manifest.nodes.length > 0) {
-            const deletedIds = state.deletedNodeIds || new Set();
-            const localOnlyHasWelcome = state.nodes.size === 1 && state.nodes.has('welcome-root');
-            let merged = 0;
-            let updated = 0;
+        const deletedIds = state.deletedNodeIds || new Set();
 
-            for (const mNode of manifest.nodes) {
-                if (!mNode || !mNode.id || deletedIds.has(mNode.id)) continue;
-                const localNode = state.nodes.get(mNode.id);
-                if (!localNode) {
-                    if (localOnlyHasWelcome && mNode.id !== 'welcome-root') {
-                        state.nodes.delete('welcome-root');
-                    }
-                    state.nodes.set(mNode.id, {
-                        ...mNode,
-                        content: '',
-                        _contentLoaded: !!(mNode.is_folder || mNode.icon === 'folder')
-                    });
-                    merged++;
-                } else {
-                    const hasLocalContent = typeof localNode.content === 'string' && localNode.content.length > 0;
-                    const isNewerOnCloud = (mNode.updated_at || 0) > (localNode.updated_at || 0);
-                    if (hasLocalContent && !isNewerOnCloud) {
-                        const curContent = localNode.content;
-                        Object.assign(localNode, mNode);
-                        localNode.content = curContent;
-                        localNode._contentLoaded = true;
-                    } else if (hasLocalContent && isNewerOnCloud) {
-                        Object.assign(localNode, mNode);
-                        localNode._contentLoaded = false;
-                    } else {
-                        Object.assign(localNode, mNode);
-                        localNode.content = localNode.content || '';
-                        localNode._contentLoaded = !!(mNode.is_folder || mNode.icon === 'folder');
-                    }
-                    updated++;
+        // 1. Map of files found in Drive folder
+        const driveFileMap = new Map();
+        for (const file of driveFiles) {
+            if (file && file.name && file.name.startsWith('cn_') && file.name.endsWith('.json')) {
+                const nodeId = file.name.replace(/^cn_/, '').replace(/\.json$/, '');
+                if (!deletedIds.has(nodeId)) {
+                    driveFileMap.set(nodeId, file);
+                    driveFileIdCache.set(nodeId, file.id);
                 }
             }
-
-            deduplicateNodes();
-            saveLocalNodesBackup();
-            renderTree();
-
-            // Select active or first note: content will download on-demand
-            if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
-                selectNode(state.activeNodeId);
-            } else if (state.nodes.size > 0) {
-                const firstId = state.nodes.keys().next().value;
-                selectNode(firstId);
-            }
-
-            state.lastDriveSyncTime = Date.now();
-            localStorage.setItem('cybernote_last_drive_sync', state.lastDriveSyncTime.toString());
-            const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            setSyncStatus('live', `Drive Synced (${nowStr})`);
-
-            const summary = `✓ ${manifest.nodes.length} notes synced from Drive!`;
-            if (!silent) {
-                if (logDiv) logDiv.innerHTML = `<span style="color:var(--success); font-weight:600;">${summary}</span>`;
-                if (manageOverlay) hideSyncOverlay();
-                showToast(summary);
-            }
-            prefetchAllNoteContentsInBackground();
-            return;
         }
 
-        // 2. Fallback Path: scan individual files safely without aborting on a single file failure
-        if (!silent) updateSyncProgress(40, 'Step 2/3: Scanning notes...', 'Finding notes on Google Drive...');
-        const driveFiles = await listDriveCyberNoteFiles(folderId);
+        // 2. Gather manifest hierarchy metadata
+        const manifestMap = new Map();
+        if (manifest && Array.isArray(manifest.nodes)) {
+            for (const mNode of manifest.nodes) {
+                if (mNode && mNode.id && !deletedIds.has(mNode.id)) {
+                    manifestMap.set(mNode.id, mNode);
+                }
+            }
+        }
 
-        if (driveFiles.length === 0) {
-            // Check for legacy single-file backup CyberNote_Backup.json on Google Drive
+        // 3. Union of all cloud note IDs (manifest + individual files on Drive)
+        const allCloudNodeIds = new Set([...manifestMap.keys(), ...driveFileMap.keys()]);
+
+        // If no notes exist on Drive, check legacy backup
+        if (allCloudNodeIds.size === 0) {
             if (!silent) updateSyncProgress(45, 'Checking backups...', 'Checking for legacy CyberNote backup on Google Drive...');
             const legacyRestored = await checkAndRestoreLegacyDriveBackup(folderId);
             if (legacyRestored && legacyRestored.length > 0) {
@@ -2160,70 +2205,141 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
             if (!silent) {
                 if (logDiv) logDiv.innerHTML = `<span style="color:var(--text-muted);">No notes found in Google Drive CyberNote folder yet.</span>`;
                 if (manageOverlay) hideSyncOverlay();
+                showToast('Google Drive connected! Notebook ready.');
             }
             if (state.nodes.size === 0) {
                 seedDefaultLocalNotes();
                 renderTree();
                 selectNode('welcome-root');
             }
-            if (!silent) showToast('Google Drive connected! Notebook ready.');
             return;
         }
 
-        if (!silent) updateSyncProgress(50, 'Step 3/3: Synchronizing notes...', `Reading ${driveFiles.length} notes from Drive...`);
+        // 4. Download ALL note contents directly so zero notes are empty!
+        const totalNotes = allCloudNodeIds.size;
+        let downloadedCount = 0;
+        let newCount = 0;
+        let updatedCount = 0;
 
-        const deletedIds = state.deletedNodeIds || new Set();
-        let downloaded = 0;
-        let merged = 0;
-        let updated = 0;
-        const localOnlyHasWelcome = state.nodes.size === 1 && state.nodes.has('welcome-root');
+        if (!silent) {
+            updateSyncProgress(40, 'Step 3/3: Downloading notes...', `Downloading ${totalNotes} notes with full content...`);
+        }
 
-        for (const driveFile of driveFiles) {
-            const nodeId = driveFile.name.replace(/^cn_/, '').replace(/\.json$/, '');
-            if (deletedIds.has(nodeId)) continue;
+        const downloadSingleTask = async (nodeId) => {
+            const fileInfo = driveFileMap.get(nodeId);
+            const mNode = manifestMap.get(nodeId);
 
-            try {
-                const dlRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?alt=media`);
-                if (!dlRes.ok) continue;
-
-                let cloudNode;
-                try { cloudNode = await dlRes.json(); } catch (e) { continue; }
-                if (!cloudNode || !cloudNode.id) continue;
-
-                downloaded++;
-                cloudNode._contentLoaded = true;
-
-                const localNode = state.nodes.get(cloudNode.id);
-                if (!localNode) {
-                    if (localOnlyHasWelcome && cloudNode.id !== 'welcome-root') {
-                        state.nodes.delete('welcome-root');
-                    }
-                    state.nodes.set(cloudNode.id, cloudNode);
-                    merged++;
+            // Folder nodes do not hold text content files
+            if ((mNode?.is_folder || mNode?.icon === 'folder') && !fileInfo) {
+                const existing = state.nodes.get(nodeId);
+                if (!existing) {
+                    state.nodes.set(nodeId, { ...mNode, content: '', _contentLoaded: true });
+                    newCount++;
                 } else {
-                    const cloudTime = cloudNode.updated_at || cloudNode.created_at || 0;
-                    const localTime = localNode.updated_at || localNode.created_at || 0;
-                    if (cloudTime > localTime) {
-                        Object.assign(localNode, cloudNode);
-                        updated++;
+                    Object.assign(existing, mNode);
+                    existing._contentLoaded = true;
+                    updatedCount++;
+                }
+                downloadedCount++;
+                return;
+            }
+
+            let fileId = fileInfo ? fileInfo.id : driveFileIdCache.get(nodeId);
+            if (!fileId) {
+                const fileName = `cn_${nodeId}.json`;
+                const q = `'${folderId}' in parents and name = '${fileName}' and trashed = false`;
+                const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`).catch(() => null);
+                if (searchRes && searchRes.ok) {
+                    const data = await searchRes.json();
+                    if (data.files && data.files.length > 0) {
+                        fileId = data.files[0].id;
+                        driveFileIdCache.set(nodeId, fileId);
                     }
                 }
-            } catch (fileErr) {
-                if (fileErr && fileErr.isSessionExpired) throw fileErr;
-                console.warn(`Safe-skip file ${driveFile.name}:`, fileErr);
             }
+
+            if (!fileId) {
+                if (mNode) {
+                    const existing = state.nodes.get(nodeId);
+                    if (!existing) {
+                        state.nodes.set(nodeId, { ...mNode, content: '', _contentLoaded: true });
+                        newCount++;
+                    }
+                }
+                downloadedCount++;
+                return;
+            }
+
+            try {
+                const dlRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+                if (dlRes && dlRes.ok) {
+                    const cloudNode = await dlRes.json();
+                    if (cloudNode && cloudNode.id) {
+                        if (cloudNode.content && hasEscapedHtmlTags(cloudNode.content)) {
+                            cloudNode.content = repairEscapedHtml(cloudNode.content);
+                        }
+                        cloudNode._contentLoaded = true;
+
+                        const localNode = state.nodes.get(cloudNode.id);
+                        if (!localNode) {
+                            state.nodes.set(cloudNode.id, cloudNode);
+                            newCount++;
+                        } else {
+                            const cloudTime = cloudNode.updated_at || cloudNode.created_at || 0;
+                            const localTime = localNode.updated_at || localNode.created_at || 0;
+                            const isLocalPending = state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(cloudNode.id);
+                            // If local has newer offline edits, keep local edits!
+                            if (isLocalPending && localTime > cloudTime) {
+                                // keep local
+                            } else {
+                                Object.assign(localNode, cloudNode);
+                                updatedCount++;
+                            }
+                            localNode._contentLoaded = true;
+                        }
+
+                        idbPutNote(state.nodes.get(cloudNode.id) || cloudNode);
+                        try {
+                            localStorage.setItem(`cybernote_node_${cloudNode.id}`, JSON.stringify(state.nodes.get(cloudNode.id) || cloudNode));
+                        } catch (e2) {}
+                    }
+                }
+            } catch (err) {
+                if (err && err.isSessionExpired) throw err;
+                console.warn(`Failed to download node ${nodeId}:`, err);
+            }
+
+            downloadedCount++;
+            if (!silent && totalNotes > 0) {
+                const percent = 40 + Math.floor((downloadedCount / totalNotes) * 55);
+                updateSyncProgress(percent, 'Downloading notes...', `Downloaded ${downloadedCount}/${totalNotes} notes...`);
+            }
+        };
+
+        // Download in parallel batches of 6 requests
+        const nodeIdsList = Array.from(allCloudNodeIds);
+        const BATCH_SIZE = 6;
+        for (let i = 0; i < nodeIdsList.length; i += BATCH_SIZE) {
+            const batch = nodeIdsList.slice(i, i + BATCH_SIZE);
+            await Promise.allSettled(batch.map(downloadSingleTask));
+        }
+
+        // If default welcome root was there and cloud has real notes, remove default welcome
+        if (state.nodes.has('welcome-root') && state.nodes.size > 1) {
+            state.nodes.delete('welcome-root');
+            try { localStorage.removeItem('cybernote_node_welcome-root'); } catch (e) {}
         }
 
         deduplicateNodes();
         saveLocalNodesBackup();
         renderTree();
 
-        // Create manifest so future syncs are instant
-        scheduleManifestUploadToDrive();
-
-        if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
-            const isUserTyping = (document.activeElement === noteEditor || document.activeElement === noteTitleInput);
-            if (!isUserTyping) selectNode(state.activeNodeId);
+        // Select active or first note - content is ALREADY downloaded!
+        const lastActive = localStorage.getItem('cybernote_active');
+        if (lastActive && state.nodes.has(lastActive)) {
+            selectNode(lastActive);
+        } else if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
+            selectNode(state.activeNodeId);
         } else if (state.nodes.size > 0) {
             const firstId = state.nodes.keys().next().value;
             selectNode(firstId);
@@ -2232,9 +2348,9 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
         state.lastDriveSyncTime = Date.now();
         localStorage.setItem('cybernote_last_drive_sync', state.lastDriveSyncTime.toString());
         const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setSyncStatus('live', `Downloaded from Drive (${nowStr})`);
+        setSyncStatus('live', `Drive Synced (${nowStr})`);
 
-        const summary = `✓ ${merged + updated} notes synced from Drive at ${nowStr} (${merged} new, ${updated} updated)`;
+        const summary = `✓ ${totalNotes} notes downloaded from Drive!`;
         if (!silent) {
             if (logDiv) logDiv.innerHTML = `<span style="color:var(--success); font-weight:600;">${summary}</span>`;
             if (manageOverlay) hideSyncOverlay();
@@ -2301,20 +2417,20 @@ function closeSyncConflictModal() {
 }
 
 async function autoRestoreFromDriveOnSignIn() {
-    // Collect local notes (excluding the default welcome note if that's all there is)
+    const hasPendingUploads = Boolean(state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0);
     const localNotes = Array.from(state.nodes.values()).filter(n => n.id !== 'welcome-root');
     const hasMeaningfulLocalNotes = localNotes.length > 0;
 
     setSyncStatus('syncing', 'Connecting to Google Drive...');
-    showSyncOverlay('Connecting to Google Drive...', 'Checking your Google Drive notebook...');
+    showSyncOverlay('Syncing with Google Drive...', 'Connecting to your Google Drive notebook...');
 
     try {
         const folderId = await ensureDriveCyberNoteFolder();
         await cleanAndImportRootBackup(folderId);
 
-        // Check what exists on Drive: manifest, per-node files, or legacy backup
-        const manifest = await downloadTreeManifestFromDrive();
-        const driveFiles = await listDriveCyberNoteFiles(folderId);
+        // Check what exists on Drive
+        const manifest = await downloadTreeManifestFromDrive().catch(() => null);
+        const driveFiles = await listDriveCyberNoteFiles(folderId).catch(() => []);
         let cloudCount = (manifest && Array.isArray(manifest.nodes) && manifest.nodes.length > 0)
             ? manifest.nodes.length
             : driveFiles.length;
@@ -2328,7 +2444,7 @@ async function autoRestoreFromDriveOnSignIn() {
             // Fresh / Empty Drive notebook
             if (hasMeaningfulLocalNotes) {
                 // Upload local offline notes to Drive
-                showSyncOverlay('Connected to Drive!', `Uploading your ${localNotes.length} local notes to Google Drive...`);
+                updateSyncProgress(40, 'Uploading to Drive...', `Uploading your ${localNotes.length} local notes to Google Drive...`);
                 await saveAllNotesToDrive(false, { forceAll: true, manageOverlay: false });
                 hideSyncOverlay();
                 showToast(`✓ Google Drive connected! Uploaded ${localNotes.length} notes to Drive.`, 'success');
@@ -2341,18 +2457,28 @@ async function autoRestoreFromDriveOnSignIn() {
         }
 
         // Cloud HAS notes!
-        if (!hasMeaningfulLocalNotes) {
-            // Fresh device / no local offline notes: remove default welcome note and download all notes from Drive
+        // Case A: Device has NO local notes or only welcome note:
+        // ACTUALLY download all notes with full contents directly!
+        if (!hasMeaningfulLocalNotes || !hasPendingUploads) {
             if (state.nodes.has('welcome-root')) {
                 state.nodes.delete('welcome-root');
             }
+            updateSyncProgress(30, 'Downloading notes...', 'Downloading all notes from Google Drive...');
+            await downloadAllNotesFromDrive(false, { manageOverlay: false });
             hideSyncOverlay();
-            return downloadAllNotesFromDrive(false);
+            return;
         }
 
-        // Both local offline notes and cloud notes exist! Prompt user with Conflict Modal
+        // Case B: User typed notes offline, then came online and signed in:
+        // Automatically merge: download cloud notes (local newer edits preserved) and upload offline notes!
+        updateSyncProgress(30, 'Merging notes...', 'Downloading cloud notes and syncing offline edits...');
+        await downloadAllNotesFromDrive(false, { manageOverlay: false });
+        if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+            updateSyncProgress(85, 'Uploading offline edits...', 'Syncing offline notes to Google Drive...');
+            await uploadPendingNotesToDrive();
+        }
         hideSyncOverlay();
-        openSyncConflictModal(localNotes.length, cloudCount);
+        showToast('✓ Successfully synced notes with Google Drive!', 'success');
     } catch (err) {
         if (err && err.isSessionExpired) {
             hideSyncOverlay();
@@ -2429,7 +2555,7 @@ function scheduleDriveAutoBackup() {
             flushEditorToState();
             uploadSingleNodeToDrive(state.activeNodeId, true);
         }
-    }, 1800);
+    }, 1100);
 }
 
 // ---- Header "Save" Button Handler ----
@@ -2858,8 +2984,8 @@ function saveLocalNodesBackup() {
 }
 
 async function loadLocalNodes() {
-    // If a Google token/session was stored but is now expired, immediately expire & log out and hide notes
-    if ((localStorage.getItem('cybernote_google_token') || localStorage.getItem('cybernote_google_user') || state.googleUser || state.googleAccessToken) && !isGoogleSessionValid()) {
+    // If online and a Google token/session was stored but is now expired, expire & log out
+    if (navigator.onLine && (localStorage.getItem('cybernote_google_token') || localStorage.getItem('cybernote_google_user') || state.googleUser || state.googleAccessToken) && !isGoogleSessionValid()) {
         handleExpiredGoogleSession({ silent: true });
         return;
     }
@@ -4592,6 +4718,18 @@ function flushActiveNodeBeforeUnload() {
                 navigator.sendBeacon(`${API_BASE}/api/nodes/${activeId}`, new Blob([payload], { type: 'application/json' }));
             } catch (e2) {}
         }
+    }
+
+    // 4. Immediate Google Drive cloud push when leaving/hiding active note
+    if (isGoogleSessionValid() && navigator.onLine) {
+        uploadSingleNodeToDrive(activeId, true).catch(() => {});
+    } else {
+        cur._offlineEdited = true;
+        if (!state.pendingUploadNodeIds) state.pendingUploadNodeIds = new Set();
+        state.pendingUploadNodeIds.add(activeId);
+        try {
+            localStorage.setItem('cybernote_pending_uploads', JSON.stringify(Array.from(state.pendingUploadNodeIds)));
+        } catch (e3) {}
     }
 }
 
