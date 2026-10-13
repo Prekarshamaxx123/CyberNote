@@ -3913,6 +3913,8 @@ function selectNode(id) {
         }
         if (titleContainer) titleContainer.style.display = 'none';
         if (ribbonEl) ribbonEl.style.display = 'none';
+        document.getElementById('mobile-bottom-toolbar-wrap')?.classList.add('mobile-toolbar-hidden');
+        if (typeof closeMobileToolbarDrawer === 'function') closeMobileToolbarDrawer();
         if (tagsEl) tagsEl.style.display = 'none';
         if (scrollArea) scrollArea.style.display = 'none';
         if (folderViewEl) folderViewEl.style.display = 'none';
@@ -3944,6 +3946,8 @@ function selectNode(id) {
 
         if (isFolder) {
             if (ribbonEl) ribbonEl.style.display = 'none';
+            document.getElementById('mobile-bottom-toolbar-wrap')?.classList.add('mobile-toolbar-hidden');
+            if (typeof closeMobileToolbarDrawer === 'function') closeMobileToolbarDrawer();
             if (tagsEl) tagsEl.style.display = 'none';
             if (scrollArea) scrollArea.style.display = 'none';
             if (folderViewEl) folderViewEl.style.display = 'flex';
@@ -3955,6 +3959,8 @@ function selectNode(id) {
             if (tagsEl) tagsEl.style.display = 'flex';
             if (scrollArea) scrollArea.style.display = 'flex';
             if (ribbonEl) ribbonEl.style.display = node.is_readonly ? 'none' : '';
+            document.getElementById('mobile-bottom-toolbar-wrap')?.classList.toggle('mobile-toolbar-hidden', !!node.is_readonly);
+            if (node.is_readonly && typeof closeMobileToolbarDrawer === 'function') closeMobileToolbarDrawer();
             if (btnToggleRo) btnToggleRo.style.display = 'inline-flex';
             noteTitleInput.placeholder = 'Note Title...';
 
@@ -4548,15 +4554,22 @@ function toggleReadOnlyMode(targetNodeId = null) {
 function applyReadOnlyState(isReadOnly) {
     state.isReadOnly = isReadOnly;
 
-    // 1. Hide/Show Ribbon Toolbar
+    // 1. Hide/Show Ribbon Toolbar & Mobile Bottom Toolbar
     const ribbon = document.getElementById('editor-ribbon');
+    const mobileBarWrap = document.getElementById('mobile-bottom-toolbar-wrap');
+    const activeNode = state.activeNodeId ? state.nodes.get(state.activeNodeId) : null;
+    const isFolder = activeNode && (activeNode.is_folder || activeNode.icon === 'folder');
     if (ribbon) {
-        const activeNode = state.activeNodeId ? state.nodes.get(state.activeNodeId) : null;
-        const isFolder = activeNode && (activeNode.is_folder || activeNode.icon === 'folder');
         if (isFolder) {
             ribbon.style.display = 'none';
         } else {
             ribbon.style.display = isReadOnly ? 'none' : '';
+        }
+    }
+    if (mobileBarWrap) {
+        mobileBarWrap.classList.toggle('mobile-toolbar-hidden', !!(isFolder || isReadOnly));
+        if (isFolder || isReadOnly) {
+            try { if (typeof closeMobileToolbarDrawer === 'function') closeMobileToolbarDrawer(); } catch (e) {}
         }
     }
 
@@ -9890,6 +9903,7 @@ function setupEventListeners() {
     setupSelectionBubble();
     setupSlashCommandMenu();
     setupEditorContextMenu();
+    setupMobileBottomToolbar();
 }
 
 // ==========================================================================
@@ -10354,11 +10368,310 @@ function setupSlashCommandMenu() {
         }, 10);
     });
 
+    // Support Android / iOS soft keyboards where e.key is 'Unidentified' on '/'
+    noteEditor.addEventListener('input', (e) => {
+        if (state.isReadOnly) return;
+        if (!slashState.active && e.data === '/') {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount) return;
+            const node = sel.anchorNode;
+            const offset = sel.anchorOffset;
+            if (node && node.nodeType === Node.TEXT_NODE) {
+                const text = node.textContent;
+                const slashPos = offset - 1;
+                if (slashPos === 0 || /\s/.test(text[slashPos - 1])) {
+                    slashState.textNode = node;
+                    slashState.slashIndex = slashPos;
+                    openSlashMenuAtCursor();
+                }
+            }
+        } else if (slashState.active && slashState.textNode) {
+            const text = slashState.textNode.textContent;
+            if (slashState.slashIndex < text.length && text[slashState.slashIndex] === '/') {
+                slashState.query = text.substring(slashState.slashIndex + 1);
+                renderSlashMenuItems();
+            } else {
+                closeSlashMenu();
+            }
+        }
+    });
+
     document.addEventListener('mousedown', (e) => {
-        if (slashState.active && !slashMenu.contains(e.target) && e.target !== noteEditor) {
+        if (slashState.active && !slashMenu.contains(e.target) && e.target !== noteEditor && !e.target.closest('#m-btn-slash')) {
             closeSlashMenu();
         }
     });
+}
+
+// ==========================================================================
+// MOBILE & PWA BOTTOM KEYBOARD-AWARE TOOLBAR ENGINE
+// ==========================================================================
+let activeMobileDrawerId = null;
+let mobileHeadingCycleIdx = 0;
+const MOBILE_HEADINGS_ORDER = ['h1', 'h2', 'h3', 'p'];
+let mobileAlignCycleIdx = 0;
+const MOBILE_ALIGNS_ORDER = [
+    { cmd: 'justifyLeft', label: 'Align Left' },
+    { cmd: 'justifyCenter', label: 'Align Center' },
+    { cmd: 'justifyRight', label: 'Align Right' },
+    { cmd: 'justifyFull', label: 'Justify' }
+];
+let maxObservedViewportHeight = window.innerHeight || 800;
+
+function closeMobileToolbarDrawer() {
+    const drawer = document.getElementById('mobile-toolbar-drawer');
+    if (drawer) drawer.style.display = 'none';
+    ['m-drawer-insert', 'm-drawer-format', 'm-drawer-tools'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    ['m-btn-insert', 'm-btn-format', 'm-btn-tools'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.remove('active');
+    });
+    activeMobileDrawerId = null;
+}
+window.closeMobileToolbarDrawer = closeMobileToolbarDrawer;
+
+function toggleMobileToolbarDrawer(paneId, btnId) {
+    saveSelection();
+    closeSlashMenu();
+    const drawer = document.getElementById('mobile-toolbar-drawer');
+    if (!drawer) return;
+
+    if (activeMobileDrawerId === paneId && drawer.style.display !== 'none') {
+        closeMobileToolbarDrawer();
+        return;
+    }
+
+    ['m-drawer-insert', 'm-drawer-format', 'm-drawer-tools'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = id === paneId ? 'flex' : 'none';
+    });
+    ['m-btn-insert', 'm-btn-format', 'm-btn-tools'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.toggle('active', id === btnId);
+    });
+
+    drawer.style.display = 'block';
+    activeMobileDrawerId = paneId;
+}
+
+function setupMobileBottomToolbar() {
+    const mobileBar = document.getElementById('mobile-bottom-toolbar');
+    const mobileDrawer = document.getElementById('mobile-toolbar-drawer');
+    if (!mobileBar) return;
+
+    // 1. Prevent tapping toolbar buttons from stealing focus or closing the virtual keyboard
+    const preventFocusSteal = (e) => {
+        if (e.target.closest('select, input')) return;
+        if (e.target.closest('button, .m-color-swatch')) {
+            saveSelection();
+            e.preventDefault();
+        }
+    };
+    mobileBar.addEventListener('mousedown', preventFocusSteal);
+    if (mobileDrawer) mobileDrawer.addEventListener('mousedown', preventFocusSteal);
+
+    // 2. Wire up Mobile Bottom Bar Buttons (100% CyberNote Tools)
+    const bindM = (id, fn) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fn(e);
+        };
+    };
+
+    // Drawers (+, Aa, Tools)
+    bindM('m-btn-insert', () => toggleMobileToolbarDrawer('m-drawer-insert', 'm-btn-insert'));
+    bindM('m-btn-format', () => toggleMobileToolbarDrawer('m-drawer-format', 'm-btn-format'));
+    bindM('m-btn-tools', () => toggleMobileToolbarDrawer('m-drawer-tools', 'm-btn-tools'));
+
+    // Slash Quick Actions Menu (/)
+    bindM('m-btn-slash', () => {
+        closeMobileToolbarDrawer();
+        if (slashState.active) {
+            closeSlashMenu();
+            return;
+        }
+        restoreSelection();
+        if (document.activeElement !== noteEditor) {
+            noteEditor.focus();
+        }
+        slashState.active = true;
+        slashState.query = '';
+        slashState.selectedIndex = 0;
+        slashState.textNode = null;
+        slashState.slashIndex = -1;
+        if (slashMenu) {
+            slashMenu.style.display = 'flex';
+            renderSlashMenuItems();
+        }
+    });
+
+    // Studio & Media Actions
+    bindM('m-btn-photo', () => {
+        closeMobileToolbarDrawer();
+        triggerImageUpload();
+    });
+    bindM('m-btn-paint', () => {
+        closeMobileToolbarDrawer();
+        openPaintModal('signature');
+    });
+    bindM('m-btn-shape', () => {
+        closeMobileToolbarDrawer();
+        openShapeModal('rect');
+    });
+    bindM('m-btn-table', () => {
+        closeMobileToolbarDrawer();
+        openTableModal();
+    });
+    bindM('m-btn-codebox', () => {
+        closeMobileToolbarDrawer();
+        openCodeBoxModal();
+    });
+
+    // Indentation, Lists & Links
+    bindM('m-btn-outdent', () => execFormat('outdent'));
+    bindM('m-btn-indent', () => execFormat('indent'));
+    bindM('m-btn-link', () => {
+        closeMobileToolbarDrawer();
+        insertHyperlink();
+    });
+    bindM('m-btn-todo', () => insertTodoItem());
+    bindM('m-btn-ul', () => execFormat('insertUnorderedList'));
+    bindM('m-btn-ol', () => execFormat('insertOrderedList'));
+
+    // Undo, Redo & Clear Formatting
+    bindM('m-btn-undo', () => performUndo());
+    bindM('m-btn-redo', () => performRedo());
+    bindM('m-btn-clear', () => execFormat('removeFormat'));
+
+    // Heading & Alignment Cycles + Character Styles
+    bindM('m-btn-heading', () => {
+        const tag = MOBILE_HEADINGS_ORDER[mobileHeadingCycleIdx % MOBILE_HEADINGS_ORDER.length];
+        mobileHeadingCycleIdx = (mobileHeadingCycleIdx + 1) % MOBILE_HEADINGS_ORDER.length;
+        handleHeadingChange(tag);
+    });
+    bindM('m-btn-align', () => {
+        const item = MOBILE_ALIGNS_ORDER[mobileAlignCycleIdx % MOBILE_ALIGNS_ORDER.length];
+        mobileAlignCycleIdx = (mobileAlignCycleIdx + 1) % MOBILE_ALIGNS_ORDER.length;
+        execFormat(item.cmd);
+        showToast(`✓ ${item.label}`);
+    });
+    bindM('m-btn-bold', () => execFormat('bold'));
+    bindM('m-btn-italic', () => execFormat('italic'));
+    bindM('m-btn-underline', () => execFormat('underline'));
+    bindM('m-btn-autostyle', () => {
+        closeMobileToolbarDrawer();
+        applyAutoStyle('smart');
+    });
+
+    // Right Pinned Keyboard Dismiss / Toggle Button
+    bindM('m-btn-kb-toggle', () => {
+        if (activeMobileDrawerId) {
+            closeMobileToolbarDrawer();
+        }
+        if (slashState.active) {
+            closeSlashMenu();
+        }
+        const isKbOpen = document.body.classList.contains('mobile-kb-open') ||
+                         document.activeElement === noteEditor ||
+                         document.activeElement === noteTitleInput ||
+                         document.activeElement === noteTagsInput;
+        if (isKbOpen) {
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+            noteEditor.blur();
+        } else {
+            noteEditor.focus();
+        }
+    });
+
+    // Close mobile drawer when tapping inside editor or outside drawer
+    document.addEventListener('pointerdown', (e) => {
+        if (activeMobileDrawerId && !e.target.closest('#mobile-bottom-toolbar-wrap')) {
+            closeMobileToolbarDrawer();
+        }
+    });
+
+    // 3. Real-Time Virtual Keyboard Tracking (visualViewport API)
+    let kbRaf = null;
+    const syncKeyboardViewport = () => {
+        if (kbRaf) cancelAnimationFrame(kbRaf);
+        kbRaf = requestAnimationFrame(() => {
+            const vv = window.visualViewport;
+            const layoutH = window.innerHeight || document.documentElement.clientHeight;
+            if (layoutH > maxObservedViewportHeight) {
+                maxObservedViewportHeight = layoutH;
+            }
+            if (!vv) {
+                document.documentElement.style.setProperty('--kb-offset', '0px');
+                return;
+            }
+            if (vv.height > maxObservedViewportHeight) {
+                maxObservedViewportHeight = vv.height;
+            }
+
+            // Distance from bottom of layout viewport to bottom of visible viewport (top of keyboard)
+            const viewportBottom = vv.offsetTop + vv.height;
+            const kbOffset = Math.max(0, Math.round(layoutH - viewportBottom));
+
+            // Detect if virtual keyboard is open (either via visualViewport offset or shrunk layout viewport)
+            const heightDrop = maxObservedViewportHeight - vv.height;
+            const isKbOpen = kbOffset > 60 || heightDrop > 140;
+
+            document.documentElement.style.setProperty('--kb-offset', `${kbOffset}px`);
+            document.body.classList.toggle('mobile-kb-open', isKbOpen);
+
+            // Keep active typing cursor visible above the bottom toolbar when keyboard opens
+            if (isKbOpen && document.activeElement === noteEditor) {
+                ensureCaretVisibleAboveMobileBar(vv.height);
+            }
+        });
+    };
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', syncKeyboardViewport);
+        window.visualViewport.addEventListener('scroll', syncKeyboardViewport);
+    }
+    window.addEventListener('resize', syncKeyboardViewport);
+    window.addEventListener('orientationchange', () => {
+        maxObservedViewportHeight = 0;
+        setTimeout(syncKeyboardViewport, 150);
+    });
+    noteEditor.addEventListener('focus', () => setTimeout(syncKeyboardViewport, 80));
+    noteEditor.addEventListener('blur', () => setTimeout(syncKeyboardViewport, 80));
+    noteEditor.addEventListener('keyup', () => {
+        if (window.innerWidth <= 820 && window.visualViewport) {
+            ensureCaretVisibleAboveMobileBar(window.visualViewport.height);
+        }
+    });
+
+    syncKeyboardViewport();
+}
+
+function ensureCaretVisibleAboveMobileBar(visibleViewportHeight) {
+    try {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        if (!noteEditor.contains(range.commonAncestorContainer)) return;
+        const rect = range.getBoundingClientRect();
+        if (!rect || (rect.top === 0 && rect.bottom === 0)) return;
+
+        const safeBottomLimit = visibleViewportHeight - 62; // 46px bar + 16px breathing room
+        const scrollArea = document.getElementById('editor-scroll-area');
+        if (scrollArea && rect.bottom > safeBottomLimit) {
+            scrollArea.scrollBy({
+                top: rect.bottom - safeBottomLimit + 20,
+                behavior: 'smooth'
+            });
+        }
+    } catch (_) {}
 }
 
 // ==========================================================================
