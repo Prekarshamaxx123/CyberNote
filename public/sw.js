@@ -1,6 +1,6 @@
 // CyberNote 🛡️ - Service Worker for 100% Offline-First PWA Execution
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '') || '';
-const CACHE_NAME = 'cybernote-v13-mobile-bottom-toolbar';
+const CACHE_NAME = 'cybernote-v14-sidebar-resizer';
 
 const ASSETS_TO_CACHE = [
     `${BASE_PATH}/`,

@@ -9900,10 +9900,119 @@ function setupEventListeners() {
     if (toggleSidebarBtn) toggleSidebarBtn.onclick = toggleSidebar;
     if (toggleSidebarRibbonBtn) toggleSidebarRibbonBtn.onclick = toggleSidebar;
 
+    setupSidebarResizer();
     setupSelectionBubble();
     setupSlashCommandMenu();
     setupEditorContextMenu();
     setupMobileBottomToolbar();
+}
+
+// ==========================================================================
+// DRAGGABLE SIDEBAR RESIZER (Mouse & Touch Support + Persistent Width)
+// ==========================================================================
+function setupSidebarResizer() {
+    const sidebar = document.getElementById('sidebar');
+    const resizer = document.getElementById('resizer');
+    if (!sidebar || !resizer) return;
+
+    const MIN_WIDTH = 170;
+    const DEFAULT_WIDTH = 290;
+
+    const getMaxWidth = () => {
+        const vw = window.innerWidth || 1024;
+        return vw <= 768 ? Math.floor(vw * 0.92) : Math.floor(vw * 0.82);
+    };
+
+    const applySidebarWidth = (w) => {
+        const clamped = Math.max(MIN_WIDTH, Math.min(getMaxWidth(), Math.round(w)));
+        sidebar.style.width = `${clamped}px`;
+        document.documentElement.style.setProperty('--sidebar-width', `${clamped}px`);
+        return clamped;
+    };
+
+    // Restore saved sidebar width if valid
+    const savedWidth = parseInt(localStorage.getItem('cybernote_sidebar_width') || '', 10);
+    if (!isNaN(savedWidth) && savedWidth >= MIN_WIDTH) {
+        applySidebarWidth(savedWidth);
+    } else {
+        document.documentElement.style.setProperty('--sidebar-width', `${DEFAULT_WIDTH}px`);
+    }
+
+    let isDragging = false;
+    let currentWidth = sidebar.offsetWidth || DEFAULT_WIDTH;
+
+    const startDrag = (e) => {
+        if (sidebar.classList.contains('collapsed')) return;
+        isDragging = true;
+        sidebar.classList.add('resizing');
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        if (e.cancelable) e.preventDefault();
+    };
+
+    const onMove = (clientX) => {
+        if (!isDragging) return;
+        currentWidth = applySidebarWidth(clientX);
+    };
+
+    const stopDrag = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        sidebar.classList.remove('resizing');
+        resizer.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        try {
+            localStorage.setItem('cybernote_sidebar_width', String(currentWidth));
+        } catch (_) {}
+    };
+
+    // Mouse Events
+    resizer.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        onMove(e.clientX);
+    });
+    window.addEventListener('mouseup', stopDrag);
+
+    // Touch Events (Mobile & Tablet)
+    resizer.addEventListener('touchstart', startDrag, { passive: false });
+    window.addEventListener('touchmove', (e) => {
+        if (!isDragging || !e.touches || !e.touches[0]) return;
+        if (e.cancelable) e.preventDefault();
+        onMove(e.touches[0].clientX);
+    }, { passive: false });
+    window.addEventListener('touchend', stopDrag);
+    window.addEventListener('touchcancel', stopDrag);
+
+    // Double-click resizer to toggle between Auto-Fit (longest node name) and Default (290px)
+    resizer.addEventListener('dblclick', () => {
+        const cur = sidebar.offsetWidth || DEFAULT_WIDTH;
+        if (Math.abs(cur - DEFAULT_WIDTH) > 15) {
+            currentWidth = applySidebarWidth(DEFAULT_WIDTH);
+        } else {
+            let maxNeeded = 340;
+            sidebar.querySelectorAll('.tree-node').forEach(nodeEl => {
+                const labelEl = nodeEl.querySelector('.tree-label');
+                if (labelEl) {
+                    const needed = nodeEl.offsetLeft + labelEl.scrollWidth + 95;
+                    if (needed > maxNeeded) maxNeeded = needed;
+                }
+            });
+            currentWidth = applySidebarWidth(maxNeeded);
+        }
+        try {
+            localStorage.setItem('cybernote_sidebar_width', String(currentWidth));
+        } catch (_) {}
+    });
+
+    window.addEventListener('resize', () => {
+        const saved = parseInt(localStorage.getItem('cybernote_sidebar_width') || '', 10);
+        if (!isNaN(saved) && saved >= MIN_WIDTH) {
+            applySidebarWidth(saved);
+        }
+    });
 }
 
 // ==========================================================================
