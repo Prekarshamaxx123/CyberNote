@@ -273,22 +273,69 @@ async function initApp() {
     }
 }
 
-// --- Theme Management ---
+// --- Theme Management (8 Curated Themes with Distinct Contrasting Sidebar) ---
+const VALID_THEMES = ['dark', 'cyberpunk', 'ocean', 'emerald', 'dracula', 'sunset', 'sepia', 'light'];
+const THEME_META_COLORS = {
+    dark: '#151624',
+    cyberpunk: '#0d0722',
+    ocean: '#091929',
+    emerald: '#0a1c15',
+    dracula: '#191229',
+    sunset: '#1f1116',
+    sepia: '#f3ead8',
+    light: '#f1f5f9'
+};
+
 function applyTheme(theme) {
-    state.theme = theme;
-    document.body.className = theme === 'light' ? 'theme-light' : 'theme-dark';
-    const themeBtn = document.getElementById('btn-theme');
-    if (themeBtn) {
-        themeBtn.innerHTML = theme === 'light'
-            ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
-            : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    const validTheme = VALID_THEMES.includes(theme) ? theme : 'dark';
+    state.theme = validTheme;
+
+    // Remove existing theme-* classes while preserving other body classes (e.g. zen-mode-active, mobile-kb-open)
+    VALID_THEMES.forEach(t => document.body.classList.remove(`theme-${t}`));
+    document.body.classList.remove('light-theme');
+    document.body.classList.add(`theme-${validTheme}`);
+    if (validTheme === 'light' || validTheme === 'sepia') {
+        document.body.classList.add('light-theme');
     }
-    localStorage.setItem('cybernote_theme', theme);
+
+    // Sync mobile browser / PWA status bar color
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor && THEME_META_COLORS[validTheme]) {
+        metaThemeColor.setAttribute('content', THEME_META_COLORS[validTheme]);
+    }
+
+    // Highlight active theme in Theme Picker Popover & Mobile Drawer Pills
+    document.querySelectorAll('.theme-option-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.theme === validTheme);
+    });
+    document.querySelectorAll('.theme-choice-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.theme === validTheme);
+    });
+
+    try {
+        localStorage.setItem('cybernote_theme', validTheme);
+    } catch (_) {}
 }
 
-function toggleTheme() {
-    applyTheme(state.theme === 'light' ? 'dark' : 'light');
+function toggleThemePickerPopover(e) {
+    if (e) e.stopPropagation();
+    const popover = document.getElementById('theme-picker-popover');
+    if (!popover) return;
+    const isVisible = popover.style.display !== 'none';
+    popover.style.display = isVisible ? 'none' : 'block';
 }
+
+function closeThemePickerPopover() {
+    const popover = document.getElementById('theme-picker-popover');
+    if (popover) popover.style.display = 'none';
+}
+
+function toggleTheme(e) {
+    toggleThemePickerPopover(e);
+}
+window.applyTheme = applyTheme;
+window.toggleThemePickerPopover = toggleThemePickerPopover;
+window.closeThemePickerPopover = closeThemePickerPopover;
 
 // --- Google Authentication & Google Drive Integration ---
 function getEffectiveGoogleClientId() {
@@ -3448,6 +3495,11 @@ function showAllNotesView() {
     if (footerPath) footerPath.textContent = 'View: All Notes (Favorites & Nodes)';
     if (footerStats) footerStats.textContent = `${state.nodes.size} notes total`;
 
+    if (window.innerWidth <= 768) {
+        document.getElementById('sidebar')?.classList.remove('open');
+        document.getElementById('mobile-sidebar-backdrop')?.classList.remove('open');
+    }
+
     renderAllNotesView();
 }
 
@@ -3987,6 +4039,8 @@ function selectNode(id) {
     if (window.innerWidth <= 768) {
         const sidebar = document.getElementById('sidebar');
         if (sidebar) sidebar.classList.remove('open');
+        document.getElementById('mobile-sidebar-backdrop')?.classList.remove('open');
+        document.getElementById('header-center-search')?.classList.remove('mobile-search-open');
     }
 
     footerPath.textContent = `Node: ${node.title}`;
@@ -9887,18 +9941,60 @@ function setupEventListeners() {
 
     const toggleSidebar = () => {
         const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('mobile-sidebar-backdrop');
         if (!sidebar) return;
         if (window.innerWidth <= 768) {
-            sidebar.classList.toggle('open');
+            const isOpen = sidebar.classList.toggle('open');
+            if (backdrop) backdrop.classList.toggle('open', isOpen);
         } else {
             sidebar.classList.toggle('collapsed');
+            if (backdrop) backdrop.classList.remove('open');
         }
     };
 
     const toggleSidebarBtn = document.getElementById('btn-toggle-sidebar');
     const toggleSidebarRibbonBtn = document.getElementById('btn-toggle-sidebar-view');
+    const sidebarBackdrop = document.getElementById('mobile-sidebar-backdrop');
     if (toggleSidebarBtn) toggleSidebarBtn.onclick = toggleSidebar;
     if (toggleSidebarRibbonBtn) toggleSidebarRibbonBtn.onclick = toggleSidebar;
+    if (sidebarBackdrop) {
+        sidebarBackdrop.onclick = () => {
+            document.getElementById('sidebar')?.classList.remove('open');
+            sidebarBackdrop.classList.remove('open');
+        };
+    }
+
+    // Mobile Search Bar Toggle
+    const btnMobileSearch = document.getElementById('btn-mobile-search');
+    const headerCenterSearch = document.getElementById('header-center-search');
+    if (btnMobileSearch && headerCenterSearch) {
+        btnMobileSearch.onclick = (e) => {
+            e.stopPropagation();
+            const isOpen = headerCenterSearch.classList.toggle('mobile-search-open');
+            if (isOpen) {
+                const input = document.getElementById('global-search');
+                if (input) setTimeout(() => input.focus(), 40);
+            } else {
+                closeGlobalSearchDropdown();
+            }
+        };
+    }
+
+    // Close Theme Picker Popover & Mobile Search when clicking outside
+    document.addEventListener('pointerdown', (e) => {
+        const themePopover = document.getElementById('theme-picker-popover');
+        if (themePopover && themePopover.style.display !== 'none') {
+            if (!e.target.closest('#theme-picker-popover, #btn-theme')) {
+                closeThemePickerPopover();
+            }
+        }
+        if (headerCenterSearch && headerCenterSearch.classList.contains('mobile-search-open')) {
+            if (!e.target.closest('#header-center-search, #btn-mobile-search')) {
+                headerCenterSearch.classList.remove('mobile-search-open');
+                closeGlobalSearchDropdown();
+            }
+        }
+    });
 
     setupSidebarResizer();
     setupSelectionBubble();
