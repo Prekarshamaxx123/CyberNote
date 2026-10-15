@@ -1043,8 +1043,6 @@ function flushAndPersistActiveNode() {
             tags: tagsVal
         });
     }
-
-    scheduleDriveAutoBackup();
 }
 
 // Flush current editor content into state.nodes immediately before any Drive op
@@ -1611,7 +1609,10 @@ async function uploadNodeToDrive(folderId, node) {
             headers: { 'Content-Type': 'application/json' },
             body: payload
         });
-        if (patchRes.ok) return fileId;
+        if (patchRes.ok) {
+            node._lastSyncedSig = `${node.title || ''}|${node.tags || ''}|${node.content || ''}`;
+            return fileId;
+        }
         if (patchRes.status === 404 || patchRes.status === 403) {
             // File was deleted or created by another client/session; recreate cleanly below
             driveFileIdCache.delete(node.id);
@@ -1665,6 +1666,7 @@ async function uploadNodeToDrive(folderId, node) {
     if (!uploadRes.ok) {
         throw new Error(`Content upload failed (${uploadRes.status})`);
     }
+    node._lastSyncedSig = `${node.title || ''}|${node.tags || ''}|${node.content || ''}`;
     return fileId;
 }
 
@@ -1817,6 +1819,7 @@ async function uploadSingleNodeToDrive(nodeId, silent = true) {
     try {
         const folderId = await ensureDriveCyberNoteFolder();
         await uploadNodeToDrive(folderId, node);
+        node._lastSyncedSig = `${node.title || ''}|${node.tags || ''}|${node.content || ''}`;
 
         if (state.pendingUploadNodeIds) {
             state.pendingUploadNodeIds.delete(nodeId);
@@ -1955,6 +1958,11 @@ async function downloadSingleNoteFromDrive(nodeId, { silent = false } = {}) {
             }
         } else {
             if (localNode) localNode._contentLoaded = true;
+        }
+
+        const savedNode = state.nodes.get(nodeId);
+        if (savedNode) {
+            savedNode._lastSyncedSig = `${savedNode.title || ''}|${savedNode.tags || ''}|${savedNode.content || ''}`;
         }
 
         const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -2320,9 +2328,11 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
                             localNode._contentLoaded = true;
                         }
 
-                        idbPutNote(state.nodes.get(cloudNode.id) || cloudNode);
+                        const targetNode = state.nodes.get(cloudNode.id) || cloudNode;
+                        targetNode._lastSyncedSig = `${targetNode.title || ''}|${targetNode.tags || ''}|${targetNode.content || ''}`;
+                        idbPutNote(targetNode);
                         try {
-                            localStorage.setItem(`cybernote_node_${cloudNode.id}`, JSON.stringify(state.nodes.get(cloudNode.id) || cloudNode));
+                            localStorage.setItem(`cybernote_node_${cloudNode.id}`, JSON.stringify(targetNode));
                         } catch (e2) {}
                     }
                 }
@@ -2567,17 +2577,31 @@ async function triggerTwoWaySync(silent = false) {
     }
 }
 
-// Debounced auto-save to Drive (fires 1.8 seconds after editing pauses on active note)
+// Debounced auto-save to Drive (fires 1.2 seconds after editing pauses on active note)
 function scheduleDriveAutoBackup() {
-    if (!state.googleAccessToken || !state.activeNodeId) return;
+    if (!isGoogleSessionValid() || !state.activeNodeId) return;
+    const node = state.nodes.get(state.activeNodeId);
+    if (!node) return;
+
+    // Check if the current editor / node content actually differs from what was last synced
+    const curTitle = noteTitleInput ? noteTitleInput.value : (node.title || '');
+    const curContent = noteEditor ? noteEditor.innerHTML : (node.content || '');
+    const curTags = noteTagsInput ? noteTagsInput.value : (node.tags || '');
+    const currentSig = `${curTitle}|${curTags}|${curContent}`;
+
+    // If node content has not changed since last successful sync, and it's not marked pending, ignore
+    if (node._lastSyncedSig && node._lastSyncedSig === currentSig && (!state.pendingUploadNodeIds || !state.pendingUploadNodeIds.has(state.activeNodeId))) {
+        return;
+    }
+
     setSyncStatus('pending', 'Changes pending...');
     clearTimeout(state.driveSaveTimer);
-    state.driveSaveTimer = setTimeout(() => {
-        if (state.activeNodeId) {
+    state.driveSaveTimer = setTimeout(async () => {
+        if (state.activeNodeId && isGoogleSessionValid()) {
             flushEditorToState();
-            uploadSingleNodeToDrive(state.activeNodeId, true);
+            await uploadSingleNodeToDrive(state.activeNodeId, true);
         }
-    }, 1100);
+    }, 1200);
 }
 
 // ---- Header "Save" Button Handler ----
@@ -4361,6 +4385,16 @@ function selectNode(id) {
     noteView.style.display = 'flex';
 
     const node = state.nodes.get(id);
+    if (!node._lastSyncedSig && (!state.pendingUploadNodeIds || !state.pendingUploadNodeIds.has(id))) {
+        node._lastSyncedSig = `${node.title || ''}|${node.tags || ''}|${node.content || ''}`;
+    }
+    if (isGoogleSessionValid()) {
+        if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(id)) {
+            setSyncStatus('pending', 'Pending Drive Sync');
+        } else {
+            setSyncStatus('live', 'Saved');
+        }
+    }
     noteTitleInput.value = node.title || '';
     if (noteTagsInput) noteTagsInput.value = node.tags || '';
     renderTagChips(node.tags || '');
@@ -4649,9 +4683,6 @@ async function sendDeltaPatch(nodeId, partialUpdate) {
         footerSyncDetail.textContent = `Local Storage (GZIP compressed, < 0.05 B/char)`;
         footerTime.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
     }
-
-    // Trigger debounced continuous auto-backup to Google Drive
-    scheduleDriveAutoBackup();
 }
 
 function flushNodeDelta(nodeId) {
@@ -4672,6 +4703,7 @@ function scheduleSave(field, value, targetNodeId = null) {
 
     const node = state.nodes.get(nodeId);
     if (node) {
+        if (node[field] === value) return;
         node[field] = value;
         node.updated_at = Date.now();
     }
@@ -10449,16 +10481,16 @@ function setupEventListeners() {
         if (connTitle) connTitle.textContent = 'Connection Status: Offline';
     });
 
-    // Auto-save to Drive when switching tabs/windows (debounced)
+    // Sync any pending offline notes to Drive when switching back to the window
     window.addEventListener('focus', () => {
-        if (state.googleAccessToken && Date.now() - (state.lastDriveSyncAttempt || 0) > 10000) {
-            scheduleDriveAutoBackup();
+        if (isGoogleSessionValid() && state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+            uploadPendingNotesToDrive();
         }
     });
 
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && state.googleAccessToken && Date.now() - (state.lastDriveSyncAttempt || 0) > 10000) {
-            scheduleDriveAutoBackup();
+        if (document.visibilityState === 'visible' && isGoogleSessionValid() && state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+            uploadPendingNotesToDrive();
         }
     });
 
