@@ -1011,23 +1011,45 @@ function markNodeDeleted(nodeId) {
 
 // Memory cache of Drive file IDs: nodeId -> fileId (initialized above)
 
+// Flush and persist current active note content synchronously to state, localStorage & IndexedDB
+function flushAndPersistActiveNode() {
+    if (!state.activeNodeId || state.isReadOnly) return;
+    const node = state.nodes.get(state.activeNodeId);
+    if (!node) return;
+
+    const titleVal = noteTitleInput ? noteTitleInput.value : node.title;
+    let contentVal = noteEditor ? noteEditor.innerHTML : node.content;
+    const tagsVal = noteTagsInput ? noteTagsInput.value : (node.tags || '');
+
+    if (contentVal && hasEscapedHtmlTags(contentVal)) {
+        contentVal = repairEscapedHtml(contentVal);
+    }
+
+    node.title = titleVal;
+    node.content = contentVal;
+    node.tags = tagsVal;
+    node.updated_at = Date.now();
+
+    persistActiveNodeImmediately(state.activeNodeId, {
+        title: titleVal,
+        content: contentVal,
+        tags: tagsVal
+    });
+
+    if (nodePendingPatches.has(state.activeNodeId)) {
+        Object.assign(nodePendingPatches.get(state.activeNodeId), {
+            title: titleVal,
+            content: contentVal,
+            tags: tagsVal
+        });
+    }
+
+    scheduleDriveAutoBackup();
+}
+
 // Flush current editor content into state.nodes immediately before any Drive op
 function flushEditorToState() {
-    if (state.activeNodeId && !state.isReadOnly) {
-        const node = state.nodes.get(state.activeNodeId);
-        if (node) {
-            const titleVal = noteTitleInput ? noteTitleInput.value : node.title;
-            const contentVal = noteEditor ? noteEditor.innerHTML : node.content;
-            const tagsVal = noteTagsInput ? noteTagsInput.value : (node.tags || '');
-            if (node.title !== titleVal || node.content !== contentVal || node.tags !== tagsVal) {
-                node.title = titleVal;
-                node.content = contentVal;
-                node.tags = tagsVal;
-                node.updated_at = Date.now();
-                persistActiveNodeImmediately(state.activeNodeId, { title: titleVal, content: contentVal, tags: tagsVal });
-            }
-        }
-    }
+    flushAndPersistActiveNode();
 }
 
 // Drive API fetch wrapper (strict user-gesture auth model; zero background popups)
@@ -2560,12 +2582,6 @@ function scheduleDriveAutoBackup() {
 
 // ---- Header "Save" Button Handler ----
 async function triggerDriveSave() {
-    if (!state.googleAccessToken) {
-        showToast('Sign in with Google to save notes to Google Drive', 'info');
-        requestGoogleLogin();
-        return;
-    }
-
     const btn = document.getElementById('btn-drive-save');
     const svg = document.getElementById('drive-save-svg');
     const txt = document.getElementById('drive-save-text');
@@ -2573,23 +2589,44 @@ async function triggerDriveSave() {
     if (svg) svg.classList.add('spinning');
     if (txt) txt.textContent = 'Saving...';
 
+    // 1. Immediately persist active editor content to in-memory state, LocalStorage, and IndexedDB
+    flushAndPersistActiveNode();
+
+    // If server mode, flush delta to server immediately
+    if (state.activeNodeId && state.isServerMode) {
+        flushNodeDelta(state.activeNodeId);
+    }
+
+    // 2. If Google Drive is not connected, save locally and inform user
+    if (!state.googleAccessToken || !isGoogleSessionValid()) {
+        setTimeout(() => {
+            if (btn) btn.classList.remove('syncing');
+            if (svg) svg.classList.remove('spinning');
+            if (txt) txt.textContent = 'Save';
+            showToast('✓ Note saved locally! (Sign in with Google to enable cloud sync)', 'info');
+        }, 350);
+        return;
+    }
+
+    // 3. Google Drive is connected -> upload to Google Drive
     try {
-        flushEditorToState();
         if (state.activeNodeId) {
             await uploadSingleNodeToDrive(state.activeNodeId, false);
-            // Also upload any other pending notes in background
             if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
                 uploadPendingNotesToDrive();
             }
         } else {
             await saveAllNotesToDrive(false);
         }
+    } catch (err) {
+        console.warn('Drive save error:', err);
+        showToast('⚠️ Note saved locally, but Drive upload failed. Will retry automatically.', 'warning');
     } finally {
         setTimeout(() => {
             if (btn) btn.classList.remove('syncing');
             if (svg) svg.classList.remove('spinning');
             if (txt) txt.textContent = 'Save';
-        }, 600);
+        }, 500);
     }
 }
 
@@ -6463,16 +6500,36 @@ function handleClipboardPaste(e) {
     }
 }
 
-function insertImageElement(src, alt) {
+function insertImageElement(src, alt, align = 'center') {
     if (state.isReadOnly) return;
     noteEditor.focus();
-    // Wrap safely with paragraphs before & after to prevent getting stuck
-    const html = `<p><br></p><div class="editor-img-wrap" style="margin: 14px 0; display: inline-block; max-width: 100%;"><img src="${src}" alt="${alt || 'Image'}" style="max-width: 100%; height: auto; border-radius: 6px; display: block;"></div><p><br></p>`;
-    document.execCommand('insertHTML', false, html);
+    restoreSelection();
+
+    const alignVal = align || 'center';
+    let wrapStyle = 'margin: 14px auto; text-align: center; display: block; max-width: 100%;';
+    let imgStyle = 'max-width: 100%; height: auto; border-radius: 6px; display: inline-block; margin: 0 auto;';
+    if (alignVal === 'left') {
+        wrapStyle = 'margin: 14px 0; text-align: left; display: block; max-width: 100%;';
+        imgStyle = 'max-width: 100%; height: auto; border-radius: 6px; display: inline-block; margin: 0;';
+    } else if (alignVal === 'right') {
+        wrapStyle = 'margin: 14px 0 14px auto; text-align: right; display: block; max-width: 100%;';
+        imgStyle = 'max-width: 100%; height: auto; border-radius: 6px; display: inline-block; margin: 0 0 0 auto;';
+    }
+
+    const html = `<div class="editor-img-wrap" data-align="${alignVal}" style="${wrapStyle}"><img src="${src}" alt="${alt || 'Image'}" style="${imgStyle}"></div><p><br></p>`;
+    insertHtmlAtCursor(html);
+
+    setTimeout(() => {
+        const imgs = noteEditor.querySelectorAll('.editor-img-wrap img');
+        if (imgs.length > 0) {
+            selectImageElement(imgs[imgs.length - 1]);
+        }
+    }, 50);
+
+    flushAndPersistActiveNode();
     handleEditorInput();
 }
 
-// Floating Image Controls & Corner Resizing
 // Floating Image Controls & Corner Resizing
 function setupImageInteractions() {
     noteEditor.addEventListener('click', (e) => {
@@ -6493,23 +6550,43 @@ function setupImageInteractions() {
     setupImageMoveInteractions();
 }
 
+function updateAlignmentButtonsUI(alignment) {
+    const align = alignment || 'center';
+    ['left', 'center', 'right'].forEach(al => {
+        const tbBtn = document.getElementById(`btn-img-align-${al}`);
+        if (tbBtn) tbBtn.classList.toggle('active', al === align);
+        const ovBtn = document.getElementById(`btn-overlay-align-${al}`);
+        if (ovBtn) ovBtn.classList.toggle('active', al === align);
+    });
+    const floatL = document.getElementById('btn-img-float-left');
+    if (floatL) floatL.classList.toggle('active', align === 'float-left');
+    const floatR = document.getElementById('btn-img-float-right');
+    if (floatR) floatR.classList.toggle('active', align === 'float-right');
+}
+
 function selectImageElement(img) {
     if (state.isReadOnly) return;
     state.activeImageElement = img;
     document.querySelectorAll('.wysiwyg-canvas img').forEach(i => i.classList.remove('selected-img'));
     img.classList.add('selected-img');
 
-    // Customize title label dynamically for Shape / Signature / Photo
+    // Customize title label dynamically for Shape / Signature / Drawing / Photo
     const typeLabel = document.getElementById('img-tb-type-label');
     if (typeLabel) {
         if (img.classList.contains('note-vector-shape') || img.closest('.editor-shape-wrap')) {
             typeLabel.textContent = 'Shape:';
         } else if (img.classList.contains('note-signature-img') || img.closest('.editor-signature-wrap')) {
             typeLabel.textContent = 'Signature:';
+        } else if (img.classList.contains('note-paint-img') || img.closest('.editor-paint-wrap')) {
+            typeLabel.textContent = 'Drawing:';
         } else {
             typeLabel.textContent = 'Image:';
         }
     }
+
+    const wrap = img.closest('.editor-img-wrap') || img;
+    const curAlign = wrap.getAttribute('data-align') || (wrap.style.textAlign || 'center');
+    updateAlignmentButtonsUI(curAlign);
 
     imageToolbar.style.display = 'flex';
     updateImageResizeOverlay();
@@ -6556,6 +6633,15 @@ function updateImageResizeOverlay() {
     const badge = document.getElementById('img-dimension-badge');
     if (badge) {
         badge.textContent = `${Math.round(imgRect.width)} × ${Math.round(imgRect.height)}`;
+    }
+
+    const controls = document.getElementById('img-overlay-controls');
+    if (controls) {
+        if (top < 44) {
+            controls.classList.add('docked-bottom');
+        } else {
+            controls.classList.remove('docked-bottom');
+        }
     }
 }
 
@@ -6683,7 +6769,7 @@ async function copyActiveImage() {
     }
 }
 
-// Global key shortcut for image copy
+// Global key shortcuts for image copy and note saving
 window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && state.activeImageElement) {
         const sel = window.getSelection();
@@ -6691,6 +6777,9 @@ window.addEventListener('keydown', (e) => {
             e.preventDefault();
             copyActiveImage();
         }
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        triggerDriveSave();
     }
 });
 
@@ -6699,6 +6788,7 @@ function setImageSize(pct) {
     state.activeImageElement.style.width = pct;
     state.activeImageElement.style.height = 'auto';
     updateImageResizeOverlay();
+    flushAndPersistActiveNode();
     handleEditorInput();
 }
 
@@ -6712,6 +6802,7 @@ function moveActiveImageUp() {
     if (prev && wrap.parentNode) {
         wrap.parentNode.insertBefore(wrap, prev);
         updateImageResizeOverlay();
+        flushAndPersistActiveNode();
         handleEditorInput();
         showToast('⬆ Moved Up');
     }
@@ -6727,6 +6818,7 @@ function moveActiveImageDown() {
     if (next && wrap.parentNode) {
         wrap.parentNode.insertBefore(wrap, next.nextSibling);
         updateImageResizeOverlay();
+        flushAndPersistActiveNode();
         handleEditorInput();
         showToast('⬇ Moved Down');
     }
@@ -6736,6 +6828,8 @@ function setImageAlign(alignment) {
     if (!state.activeImageElement) return;
     const img = state.activeImageElement;
     const wrap = img.closest('.editor-img-wrap') || img;
+
+    wrap.setAttribute('data-align', alignment);
 
     if (alignment === 'left') {
         wrap.style.display = 'block';
@@ -6773,7 +6867,9 @@ function setImageAlign(alignment) {
         img.style.margin = '0';
         img.style.display = 'block';
     }
+    updateAlignmentButtonsUI(alignment);
     updateImageResizeOverlay();
+    flushAndPersistActiveNode();
     handleEditorInput();
 }
 
@@ -6782,6 +6878,7 @@ function deleteActiveImage() {
     const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
     wrap.remove();
     hideImageToolbar();
+    flushAndPersistActiveNode();
     handleEditorInput();
 }
 
@@ -6871,6 +6968,7 @@ function setupImageMoveInteractions() {
                 block.parentNode.insertBefore(activeWrap, block.nextSibling);
             }
             updateImageResizeOverlay();
+            flushAndPersistActiveNode();
             handleEditorInput();
             showToast('✓ Element Moved Freely');
         } else if (activeWrap) {
@@ -6912,9 +7010,10 @@ function setupImageMoveInteractions() {
 
     window.addEventListener('touchmove', (e) => {
         if (isMoving && e.touches.length === 1) {
+            e.preventDefault();
             handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
         }
-    });
+    }, { passive: false });
 
     window.addEventListener('mouseup', finishMove);
     window.addEventListener('touchend', finishMove);
@@ -7505,6 +7604,37 @@ function getCroppedCanvas(srcCanvas, isTransparent) {
     return out;
 }
 
+// Convert cropped canvas to lightweight, ultra-crisp data URL (WebP with PNG fallback)
+function getOptimizedCanvasDataUrl(canvas, isTransparent) {
+    if (!canvas) return '';
+    let outCanvas = canvas;
+    const maxW = 560;
+    const maxH = 280;
+    if (canvas.width > maxW || canvas.height > maxH) {
+        const ratio = Math.min(maxW / canvas.width, maxH / canvas.height);
+        const scaledW = Math.max(20, Math.round(canvas.width * ratio));
+        const scaledH = Math.max(20, Math.round(canvas.height * ratio));
+        const scaledCanvas = document.createElement('canvas');
+        scaledCanvas.width = scaledW;
+        scaledCanvas.height = scaledH;
+        const sCtx = scaledCanvas.getContext('2d');
+        if (!isTransparent) {
+            sCtx.fillStyle = '#ffffff';
+            sCtx.fillRect(0, 0, scaledW, scaledH);
+        }
+        sCtx.drawImage(canvas, 0, 0, scaledW, scaledH);
+        outCanvas = scaledCanvas;
+    }
+
+    try {
+        const webp = outCanvas.toDataURL('image/webp', 0.90);
+        if (webp.startsWith('data:image/webp')) {
+            return webp;
+        }
+    } catch (e) {}
+    return outCanvas.toDataURL('image/png');
+}
+
 // --- Windows Paint & Signature Studio ---
 function setupPaintStudio() {
     const canvas = document.getElementById('paint-canvas');
@@ -7596,6 +7726,20 @@ function setupPaintStudio() {
         btnClear.onclick = clearCanvas;
     }
 
+    // Setup Paint Alignment Buttons (Left, Center, Right)
+    state.paintAlignment = state.paintAlignment || 'center';
+    ['left', 'center', 'right'].forEach(al => {
+        const btn = document.getElementById(`btn-paint-align-${al}`);
+        if (btn) {
+            btn.onclick = () => {
+                state.paintAlignment = al;
+                ['left', 'center', 'right'].forEach(a2 => {
+                    document.getElementById(`btn-paint-align-${a2}`)?.classList.toggle('active', a2 === al);
+                });
+            };
+        }
+    });
+
     function getCanvasCoords(e) {
         const rect = canvas.getBoundingClientRect();
         return {
@@ -7683,13 +7827,14 @@ function setupPaintStudio() {
     if (btnInsert) {
         btnInsert.onclick = () => {
             const cropped = getCroppedCanvas(canvas, state.paintTransparentBg);
-            const dataUrl = cropped.toDataURL('image/png');
+            const dataUrl = getOptimizedCanvasDataUrl(cropped, state.paintTransparentBg);
+            const chosenAlign = state.paintAlignment || 'center';
             closePaintModal();
             restoreSelection();
             if (state.paintTool === 'signature') {
-                insertSignatureElement(dataUrl, 'Handwritten Signature');
+                insertSignatureElement(dataUrl, 'Handwritten Signature', chosenAlign);
             } else {
-                insertImageElement(dataUrl, 'Paint Drawing');
+                insertPaintDrawingElement(dataUrl, 'Paint Drawing', chosenAlign);
             }
         };
     }
@@ -7715,11 +7860,65 @@ function closePaintModal() {
     if (modal) modal.style.display = 'none';
 }
 
-function insertSignatureElement(src, alt) {
+function insertSignatureElement(src, alt, align = 'center') {
     if (state.isReadOnly) return;
     noteEditor.focus();
-    const html = `<p><br></p><div class="editor-img-wrap editor-signature-wrap" style="margin: 12px 0; display: inline-block; max-width: 100%; border: none; background: transparent;"><img class="note-signature-img" src="${src}" alt="${alt || 'Signature'}" style="max-width: 100%; height: auto; display: block; border: none; background: transparent; box-shadow: none;"></div><p><br></p>`;
-    document.execCommand('insertHTML', false, html);
+    restoreSelection();
+
+    const alignVal = align || state.paintAlignment || 'center';
+    let wrapStyle = 'margin: 14px 0; text-align: left; display: block; max-width: 100%;';
+    let imgStyle = 'max-width: 100%; height: auto; display: inline-block; border: none; background: transparent; box-shadow: none;';
+
+    if (alignVal === 'center') {
+        wrapStyle = 'margin: 14px auto; text-align: center; display: block; max-width: 100%;';
+        imgStyle = 'max-width: 100%; height: auto; display: inline-block; margin: 0 auto; border: none; background: transparent; box-shadow: none;';
+    } else if (alignVal === 'right') {
+        wrapStyle = 'margin: 14px 0 14px auto; text-align: right; display: block; max-width: 100%;';
+        imgStyle = 'max-width: 100%; height: auto; display: inline-block; margin: 0 0 0 auto; border: none; background: transparent; box-shadow: none;';
+    }
+
+    const html = `<div class="editor-img-wrap editor-signature-wrap" data-align="${alignVal}" style="${wrapStyle}"><img class="note-signature-img" src="${src}" alt="${alt || 'Signature'}" style="${imgStyle}"></div><p><br></p>`;
+    insertHtmlAtCursor(html);
+
+    setTimeout(() => {
+        const imgs = noteEditor.querySelectorAll('.note-signature-img');
+        if (imgs.length > 0) {
+            selectImageElement(imgs[imgs.length - 1]);
+        }
+    }, 50);
+
+    flushAndPersistActiveNode();
+    handleEditorInput();
+}
+
+function insertPaintDrawingElement(src, alt, align = 'center') {
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+    restoreSelection();
+
+    const alignVal = align || state.paintAlignment || 'center';
+    let wrapStyle = 'margin: 14px 0; text-align: left; display: block; max-width: 100%;';
+    let imgStyle = 'max-width: 100%; height: auto; display: inline-block; border-radius: 6px;';
+
+    if (alignVal === 'center') {
+        wrapStyle = 'margin: 14px auto; text-align: center; display: block; max-width: 100%;';
+        imgStyle = 'max-width: 100%; height: auto; display: inline-block; margin: 0 auto; border-radius: 6px;';
+    } else if (alignVal === 'right') {
+        wrapStyle = 'margin: 14px 0 14px auto; text-align: right; display: block; max-width: 100%;';
+        imgStyle = 'max-width: 100%; height: auto; display: inline-block; margin: 0 0 0 auto; border-radius: 6px;';
+    }
+
+    const html = `<div class="editor-img-wrap editor-paint-wrap" data-align="${alignVal}" style="${wrapStyle}"><img class="note-paint-img" src="${src}" alt="${alt || 'Paint Drawing'}" style="${imgStyle}"></div><p><br></p>`;
+    insertHtmlAtCursor(html);
+
+    setTimeout(() => {
+        const imgs = noteEditor.querySelectorAll('.note-paint-img');
+        if (imgs.length > 0) {
+            selectImageElement(imgs[imgs.length - 1]);
+        }
+    }, 50);
+
+    flushAndPersistActiveNode();
     handleEditorInput();
 }
 
@@ -9940,6 +10139,28 @@ function setupEventListeners() {
     const btnImgCopy = document.getElementById('btn-img-copy');
     if (btnImgCopy) btnImgCopy.onclick = copyActiveImage;
     document.getElementById('btn-img-delete').onclick = deleteActiveImage;
+
+    // Image / Signature / Drawing Overlay Quick Actions
+    const overlayAlignLeft = document.getElementById('btn-overlay-align-left');
+    if (overlayAlignLeft) {
+        overlayAlignLeft.onclick = (e) => { e.preventDefault(); e.stopPropagation(); setImageAlign('left'); };
+    }
+    const overlayAlignCenter = document.getElementById('btn-overlay-align-center');
+    if (overlayAlignCenter) {
+        overlayAlignCenter.onclick = (e) => { e.preventDefault(); e.stopPropagation(); setImageAlign('center'); };
+    }
+    const overlayAlignRight = document.getElementById('btn-overlay-align-right');
+    if (overlayAlignRight) {
+        overlayAlignRight.onclick = (e) => { e.preventDefault(); e.stopPropagation(); setImageAlign('right'); };
+    }
+    const overlayMoveUp = document.getElementById('btn-overlay-move-up');
+    if (overlayMoveUp) {
+        overlayMoveUp.onclick = (e) => { e.preventDefault(); e.stopPropagation(); moveActiveImageUp(); };
+    }
+    const overlayMoveDown = document.getElementById('btn-overlay-move-down');
+    if (overlayMoveDown) {
+        overlayMoveDown.onclick = (e) => { e.preventDefault(); e.stopPropagation(); moveActiveImageDown(); };
+    }
 
     // Floating Table Toolbar Actions
     document.getElementById('btn-tbl-add-row-above').onclick = () => addTableRow(true);

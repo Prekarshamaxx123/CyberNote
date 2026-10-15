@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>CyberNote - Secure Hierarchical Cloud Notes</title>
     <meta name="google-site-verification" content="7-8ESzy_QOUR_sHuEBY-WPd0aFVT4u_AmjKsFRLDsYE" />
-    <link rel="stylesheet" href="style.css?v=20261013_full_sync_v17">
+    <link rel="stylesheet" href="style.css?v=20261015_signature_align_v18">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e1e2e">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1089,10 +1089,20 @@
 
                     <!-- Interactive Corner Resize Overlay for Images, Shapes & Signatures (inside scroll container) -->
                     <div id="image-resize-overlay" class="image-resize-overlay" style="display: none;">
-                        <!-- Center Drag-to-Move Handle -->
-                        <div class="img-move-handle" id="img-move-handle" title="Click & Drag to move anywhere in note">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-                            <span>Drag to Move</span>
+                        <div class="img-overlay-controls" id="img-overlay-controls">
+                            <!-- Center Drag-to-Move Handle -->
+                            <div class="img-move-handle" id="img-move-handle" title="Click & Drag to move anywhere in note">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+                                <span>Move</span>
+                            </div>
+                            <div class="img-overlay-align-bar">
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-align-left" title="Align Left">Left</button>
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-align-center" title="Align Center">Center</button>
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-align-right" title="Align Right">Right</button>
+                                <span class="img-overlay-divider"></span>
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-move-up" title="Move Up Above Paragraph">⬆</button>
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-move-down" title="Move Down Below Paragraph">⬇</button>
+                            </div>
                         </div>
                         <div class="img-resize-handle handle-nw" data-handle="nw"></div>
                         <div class="img-resize-handle handle-ne" data-handle="ne"></div>
@@ -1550,6 +1560,22 @@
                     <span class="paint-label">Width:</span>
                     <input type="range" id="paint-width-slider" min="1" max="18" value="3">
                     <span id="paint-width-val" class="paint-width-val">3px</span>
+                </div>
+
+                <div class="paint-tool-group">
+                    <span class="paint-label">Align:</span>
+                    <button type="button" id="btn-paint-align-left" class="paint-btn" data-align="left" title="Align Left">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+                        <span>Left</span>
+                    </button>
+                    <button type="button" id="btn-paint-align-center" class="paint-btn active" data-align="center" title="Align Center">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="18" y1="12" x2="6" y2="12"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+                        <span>Center</span>
+                    </button>
+                    <button type="button" id="btn-paint-align-right" class="paint-btn" data-align="right" title="Align Right">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="12" x2="9" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+                        <span>Right</span>
+                    </button>
                 </div>
 
                 <div class="paint-tool-group">
@@ -2770,6 +2796,6 @@
     <!-- Toast Notification Container -->
     <div id="cybernote-toast" class="cybernote-toast"></div>
 
-    <script src="app.js?v=20261013_full_sync_v17"></script>
+    <script src="app.js?v=20261015_signature_align_v18"></script>
 </body>
 </html>

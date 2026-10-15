@@ -3050,14 +3050,151 @@ body {
     white-space: nowrap;
 }
 
-/* Image / Shape Wrapper Hover & Selected state */
+/* Image / Signature / Drawing / Shape Wrapper Hover & Selected state */
 .editor-img-wrap {
     transition: opacity 0.15s ease, transform 0.15s ease;
     cursor: pointer;
+    max-width: 100%;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.editor-signature-wrap {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.note-signature-img,
+.note-paint-img {
+    max-width: 100%;
+    height: auto;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* Explicit alignment styling for drawings, signatures, paints, and images */
+.editor-img-wrap[data-align="left"] {
+    display: block !important;
+    text-align: left !important;
+    margin: 14px 0 !important;
+    margin-right: auto !important;
+}
+.editor-img-wrap[data-align="left"] > img {
+    display: inline-block !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+}
+
+.editor-img-wrap[data-align="center"] {
+    display: block !important;
+    text-align: center !important;
+    margin: 14px auto !important;
+}
+.editor-img-wrap[data-align="center"] > img {
+    display: inline-block !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.editor-img-wrap[data-align="right"] {
+    display: block !important;
+    text-align: right !important;
+    margin: 14px 0 14px auto !important;
+    margin-left: auto !important;
+}
+.editor-img-wrap[data-align="right"] > img {
+    display: inline-block !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+}
+
+.editor-img-wrap[data-align="float-left"] {
+    display: inline-block !important;
+    float: left !important;
+    margin: 4px 16px 12px 0 !important;
+    text-align: left !important;
+}
+
+.editor-img-wrap[data-align="float-right"] {
+    display: inline-block !important;
+    float: right !important;
+    margin: 4px 0 12px 16px !important;
+    text-align: right !important;
 }
 
 .editor-img-wrap.moving-active {
     opacity: 0.35 !important;
+}
+
+/* Quick Floating Controls above Image / Signature / Drawing Resize Overlay */
+.img-overlay-controls {
+    position: absolute;
+    top: -38px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(24, 24, 37, 0.96);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.18));
+    backdrop-filter: blur(12px);
+    padding: 3px 8px;
+    border-radius: 18px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+    z-index: 98;
+    pointer-events: auto;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.img-overlay-controls.docked-bottom {
+    top: auto;
+    bottom: -38px;
+}
+
+.img-overlay-align-bar {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.img-overlay-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #cdd6f4);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    transition: all 0.12s ease;
+    line-height: 1;
+}
+
+.img-overlay-btn:hover {
+    background: rgba(137, 180, 250, 0.2);
+    color: var(--accent, #00ffff);
+}
+
+.img-overlay-btn.active {
+    background: var(--accent, #00ffff) !important;
+    color: #11111b !important;
+    font-weight: 700 !important;
+}
+
+.img-overlay-divider {
+    width: 1px;
+    height: 14px;
+    background: var(--border-color, rgba(255, 255, 255, 0.2));
+    margin: 0 3px;
 }
 
 /* Table Interactive Resize Overlay & Corner Handles */
