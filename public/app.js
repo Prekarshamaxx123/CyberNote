@@ -4100,25 +4100,6 @@ function showAllNotesView() {
     renderAllNotesView();
 }
 
-window.toggleDashCard = function(headerEl) {
-    if (!headerEl) return;
-    const card = headerEl.closest('.dash-card');
-    if (!card) return;
-    const body = card.querySelector('.dash-card-body');
-    const chevron = headerEl.querySelector('.dash-card-chevron');
-    if (!body) return;
-
-    if (body.style.display === 'none') {
-        body.style.display = '';
-        if (chevron) chevron.textContent = '▲';
-        card.classList.remove('collapsed');
-    } else {
-        body.style.display = 'none';
-        if (chevron) chevron.textContent = '▼';
-        card.classList.add('collapsed');
-    }
-};
-
 function renderAllNotesView() {
     const pinnedSection = document.getElementById('keep-section-pinned');
     const pinnedGrid = document.getElementById('keep-grid-pinned');
@@ -4142,41 +4123,9 @@ function renderAllNotesView() {
     const pinnedNodes = allNodes.filter(n => !!n.is_pinned);
     const otherNodes = allNodes.filter(n => !n.is_pinned);
 
-    const notesOnly = allNodes.filter(n => !n.icon || n.icon !== 'folder');
-    const foldersOnly = allNodes.filter(n => n.icon === 'folder');
-
-    // Update 3D Metric Cards
-    const statNotesEl = document.getElementById('dash-stat-notes');
-    const statFoldersEl = document.getElementById('dash-stat-folders');
-    const statPinnedEl = document.getElementById('dash-stat-pinned');
-    const statSyncEl = document.getElementById('dash-stat-sync');
-
-    if (statNotesEl) statNotesEl.textContent = notesOnly.length;
-    if (statFoldersEl) statFoldersEl.textContent = foldersOnly.length;
-    if (statPinnedEl) statPinnedEl.textContent = pinnedNodes.length;
-    if (statSyncEl) {
-        statSyncEl.textContent = isGoogleSessionValid() ? 'LIVE' : 'OFFLINE';
-    }
-
-    // Update User Info in Dashboard
-    const userNameEl = document.getElementById('dash-user-name');
-    const userEmailEl = document.getElementById('dash-user-email');
-    const drivePillEl = document.getElementById('dash-drive-pill');
-    const acctModeEl = document.getElementById('dash-account-mode');
-
-    const curUserName = state.googleUser?.name || localStorage.getItem('cybernote_user_name') || 'Local Offline Workspace';
-    const curUserEmail = state.googleUser?.email || localStorage.getItem('cybernote_user_email') || 'cybernote@local.device';
-
-    if (userNameEl) userNameEl.textContent = curUserName;
-    if (userEmailEl) userEmailEl.textContent = curUserEmail;
-    if (drivePillEl) {
-        const isOnline = isGoogleSessionValid();
-        drivePillEl.textContent = isOnline ? 'Active' : 'Offline';
-        drivePillEl.className = isOnline ? 'dash-status-pill pill-active' : 'dash-status-pill pill-inactive';
-    }
-    if (acctModeEl) {
-        acctModeEl.textContent = isGoogleSessionValid() ? 'Google Drive Cloud Sync Active' : 'Offline Encrypted Vault';
-    }
+    // Sort by updated_at descending (latest first)
+    pinnedNodes.sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+    otherNodes.sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
 
     if (pinnedBadge) pinnedBadge.textContent = pinnedNodes.length;
     if (othersBadge) othersBadge.textContent = otherNodes.length;
