@@ -8,30 +8,35 @@
     --transition: 0.15s ease;
 }
 
-/* 1. Cyber Dark Theme (Default) — Deep Indigo Sidebar + Mocha Slate Editor */
+/* 1. Executive Carbon 3D Dark Theme (Default) — Carbon Obsidian Surfaces + 3D Tactile Accents */
 body.theme-dark {
-    --bg-app: #0d0e17;
-    --bg-header: #151624;
-    --bg-sidebar: #0e101d;
-    --bg-sidebar-gradient: linear-gradient(180deg, #111426 0%, #0a0c16 100%);
-    --sidebar-header-bg: rgba(137, 180, 250, 0.07);
-    --sidebar-border: rgba(137, 180, 250, 0.28);
-    --bg-editor: #1e1f30;
-    --bg-toolbar: #25273c;
-    --bg-hover: #2c2f48;
-    --bg-active: rgba(137, 180, 250, 0.16);
-    --border-color: #31344f;
-    --text-primary: #cdd6f4;
-    --text-secondary: #a6adc8;
-    --text-muted: #6c7086;
-    --accent: #89b4fa;
-    --accent-hover: #b4befe;
-    --success: #a6e3a1;
-    --warning: #f9e2af;
-    --danger: #f38ba8;
-    --code-bg: #11111b;
-    --code-border: #313244;
-    --bg-card: #232538;
+    --bg-app: #0c0e14;
+    --bg-header: #12151d;
+    --bg-sidebar: #0e1117;
+    --bg-sidebar-gradient: linear-gradient(180deg, #131722 0%, #0c0e14 100%);
+    --sidebar-header-bg: rgba(255, 255, 255, 0.04);
+    --sidebar-border: rgba(255, 255, 255, 0.08);
+    --bg-editor: #13161f;
+    --bg-toolbar: #171b26;
+    --bg-hover: #1e2330;
+    --bg-active: rgba(59, 130, 246, 0.16);
+    --border-color: #222838;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #f43f5e;
+    --code-bg: #0d0f16;
+    --code-border: #222838;
+    --bg-card: #151821;
+}
+
+body.theme-dark {
+    background-color: #0c0e14 !important;
+    background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0px, rgba(255, 255, 255, 0.014) 1px, transparent 1px, transparent 64px) !important;
 }
 
 /* 2. Neon Cyberpunk Theme — Ultra-Deep Cyber Violet Sidebar + Neon Plum Editor */
@@ -7941,4 +7946,581 @@ body.theme-sepia #paint-modal .modal-content {
     .sync-conflict-account-badge {
         max-width: 200px;
     }
+}
+
+
+/* ==========================================================================
+   3D EXECUTIVE DARK OVERHAUL (Sleek Modern Portal & Command Center Look)
+   ========================================================================== */
+
+/* 1. Header & Global App Container */
+body.theme-dark .app-header {
+    background-color: #12151d !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.theme-dark .logo-icon {
+    color: #3b82f6 !important;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+body.theme-dark .logo-text {
+    color: #f1f5f9 !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.01em;
+}
+
+body.theme-dark .search-box {
+    background-color: #151822 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+body.theme-dark .search-box:focus-within {
+    border-color: #3b82f6 !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45), 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+}
+
+/* 2. Tactile 3D Buttons */
+body.theme-dark .btn-primary {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
+    border: 1px solid #1d4ed8 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    transition: all 0.12s ease !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+body.theme-dark .btn-primary:hover {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%) !important;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+body.theme-dark .btn-primary:active {
+    transform: translateY(1px) !important;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25), inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+body.theme-dark .btn-secondary {
+    background: linear-gradient(180deg, #222735 0%, #171b25 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    color: #cbd5e1 !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    transition: all 0.12s ease !important;
+}
+
+body.theme-dark .btn-secondary:hover {
+    background: linear-gradient(180deg, #2c3244 0%, #1c212d 100%) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+body.theme-dark .btn-secondary:active {
+    transform: translateY(1px) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Header Action Sync / Save / Download Buttons */
+body.theme-dark .btn-drive-save {
+    background: linear-gradient(180deg, #10b981 0%, #059669 100%) !important;
+    border: 1px solid #047857 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 3px 10px rgba(5, 150, 105, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.theme-dark .btn-drive-save:hover {
+    background: linear-gradient(180deg, #34d399 0%, #059669 100%) !important;
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45) !important;
+    transform: translateY(-1px) !important;
+}
+
+body.theme-dark .btn-drive-download {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
+    border: 1px solid #1d4ed8 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.theme-dark .btn-drive-download:hover {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%) !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* 3. Executive Dashboard 3D Metric Cards (Exact match to screenshot) */
+.dash-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 1024px) {
+    .dash-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .dash-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.dash-metric-card {
+    background: #141720;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 18px 20px 16px 20px;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    user-select: none;
+}
+
+.dash-metric-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.dash-metric-number {
+    font-size: 2.3rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.dash-metric-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 0.08em;
+    margin-top: 8px;
+    text-transform: uppercase;
+}
+
+.dash-metric-icon {
+    color: #f1f5f9;
+    opacity: 0.85;
+}
+
+.dash-metric-accent {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 0 0 10px 10px;
+}
+
+.dash-metric-accent.accent-blue {
+    background: #3b82f6;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+}
+
+.dash-metric-accent.accent-green {
+    background: #10b981;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+}
+
+.dash-metric-accent.accent-pink {
+    background: #f43f5e;
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+}
+
+.dash-metric-accent.accent-amber {
+    background: #f59e0b;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+
+/* 4. 3D Executive Portal Layout (2-Columns) */
+.dash-portal-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+}
+
+@media (max-width: 900px) {
+    .dash-portal-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.dash-card {
+    background: #141720;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    margin-bottom: 18px;
+    overflow: hidden;
+    transition: border-color 0.15s ease;
+}
+
+.dash-card:hover {
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.dash-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 18px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    user-select: none;
+    cursor: pointer;
+}
+
+.dash-card-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.dash-card-chevron {
+    font-size: 0.72rem;
+    color: #64748b;
+    transition: transform 0.2s ease;
+}
+
+.dash-card-body {
+    padding: 16px 18px;
+}
+
+/* User Info Card Specifics */
+.dash-user-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #3b82f6;
+    margin-bottom: 4px;
+}
+
+.dash-user-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 2px;
+}
+
+.dash-user-email {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    margin-bottom: 6px;
+    word-break: break-all;
+}
+
+.dash-user-meta {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 14px;
+}
+
+.dash-payment-method {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: #cbd5e1;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    margin-bottom: 14px;
+}
+
+/* The Prominent 3D Emerald Button (Direct match to screenshot 'Update' button) */
+.btn-3d-emerald {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #ffffff !important;
+    background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+    border: 1px solid #047857;
+    border-top: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    transition: all 0.12s ease;
+    user-select: none;
+}
+
+.btn-3d-emerald:hover {
+    background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+    box-shadow: 0 6px 18px rgba(5, 150, 105, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-3d-emerald:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Shortcuts List */
+.dash-shortcuts-list {
+    padding: 6px 8px !important;
+}
+
+.dash-shortcut-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 0.84rem;
+    color: #cbd5e1;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.dash-shortcut-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    transform: translateX(3px);
+}
+
+.dash-shortcut-item svg {
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+/* Active Services Card */
+.dash-service-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    gap: 12px;
+}
+
+.dash-service-name {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.dash-service-desc {
+    font-size: 0.74rem;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+/* Pill Badges */
+.dash-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    border: none;
+    transition: all 0.12s ease;
+}
+
+.pill-amber {
+    background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+    color: #ffffff;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(217, 119, 6, 0.35);
+}
+
+.pill-amber:hover {
+    background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    transform: translateY(-1px);
+}
+
+.pill-blue {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    color: #ffffff;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.pill-blue:hover {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+    transform: translateY(-1px);
+}
+
+.dash-status-pill {
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+}
+
+.pill-active {
+    background: rgba(16, 185, 129, 0.14);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.pill-inactive {
+    background: rgba(100, 116, 139, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.dash-card-note-text {
+    font-size: 0.84rem;
+    color: #94a3b8;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* 5. 3D Notes Grid (Keep Cards) */
+body.theme-dark .keep-card {
+    background: #141720 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+}
+
+body.theme-dark .keep-card:hover {
+    transform: translateY(-2px) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+/* 6. 3D WYSIWYG Editor Canvas */
+body.theme-dark .editor-pane {
+    background-color: #0c0e14 !important;
+}
+
+body.theme-dark .wysiwyg-canvas {
+    background: #141720 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    color: #f1f5f9 !important;
+}
+
+body.theme-dark .editor-ribbon {
+    background: #12151d !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+body.theme-dark .ribbon-tab-nav-btn {
+    border-radius: 6px 6px 0 0 !important;
+    font-weight: 600 !important;
+    color: #94a3b8 !important;
+}
+
+body.theme-dark .ribbon-tab-nav-btn.active {
+    background: #171b26 !important;
+    color: #ffffff !important;
+    border-top: 2px solid #3b82f6 !important;
+}
+
+body.theme-dark .ribbon-tab-pane {
+    background: #171b26 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+body.theme-dark .ribbon-tool-btn {
+    border-radius: 5px !important;
+    border: 1px solid transparent !important;
+}
+
+body.theme-dark .ribbon-tool-btn:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 7. 3D Sidebar */
+body.theme-dark .sidebar {
+    background: #0e1117 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+body.theme-dark .tree-node {
+    border-radius: 6px !important;
+    transition: all 0.12s ease !important;
+}
+
+body.theme-dark .tree-node:hover {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+body.theme-dark .tree-node.active {
+    background: rgba(59, 130, 246, 0.18) !important;
+    border: 1px solid rgba(59, 130, 246, 0.35) !important;
+    color: #ffffff !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+body.theme-dark .sidebar-nav-item {
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    margin: 8px 10px !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+body.theme-dark .sidebar-nav-item:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    transform: translateY(-1px);
+}
+
+body.theme-dark .sidebar-nav-item.active {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.22) 0%, rgba(37, 99, 235, 0.15) 100%) !important;
+    border-color: rgba(59, 130, 246, 0.45) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
+/* 8. 3D Modals & Dialogs */
+body.theme-dark .modal-content,
+body.theme-dark .welcome-modal-content,
+body.theme-dark .settings-modal-content {
+    background: #141720 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 24px 60px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }

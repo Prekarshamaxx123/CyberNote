@@ -1,6 +1,6 @@
 // CyberNote 🛡️ - Service Worker for 100% Offline-First PWA Execution
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '') || '';
-const CACHE_NAME = 'cybernote-v21-settings-mirror-sites';
+const CACHE_NAME = 'cybernote-v22-3d-modern-portal';
 
 const ASSETS_TO_CACHE = [
     `${BASE_PATH}/`,

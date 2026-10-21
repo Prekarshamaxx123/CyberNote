@@ -17,3 +17,7 @@ credentials*.json
 # OS files
 .DS_Store
 Thumbs.db
+
+# Test environment folders
+web_test/
+web test
