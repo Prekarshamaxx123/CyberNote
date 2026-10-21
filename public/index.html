@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>CyberNote - Secure Hierarchical Cloud Notes</title>
     <meta name="google-site-verification" content="7-8ESzy_QOUR_sHuEBY-WPd0aFVT4u_AmjKsFRLDsYE" />
-    <link rel="stylesheet" href="style.css?v=20261015_signature_align_v18">
+    <link rel="stylesheet" href="style.css?v=20261021_mirror_sites_v21">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e1e2e">
     <meta name="mobile-web-app-capable" content="yes">
@@ -2306,6 +2306,10 @@
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="7" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="17"/><line x1="7" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="17" y2="12"/><path d="m19 19-3.5-3.5"/><path d="m5 5 3.5 3.5"/><path d="m19 5-3.5 3.5"/><path d="m5 19 3.5-3.5"/></svg>
                         <span>Bug Report</span>
                     </button>
+                    <button class="settings-tab-btn" data-tab="tab-mirrors">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        <span>Mirror Sites</span>
+                    </button>
                 </div>
             </div>
 
@@ -2525,6 +2529,130 @@
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                                     Official repository tracker at <b>github.com/Prekarshamaxx123/CyberNote/issues</b>. Locked and non-editable.
                                 </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 7: Mirror Sites (Alternative Official Endpoints) -->
+                    <div id="tab-mirrors" class="settings-tab-pane">
+                        <div class="settings-mirrors-header">
+                            <div style="display:flex; align-items:flex-start; gap:12px;">
+                                <span style="color:var(--accent); display:flex; align-items:center; margin-top:2px;">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                </span>
+                                <div>
+                                    <h4 style="margin:0 0 4px 0; font-size:0.95rem;">Official CyberNote Mirror Sites</h4>
+                                    <p style="margin:0; font-size:0.82rem; color:var(--text-muted); line-height:1.4;">
+                                        Alternative official mirror endpoints for continuous, high-availability access. If one link is slow or blocked on your network, use any mirror below. All mirrors share Google Drive cloud sync.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mirror-cards-list" style="margin-top:14px; display:flex; flex-direction:column; gap:12px;">
+                            <!-- Mirror 1: Official GitHub Web -->
+                            <div class="mirror-card" data-domain="prekarshamaxx123.github.io">
+                                <div class="mirror-card-header">
+                                    <div class="mirror-title-row">
+                                        <div class="mirror-icon-badge" style="background:rgba(88, 166, 255, 0.12); color:#58a6ff;">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                                        </div>
+                                        <div>
+                                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                                <span class="mirror-name">GitHub Pages (Official Web)</span>
+                                                <span class="mirror-badge badge-primary">Primary Edge CDN</span>
+                                            </div>
+                                            <small style="color:var(--text-muted); font-size:0.75rem;">Fast global Edge CDN, 100% offline-ready PWA, automated git releases.</small>
+                                        </div>
+                                    </div>
+                                    <span class="mirror-current-indicator" style="display:none;">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                                        Current Site
+                                    </span>
+                                </div>
+                                <div class="mirror-url-box">
+                                    <code>https://prekarshamaxx123.github.io/CyberNote/</code>
+                                </div>
+                                <div class="mirror-actions">
+                                    <a href="https://prekarshamaxx123.github.io/CyberNote/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                        <span>Open Web</span>
+                                    </a>
+                                    <button class="btn btn-sm btn-secondary" onclick="copyMirrorUrl('https://prekarshamaxx123.github.io/CyberNote/')" style="display:inline-flex; align-items:center; gap:6px;">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                        <span>Copy Link</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Mirror 2: Custom Domain Mirror -->
+                            <div class="mirror-card" data-domain="cybernote.cybertubelk.xyz">
+                                <div class="mirror-card-header">
+                                    <div class="mirror-title-row">
+                                        <div class="mirror-icon-badge" style="background:rgba(168, 85, 247, 0.12); color:#a855f7;">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                        </div>
+                                        <div>
+                                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                                <span class="mirror-name">cybertubelk.xyz (Custom Domain)</span>
+                                                <span class="mirror-badge badge-accent">Verified Custom Domain</span>
+                                            </div>
+                                            <small style="color:var(--text-muted); font-size:0.75rem;">Custom verified domain endpoint with high availability and SSL encryption.</small>
+                                        </div>
+                                    </div>
+                                    <span class="mirror-current-indicator" style="display:none;">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                                        Current Site
+                                    </span>
+                                </div>
+                                <div class="mirror-url-box">
+                                    <code>https://cybernote.cybertubelk.xyz</code>
+                                </div>
+                                <div class="mirror-actions">
+                                    <a href="https://cybernote.cybertubelk.xyz" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                        <span>Open Mirror</span>
+                                    </a>
+                                    <button class="btn btn-sm btn-secondary" onclick="copyMirrorUrl('https://cybernote.cybertubelk.xyz')" style="display:inline-flex; align-items:center; gap:6px;">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                        <span>Copy Link</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Mirror 3: Secondary Web Mirror (cybernote.free.nf) -->
+                            <div class="mirror-card" data-domain="cybernote.free.nf">
+                                <div class="mirror-card-header">
+                                    <div class="mirror-title-row">
+                                        <div class="mirror-icon-badge" style="background:rgba(234, 179, 8, 0.12); color:#eab308;">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        </div>
+                                        <div>
+                                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                                <span class="mirror-name">cybernote.free.nf (Secondary Mirror)</span>
+                                                <span class="mirror-badge badge-warning">Alternative Free Mirror</span>
+                                            </div>
+                                            <small style="color:var(--text-muted); font-size:0.75rem;">Secondary web mirror for continuous access if other domains are restricted.</small>
+                                        </div>
+                                    </div>
+                                    <span class="mirror-current-indicator" style="display:none;">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                                        Current Site
+                                    </span>
+                                </div>
+                                <div class="mirror-url-box">
+                                    <code>https://cybernote.free.nf</code>
+                                </div>
+                                <div class="mirror-actions">
+                                    <a href="https://cybernote.free.nf" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                        <span>Open Mirror</span>
+                                    </a>
+                                    <button class="btn btn-sm btn-secondary" onclick="copyMirrorUrl('https://cybernote.free.nf')" style="display:inline-flex; align-items:center; gap:6px;">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                        <span>Copy Link</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2796,6 +2924,6 @@
     <!-- Toast Notification Container -->
     <div id="cybernote-toast" class="cybernote-toast"></div>
 
-    <script src="app.js?v=20261015_silent_refresh_v20"></script>
+    <script src="app.js?v=20261021_mirror_sites_v21"></script>
 </body>
 </html>
