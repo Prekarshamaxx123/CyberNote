@@ -9135,11 +9135,9 @@ function setupTagInteractions() {
 
 // --- First-Visit Welcome Modal ---
 function checkFirstVisitWelcome() {
-    const isDismissed = localStorage.getItem('cybernote_welcome_dismissed');
-    if (!state.googleAccessToken && !isDismissed) {
-        const welcomeModal = document.getElementById('welcome-modal');
-        if (welcomeModal) welcomeModal.style.display = 'flex';
-    }
+    // CyberNote is 100% accessible and offline-first without requiring user authentication.
+    // To comply with Google OAuth guidelines, never show a blocking login/welcome overlay on initial visit.
+    // Users can access the welcome guide and sign-in anytime via the header buttons or settings.
 }
 
 function closeWelcomeModal() {

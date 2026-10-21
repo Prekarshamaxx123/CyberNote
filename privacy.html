@@ -4,58 +4,266 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy - CyberNote</title>
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
     <style>
+        :root {
+            --bg-body: #0c0e14;
+            --bg-card: #151821;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --success: #10b981;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            color: #cdd6f4;
-            background-color: #1e1e2e;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
+            line-height: 1.7;
+            color: var(--text-primary);
+            background-color: var(--bg-body);
+            background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0px, rgba(255, 255, 255, 0.014) 1px, transparent 1px, transparent 64px);
+            margin: 0;
+            padding: 30px 20px 80px 20px;
         }
-        h1, h2, h3 { color: #89b4fa; }
-        a { color: #89b4fa; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .card {
-            background-color: #181825;
-            border: 1px solid #313244;
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .policy-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .policy-nav a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .policy-nav a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
+        }
+        .policy-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 30px;
-            margin-top: 20px;
+            padding: 40px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        h1 {
+            color: #ffffff;
+            font-size: 2.2rem;
+            margin-top: 0;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+        .meta-date {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 28px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        h2 {
+            color: #ffffff;
+            font-size: 1.35rem;
+            margin-top: 36px;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            letter-spacing: -0.01em;
+        }
+        h3 {
+            color: var(--accent-hover);
+            font-size: 1.1rem;
+            margin-top: 22px;
+            margin-bottom: 10px;
+        }
+        p, li {
+            color: var(--text-secondary);
+            font-size: 0.96rem;
+        }
+        ul, ol {
+            padding-left: 24px;
+            margin-bottom: 18px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        strong {
+            color: var(--text-primary);
+        }
+        code {
+            background-color: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: #fca5a5;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.88em;
+        }
+        .callout {
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-left: 4px solid var(--accent);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 20px 0;
+        }
+        .callout-success {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-left: 4px solid var(--success);
+        }
+        .callout p {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 0.94rem;
+        }
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
+        }
+        .footer-note {
+            text-align: center;
+            margin-top: 30px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Privacy Policy for CyberNote</h1>
-        <p><strong>Effective Date:</strong> October 6, 2026</p>
-        <p>CyberNote ("we", "our", or "the application") is committed to protecting your privacy. This Privacy Policy describes how your information is handled when you use the CyberNote web application hosted at <a href="https://prekarshamaxx123.github.io/CyberNote/">https://prekarshamaxx123.github.io/CyberNote/</a>.</p>
+    <div class="container">
+        <div class="policy-nav">
+            <a href="home.html">← Back to CyberNote Home</a>
+            <div style="display:flex; gap:16px;">
+                <a href="index.html">Launch App</a>
+                <a href="terms.html">Terms of Service</a>
+            </div>
+        </div>
 
-        <h2>1. Information We Collect</h2>
-        <p>CyberNote is a client-side note-taking application. We do not operate external database servers that collect, store, or sell your personal data.</p>
-        <ul>
-            <li><strong>Local Storage:</strong> Your notes, folders, and application settings are stored locally on your device within your web browser's storage (LocalStorage and IndexedDB).</li>
-            <li><strong>Google Account Information:</strong> If you choose to connect your Google Account, we receive your basic profile information (name, email address, profile picture) to personalize your workspace header.</li>
-        </ul>
+        <div class="policy-card">
+            <h1>Privacy Policy for CyberNote</h1>
+            <div class="meta-date">
+                <strong>Effective Date:</strong> October 21, 2026 | <strong>Last Revised:</strong> October 21, 2026
+            </div>
 
-        <h2>2. Google Drive Access and Data Usage</h2>
-        <p>CyberNote integrates with the Google Drive API to provide cloud synchronization for your notes. We request the following permission:</p>
-        <ul>
-            <li><strong>https://www.googleapis.com/auth/drive.file:</strong> This permission allows CyberNote to view, create, edit, and delete only the specific files and folders created by CyberNote (such as the <code>CyberNote</code> folder and your individual note files). CyberNote does not access, read, or modify any other files or folders in your Google Drive.</li>
-        </ul>
+            <p>Welcome to <strong>CyberNote</strong> ("we", "our", or "the application"). CyberNote is an open-source, client-side, hierarchical knowledge management and note-taking application created by <strong>Prekarsha (Prekarshamaxx123)</strong>. CyberNote is designed with a strict privacy-first, offline-first philosophy.</p>
 
-        <h2>3. Google API Limited Use Disclosure</h2>
-        <p>CyberNote's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy#additional_requirements_for_specific_api_scopes" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+            <p>This Privacy Policy describes in clear, transparent detail how CyberNote handles information, what permissions are requested, how Google user data is accessed, used, and stored, and the extensive controls you retain over your data. This policy applies to all official access endpoints of CyberNote, including:</p>
+            <ul>
+                <li><strong>Custom Domain:</strong> <a href="https://cybernote.cybertubelk.xyz" target="_blank" rel="noopener">https://cybernote.cybertubelk.xyz</a></li>
+                <li><strong>Official GitHub Pages:</strong> <a href="https://prekarshamaxx123.github.io/CyberNote/" target="_blank" rel="noopener">https://prekarshamaxx123.github.io/CyberNote/</a></li>
+                <li><strong>Alternative Hosting:</strong> <a href="https://cybernote.free.nf" target="_blank" rel="noopener">https://cybernote.free.nf</a></li>
+            </ul>
 
-        <h2>4. Data Sharing and Third Parties</h2>
-        <p>We do not share, sell, rent, or trade your notes or personal data with any third parties or advertisers. All synchronization occurs directly between your web browser and Google's official servers via secure HTTPS connections.</p>
+            <div class="callout callout-success">
+                <p><strong>Core Privacy Principle:</strong> CyberNote is an <strong>offline-first, client-side application</strong>. We do not own, operate, or maintain any centralized database servers that store or collect your personal notes, passwords, or Google credentials. All note storage occurs locally on your personal device, with optional cloud backup directly connecting to your own personal Google Drive account.</p>
+            </div>
 
-        <h2>5. Data Security</h2>
-        <p>Your notes can be protected with local client-side password encryption (SHA-256). All communications with Google APIs use industry-standard SSL/TLS encryption.</p>
+            <h2>1. Information We Collect and Process</h2>
+            <p>CyberNote collects the minimum amount of data necessary to provide you with secure, reliable note-taking services:</p>
+            <ul>
+                <li><strong>Local Storage (Notes, Drawings &amp; Settings):</strong> Your hierarchical notes, notebooks, tags, folder structures, Windows Paint drawings, handwritten signatures, and user preferences are saved directly to your web browser's local client storage (specifically <code>IndexedDB</code> and <code>localStorage</code>). This data stays entirely on your physical device.</li>
+                <li><strong>Client-Side Master Passwords:</strong> If you choose to lock specific notes with a password or enable client-side note encryption, passwords are used strictly in client memory to compute SHA-256 hashes or AES-256-GCM decryption keys. Your passwords are never transmitted over the internet or saved to external servers.</li>
+                <li><strong>Google Account Information (Optional):</strong> If you choose to connect your Google Account for Google Drive Cloud Backup, we receive your basic profile information (display name, email address, and avatar image). This information is used solely to display your active account profile in the workspace header.</li>
+            </ul>
 
-        <h2>6. Contact Us</h2>
-        <p>If you have any questions about this Privacy Policy or how your data is handled, please open an issue on our GitHub repository: <a href="https://github.com/Prekarshamaxx123/CyberNote" target="_blank" rel="noopener">https://github.com/Prekarshamaxx123/CyberNote</a>.</p>
+            <h2>2. Google API Permissions and Exact Data Usage</h2>
+            <p>CyberNote provides an optional Google Drive integration allowing users to synchronize and back up their notes to their personal cloud storage. To provide this functionality, CyberNote requests the following explicit Google OAuth 2.0 scopes:</p>
+
+            <h3>A. <code>https://www.googleapis.com/auth/drive.file</code> (Non-Sensitive Scope)</h3>
+            <ul>
+                <li><strong>What it does:</strong> This permission grants CyberNote access to view, create, edit, download, and delete <strong>ONLY the specific files and folders created by CyberNote itself</strong>.</li>
+                <li><strong>How CyberNote uses this permission:</strong>
+                    <ul>
+                        <li>CyberNote automatically creates a single dedicated folder named <code>CyberNote</code> on your personal Google Drive.</li>
+                        <li>CyberNote uploads and downloads your note documents (files prefixed with <code>cn_</code> or <code>CyberNote_Backup.json</code>), handwritten signature images, and folder metadata into this single folder.</li>
+                    </ul>
+                </li>
+                <li><strong>Strict Non-Access Guarantee:</strong> <strong>CyberNote CANNOT and DOES NOT read, access, search, modify, view, or delete any other files, folders, documents, spreadsheets, photos, videos, or personal data in your Google Drive.</strong> CyberNote's access is strictly restricted to files that CyberNote itself creates.</li>
+            </ul>
+
+            <h3>B. <code>https://www.googleapis.com/auth/userinfo.profile</code></h3>
+            <ul>
+                <li><strong>How CyberNote uses this permission:</strong> Used exclusively to retrieve your Google display name and profile photo thumbnail so that the workspace header displays your identity and indicates your active connection status.</li>
+            </ul>
+
+            <h3>C. <code>https://www.googleapis.com/auth/userinfo.email</code></h3>
+            <ul>
+                <li><strong>How CyberNote uses this permission:</strong> Used solely to display the connected Google email address in your settings hub, and to guarantee that cloud synchronizations write to the authenticated owner's storage quota.</li>
+            </ul>
+
+            <h2>3. Google API Limited Use Disclosure</h2>
+            <div class="callout">
+                <p><strong>Google API Services User Data Policy Compliance:</strong><br>
+                CyberNote's use and transfer of information received from Google APIs to any other app will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy#additional_requirements_for_specific_api_scopes" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+            </div>
+
+            <h2>4. Strict Prohibitions: No Sale, No Advertising, No AI Training</h2>
+            <p>We believe your personal notes, creative writings, and thoughts must remain completely private. Therefore, CyberNote adheres to the following strict rules:</p>
+            <ul>
+                <li><strong>No Sale of User Data:</strong> We do not sell, rent, monetize, lease, or trade Google user data or personal notes to any third parties, brokers, or marketing platforms under any circumstances.</li>
+                <li><strong>No Advertising or Marketing:</strong> CyberNote is 100% ad-free. Google user data is never used, transferred, or disclosed for serving advertisements, retargeting campaigns, or behavioral profiling.</li>
+                <li><strong>No AI Model Training:</strong> Your notes, Google user data, and documents are <strong>NEVER used to train, develop, or fine-tune generalized artificial intelligence (AI) or machine learning (ML) models</strong>.</li>
+                <li><strong>No Transfer to Third Parties:</strong> CyberNote does not transfer Google user data to third parties, except as strictly required to fulfill user-initiated synchronization directly with Google's official Drive servers.</li>
+            </ul>
+
+            <h2>5. Data Architecture, Storage &amp; Security</h2>
+            <p>CyberNote's technical architecture guarantees security through decentralization:</p>
+            <ul>
+                <li><strong>Direct Client-to-Google Communication:</strong> When you sync notes, your web browser communicates directly with Google's official API servers (<code>https://www.googleapis.com</code>) using encrypted HTTPS / TLS 1.3 transport. There is no intermediary proxy or proxy server in between.</li>
+                <li><strong>Local Ephemeral Tokens:</strong> Google OAuth 2.0 access tokens are held in client-side memory and temporary browser storage. They are never transmitted to any third-party server.</li>
+                <li><strong>End-to-End Encryption (Optional):</strong> You have the option to enable AES-256-GCM encryption with SHA-256 master password key derivation for your notes. When enabled, your note content is encrypted locally on your device prior to saving or syncing.</li>
+            </ul>
+
+            <h2>6. Data Retention and Deletion Rights</h2>
+            <p>Because CyberNote does not maintain external database servers, your data is retained only where you choose to keep it:</p>
+            <ul>
+                <li><strong>Local Browser Storage:</strong> Notes remain on your device's browser until you manually delete them, or until you click <code>Clear All Local Data</code> in CyberNote Settings.</li>
+                <li><strong>Google Drive Storage:</strong> Synced files remain in your personal Google Drive inside the <code>CyberNote</code> folder until you delete them. You can open <a href="https://drive.google.com" target="_blank" rel="noopener">Google Drive</a> at any time and permanently delete the <code>CyberNote</code> folder or individual note files.</li>
+            </ul>
+
+            <h3>How to Revoke CyberNote's Google Account Permissions</h3>
+            <p>You can revoke CyberNote's access to your Google Account at any time through Google's official security management console:</p>
+            <ol>
+                <li>Visit your Google Account Security Dashboard: <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">https://myaccount.google.com/permissions</a></li>
+                <li>Find <strong>CyberNote</strong> under "Third-party apps with account access".</li>
+                <li>Click <strong>Remove Access</strong>.</li>
+            </ol>
+            <p>Upon revoking permissions, CyberNote will immediately lose all ability to access your Google Drive or profile information.</p>
+
+            <h2>7. Children's Privacy</h2>
+            <p>CyberNote is a general productivity tool and is not directed towards children under the age of 13. We do not knowingly collect or solicit personal information from children under 13.</p>
+
+            <h2>8. Changes to this Privacy Policy</h2>
+            <p>We may update this Privacy Policy from time to time to reflect new features or regulatory requirements. Any modifications will be posted to this page with an updated "Last Revised" date. We encourage users to periodically review this page.</p>
+
+            <h2>9. Contact and Developer Information</h2>
+            <p>CyberNote is an open-source project developed and maintained by <strong>Prekarsha (Prekarshamaxx123)</strong>. If you have any questions, feedback, or concerns regarding this Privacy Policy or your data privacy, please contact us:</p>
+            <ul>
+                <li><strong>Project Owner &amp; Developer:</strong> Prekarsha (Prekarshamaxx123)</li>
+                <li><strong>Official GitHub Repository:</strong> <a href="https://github.com/Prekarshamaxx123/CyberNote" target="_blank" rel="noopener">https://github.com/Prekarshamaxx123/CyberNote</a></li>
+                <li><strong>Bug Reports &amp; Inquiries:</strong> <a href="https://github.com/Prekarshamaxx123/CyberNote/issues" target="_blank" rel="noopener">https://github.com/Prekarshamaxx123/CyberNote/issues</a></li>
+                <li><strong>Developer Email:</strong> <code>prekarshamaxx123@gmail.com</code></li>
+            </ul>
+        </div>
+
+        <div class="footer-note">
+            &copy; 2026 CyberNote. Open-source hierarchical knowledge tree &amp; cloud notes system.
+        </div>
     </div>
 </body>
 </html>

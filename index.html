@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>CyberNote - Secure Hierarchical Cloud Notes</title>
     <meta name="google-site-verification" content="7-8ESzy_QOUR_sHuEBY-WPd0aFVT4u_AmjKsFRLDsYE" />
-    <link rel="stylesheet" href="style.css?v=20261021_3d_portal_v22">
+    <link rel="stylesheet" href="style.css?v=20261021_oauth_verification_v23">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e1e2e">
     <meta name="mobile-web-app-capable" content="yes">
@@ -127,6 +127,12 @@
                 <span>Install App</span>
             </button>
 
+            <!-- Public Application Home Page (Explains purpose & features) -->
+            <a href="home.html" class="btn btn-about" title="CyberNote Home, Mission & Purpose" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Home</span>
+            </a>
+
             <!-- About / Follow Prekarsha Button -->
             <button id="btn-about" class="btn btn-about" title="About CyberNote & Follow Prekarsha on GitHub">
                 <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -236,6 +242,18 @@
                 </div>
 
                 <div class="all-notes-scroll-area">
+                    <!-- Purpose & Privacy Banner (Explains App Mission & Zero-Login Architecture) -->
+                    <div class="dash-purpose-banner" style="display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 18px; background:rgba(59, 130, 246, 0.08); border:1px solid rgba(59, 130, 246, 0.25); border-radius:10px; margin-bottom:20px; flex-wrap:wrap;">
+                        <div style="display:flex; align-items:center; gap:10px; min-width:280px; flex:1;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            <span style="font-size:0.86rem; color:#cbd5e1; line-height:1.45;"><strong>CyberNote</strong> is an open-source hierarchical knowledge base. 100% free and fully usable offline without login, with optional Google Drive backup.</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                            <a href="home.html" class="dash-badge-pill pill-blue" style="text-decoration:none; padding:5px 12px; font-size:0.75rem;">About Purpose</a>
+                            <a href="privacy.html" class="dash-badge-pill" style="text-decoration:none; padding:5px 12px; font-size:0.75rem; background:rgba(255,255,255,0.08); color:#f1f5f9; border:1px solid rgba(255,255,255,0.12);">Privacy Policy</a>
+                        </div>
+                    </div>
+
                     <!-- 3D Executive Dashboard Metric Cards (Inspired by modern portal) -->
                     <div class="dash-metrics-grid">
                         <div class="dash-metric-card" onclick="showAllNotesView()" title="All Notes">
