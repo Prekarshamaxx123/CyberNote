@@ -4711,6 +4711,122 @@ body {
     }
 }
 
+/* Mirror Sites Settings Styling */
+.settings-mirrors-header {
+    background-color: var(--bg-header);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+}
+
+.mirror-card {
+    background-color: var(--bg-header);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.2s ease;
+}
+
+.mirror-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.mirror-card.active-mirror {
+    border-color: var(--success);
+    background: linear-gradient(180deg, rgba(34, 197, 94, 0.06) 0%, var(--bg-header) 100%);
+}
+
+.mirror-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mirror-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mirror-icon-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.mirror-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mirror-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 10px;
+    display: inline-block;
+}
+
+.badge-primary {
+    background: rgba(88, 166, 255, 0.15);
+    color: #58a6ff;
+    border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+.badge-accent {
+    background: rgba(168, 85, 247, 0.15);
+    color: #a855f7;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.badge-warning {
+    background: rgba(234, 179, 8, 0.15);
+    color: #eab308;
+    border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.mirror-current-indicator {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--success);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mirror-url-box {
+    background-color: var(--bg-app);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.mirror-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 /* User Profile Card (Matches photo style) */
 .settings-user-card {
     display: flex;

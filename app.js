@@ -9146,7 +9146,8 @@ const SETTINGS_TAB_TITLES = {
     'tab-migration': 'Import & Export',
     'tab-github': 'GitHub Sync',
     'tab-security': 'Security & E2EE',
-    'tab-bug': 'Bug Report'
+    'tab-bug': 'Bug Report',
+    'tab-mirrors': 'Mirror Sites'
 };
 
 function switchSettingsTab(tabId) {
@@ -9160,6 +9161,42 @@ function switchSettingsTab(tabId) {
     if (titleEl && SETTINGS_TAB_TITLES[tabId]) {
         titleEl.textContent = SETTINGS_TAB_TITLES[tabId];
     }
+    if (tabId === 'tab-mirrors') {
+        highlightCurrentMirror();
+    }
+}
+
+function copyMirrorUrl(url) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+            showToast('✓ Mirror link copied to clipboard!', 'success');
+        }).catch(() => {
+            showToast('Link: ' + url, 'info');
+        });
+    } else {
+        const temp = document.createElement('textarea');
+        temp.value = url;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        showToast('✓ Mirror link copied to clipboard!', 'success');
+    }
+}
+
+function highlightCurrentMirror() {
+    const curHost = (window.location.hostname || '').toLowerCase();
+    document.querySelectorAll('.mirror-card').forEach(card => {
+        const domain = (card.dataset.domain || '').toLowerCase();
+        const indicator = card.querySelector('.mirror-current-indicator');
+        if (domain && curHost.includes(domain)) {
+            card.classList.add('active-mirror');
+            if (indicator) indicator.style.display = 'inline-flex';
+        } else {
+            card.classList.remove('active-mirror');
+            if (indicator) indicator.style.display = 'none';
+        }
+    });
 }
 
 function updateSettingsUI() {
