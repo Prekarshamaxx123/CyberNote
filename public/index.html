@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>CyberNote - Secure Hierarchical Cloud Notes</title>
     <meta name="google-site-verification" content="7-8ESzy_QOUR_sHuEBY-WPd0aFVT4u_AmjKsFRLDsYE" />
-    <link rel="stylesheet" href="style.css?v=20261021_classic_restore_v24">
+    <link rel="stylesheet" href="style.css?v=20261021_universal_rounded_v33">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e1e2e">
     <meta name="mobile-web-app-capable" content="yes">
@@ -269,10 +269,29 @@
             </div>
 
             <div id="note-view" class="note-view">
-                <!-- Breadcrumbs & Note Header -->
+                <!-- Unified Compact Header Bar (Breadcrumbs + Title + Tags + Actions) -->
                 <div class="note-meta-bar">
-                    <div class="breadcrumbs" id="breadcrumbs">
+                    <div class="breadcrumbs" id="breadcrumbs" style="display: none;">
                         <span>Root</span>
+                    </div>
+                    <div class="title-container" id="title-container">
+                        <div class="title-left-group">
+                            <button id="btn-icon-picker" class="icon-selector" title="Change Node Icon">
+                                <svg class="node-svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                            </button>
+                            <span id="title-color-dot" class="node-color-indicator" title="Node Color"></span>
+                            <input type="text" id="note-title" class="note-title-input" placeholder="Note Title...">
+                        </div>
+                        <div class="tags-container" id="tags-container">
+                            <span class="tags-label">
+                                <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                            </span>
+                            <div class="tags-chip-wrapper" id="tags-chip-wrapper">
+                                <div id="tags-chips-list" class="tags-chips-list"></div>
+                                <input type="text" id="note-tags-input" class="note-tags-input" placeholder="+ Add tag (press Enter or comma)...">
+                            </div>
+                            <input type="hidden" id="note-tags">
+                        </div>
                     </div>
                     <div class="note-meta-actions">
                         <button id="btn-toggle-readonly" class="btn btn-sm btn-secondary note-lock-btn" title="Toggle Read-Only Mode">
@@ -305,26 +324,6 @@
                     </div>
                     <div id="note-unlock-error" class="lock-error-msg" style="display: none;">Incorrect password. Please try again.</div>
                     <div id="note-unlock-hint" class="lock-hint-msg" style="display: none;"></div>
-                </div>
-
-                <div class="title-container">
-                    <button id="btn-icon-picker" class="icon-selector" title="Change Node Icon">
-                        <svg class="node-svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                    </button>
-                    <span id="title-color-dot" class="node-color-indicator" title="Node Color"></span>
-                    <input type="text" id="note-title" class="note-title-input" placeholder="Note Title...">
-                </div>
-
-                <div class="tags-container" id="tags-container">
-                    <span class="tags-label">
-                        <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                        <span>Tags:</span>
-                    </span>
-                    <div class="tags-chip-wrapper" id="tags-chip-wrapper">
-                        <div id="tags-chips-list" class="tags-chips-list"></div>
-                        <input type="text" id="note-tags-input" class="note-tags-input" placeholder="+ Add tag (press Enter or comma)...">
-                    </div>
-                    <input type="hidden" id="note-tags">
                 </div>
 
                 <!-- Dedicated Folder Explorer View (Shown when active node is a Folder) -->
@@ -579,12 +578,85 @@
                                     </span>
                                     <span class="badge-label">Paint / Sign</span>
                                 </button>
-                                <button id="btn-draw-shape" class="ribbon-btn ribbon-badge-action" title="Geometric Shape Studio (Clean Vector Shapes)">
-                                    <span class="badge-icon">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><circle cx="17" cy="7" r="4"/><polygon points="7 15 11 21 3 21"/></svg>
-                                    </span>
-                                    <span class="badge-label">Draw Shape</span>
-                                </button>
+                                <div class="ribbon-dropdown-wrap">
+                                    <button id="btn-draw-shape" class="ribbon-btn ribbon-badge-action" title="Shapes & Diagrams (Click to Place or Draw on Note)">
+                                        <span class="badge-icon">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><circle cx="17" cy="7" r="4"/><polygon points="7 15 11 21 3 21"/></svg>
+                                        </span>
+                                        <span class="badge-label">Shapes</span>
+                                    </button>
+                                    <div id="shape-palette-popover" class="ribbon-popover-menu shape-palette-popover" style="display: none;">
+                                        <div class="shape-palette-header">
+                                            <div class="shape-mode-switch">
+                                                <button type="button" class="shape-mode-pill active" id="pill-shape-click" title="Click any shape to place it immediately on the note">
+                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                                    <span>Click to Place</span>
+                                                </button>
+                                                <button type="button" class="shape-mode-pill" id="pill-shape-draw" title="Draw directly by clicking and dragging on the note canvas">
+                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                                                    <span>Drag to Draw</span>
+                                                </button>
+                                            </div>
+                                            <div class="shape-palette-colors">
+                                                <span class="palette-color-dot active" data-color="#00ffff" style="background:#00ffff;" title="Cyan"></span>
+                                                <span class="palette-color-dot" data-color="#10b981" style="background:#10b981;" title="Emerald"></span>
+                                                <span class="palette-color-dot" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></span>
+                                                <span class="palette-color-dot" data-color="#f59e0b" style="background:#f59e0b;" title="Amber"></span>
+                                                <span class="palette-color-dot" data-color="#ef4444" style="background:#ef4444;" title="Red"></span>
+                                                <span class="palette-color-dot" data-color="#ffffff" style="background:#ffffff;" title="White"></span>
+                                            </div>
+                                        </div>
+                                        <div class="shape-palette-body">
+                                            <div class="shape-palette-section-title">General Shapes</div>
+                                            <div class="shape-palette-grid">
+                                                <button type="button" class="shape-palette-btn" data-shape="rect" title="Rectangle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg><span>Rect</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="rounded" title="Rounded Rectangle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="6"/></svg><span>Round</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="circle" title="Circle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg><span>Circle</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="oval" title="Oval / Ellipse"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="10" ry="6"/></svg><span>Oval</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="diamond" title="Diamond / Rhombus"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 12 12 22 2 12"/></svg><span>Diamond</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="parallelogram" title="Parallelogram (Data / I/O)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7 4 22 4 17 20 2 20"/></svg><span>Data</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="triangle" title="Triangle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 3 22 21 2 21"/></svg><span>Triangle</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="triangle-right" title="Play / Right Triangle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 21 12 5 21"/></svg><span>Play</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="hexagon" title="Hexagon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 21 7.2 21 16.8 12 22 3 16.8 3 7.2"/></svg><span>Hexagon</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="cylinder" title="Database / Cylinder"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg><span>Database</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="cloud" title="Cloud Storage / Network"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg><span>Cloud</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="document" title="Document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>Doc</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="actor" title="Actor / Stick Figure"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="5" y1="11" x2="19" y2="11"/><line x1="12" y1="16" x2="6" y2="22"/><line x1="12" y1="16" x2="18" y2="22"/></svg><span>Actor</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="cube" title="3D Cube / Box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="12 2 22 7 22 17 12 22 2 17 2 7 12 2"/><line x1="12" y1="12" x2="22" y2="7"/><line x1="12" y1="12" x2="12" y2="22"/><line x1="12" y1="12" x2="2" y2="7"/></svg><span>Cube</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="callout" title="Speech Callout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Callout</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="trapezoid" title="Trapezoid"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 4 18 4 22 20 2 20"/></svg><span>Trapezoid</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="internal-storage" title="Internal Storage"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="17" y2="20"/></svg><span>Storage</span></button>
+                                            </div>
+
+                                            <div class="shape-palette-section-title">Arrows & Connectors</div>
+                                            <div class="shape-palette-grid">
+                                                <button type="button" class="shape-palette-btn" data-shape="arrow-right" title="Right Block Arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="2 9 14 9 14 4 22 12 14 20 14 15 2 15"/></svg><span>Right</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="arrow-left" title="Left Block Arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 9 10 9 10 4 2 12 10 20 10 15 22 15"/></svg><span>Left</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="arrow-up" title="Up Block Arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="9 22 9 10 4 10 12 2 20 10 15 10 15 22"/></svg><span>Up</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="arrow-down" title="Down Block Arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="9 2 9 14 4 14 12 22 20 14 15 14 15 2"/></svg><span>Down</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="arrow-diagonal" title="Diagonal Arrow (Up-Left / Free Rotate)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 19 17 21 6 10 3 13 2 2 13 3 10 6"/></svg><span>Diagonal</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="arrow-double" title="Double Block Arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="2 12 7 6 7 9 17 9 17 6 22 12 17 18 17 15 7 15 7 18"/></svg><span>Double</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="line" title="Straight Line"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"/></svg><span>Line</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="line-arrow" title="Line Arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg><span>Pointer</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="line-double-arrow" title="Double Line Arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="10 7 5 12 10 17"/><polyline points="14 7 19 12 14 17"/></svg><span>2-Way</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="line-curved-arrow" title="Curved S-Arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19c0-6 12-4 12-12"/><polyline points="11 8 16 3 19 8"/></svg><span>Curve</span></button>
+                                            </div>
+
+                                            <div class="shape-palette-section-title">Symbols & Badges</div>
+                                            <div class="shape-palette-grid">
+                                                <button type="button" class="shape-palette-btn" data-shape="star" title="5-Point Star"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>Star</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="cross" title="Plus / Cross"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="8 2 16 2 16 8 22 8 22 16 16 16 16 22 8 22 8 16 2 16 2 8 8 8"/></svg><span>Cross</span></button>
+                                                <button type="button" class="shape-palette-btn" data-shape="heart" title="Heart"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span>Heart</span></button>
+                                            </div>
+                                        </div>
+                                        <div class="shape-palette-footer">
+                                            <button type="button" class="shape-palette-btn-studio" onclick="openShapeModal('rect')">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                                <span>Advanced Shape Studio Modal...</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <button id="btn-insert-image" class="ribbon-btn ribbon-badge-action" title="Insert Photo or Screenshot (Ctrl+V)">
                                     <span class="badge-icon">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -1072,11 +1144,30 @@
                     <button id="btn-img-size-50" class="tb-btn-small" title="Resize to 50%">50%</button>
                     <button id="btn-img-size-100" class="tb-btn-small" title="Full Width (100%)">100%</button>
                     <span class="tb-divider" style="display:inline-block;width:1px;height:16px;background:var(--border-color);margin:0 2px;vertical-align:middle;"></span>
+                    <button id="btn-img-align-free" class="tb-btn-small" title="Free Float Anywhere (Move freely across 2D canvas)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle;margin-right:3px;"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Free Float</button>
                     <button id="btn-img-align-left" class="tb-btn-small" title="Align Left">Left</button>
                     <button id="btn-img-align-center" class="tb-btn-small" title="Align Center">Center</button>
                     <button id="btn-img-align-right" class="tb-btn-small" title="Align Right">Right</button>
                     <button id="btn-img-float-left" class="tb-btn-small" title="Float Left (Text wraps around on right)">Float L</button>
                     <button id="btn-img-float-right" class="tb-btn-small" title="Float Right (Text wraps around on left)">Float R</button>
+                    <span class="tb-divider" style="display:inline-block;width:1px;height:16px;background:var(--border-color);margin:0 2px;vertical-align:middle;"></span>
+                    <!-- Quick Rotation Buttons -->
+                    <button id="btn-img-rotate-left" class="tb-btn-small" title="Rotate Counter-Clockwise (-45°)">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>-45°
+                    </button>
+                    <span id="img-tb-rotate-badge" class="tb-badge-small" title="Current Rotation Angle" style="font-size:0.72rem;font-weight:700;color:var(--accent-color);padding:0 3px;">0°</span>
+                    <button id="btn-img-rotate-right" class="tb-btn-small" title="Rotate Clockwise (+45°)">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:2px;"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>+45°
+                    </button>
+                    <button id="btn-img-rotate-reset" class="tb-btn-small" title="Reset Rotation to 0°">Reset</button>
+                    <!-- In-Place Shape Styler (Draw.io basic styles) -->
+                    <span id="shape-tb-controls" class="shape-tb-controls" style="display: none; align-items: center; gap: 3px;">
+                        <span class="tb-divider" style="display:inline-block;width:1px;height:16px;background:var(--border-color);margin:0 2px;vertical-align:middle;"></span>
+                        <input type="color" id="shape-tb-color" title="Shape Color (Border / Fill)" value="#00ffff" style="width:20px;height:20px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;cursor:pointer;background:transparent;padding:0;margin:0 2px;vertical-align:middle;">
+                        <button type="button" id="btn-shape-tb-mode" class="tb-btn-small" title="Fill: None / Tint / Solid">Fill: <span id="shape-tb-mode-label">None</span></button>
+                        <button type="button" id="btn-shape-tb-width" class="tb-btn-small" title="Border Width (1px, 2px, 3px, 5px)">Width: <span id="shape-tb-width-label">3px</span></button>
+                        <button type="button" id="btn-shape-tb-style" class="tb-btn-small" title="Border Style (Solid / Dashed / Dotted)">Style: <span id="shape-tb-style-label">Solid</span></button>
+                    </span>
                     <span class="tb-divider" style="display:inline-block;width:1px;height:16px;background:var(--border-color);margin:0 2px;vertical-align:middle;"></span>
                     <button id="btn-img-copy" class="tb-btn-small" title="Copy Image to Clipboard (Ctrl+C)">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy
@@ -1090,25 +1181,40 @@
                 <div class="editor-scroll-area" id="editor-scroll-area">
                     <!-- Drop Line Indicator during dragging -->
                     <div id="editor-drop-line" class="editor-drop-line" style="display: none;">
-                        <span class="editor-drop-badge">✨ Drop to Move Here</span>
+                        <span class="editor-drop-badge"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle;margin-right:3px;"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Free Move Position</span>
                     </div>
 
                     <!-- Interactive Corner Resize Overlay for Images, Shapes & Signatures (inside scroll container) -->
                     <div id="image-resize-overlay" class="image-resize-overlay" style="display: none;">
                         <div class="img-overlay-controls" id="img-overlay-controls">
                             <!-- Center Drag-to-Move Handle -->
-                            <div class="img-move-handle" id="img-move-handle" title="Click & Drag to move anywhere in note">
+                            <div class="img-move-handle" id="img-move-handle" title="Click & Drag to move anywhere freely across the note canvas">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-                                <span>Move</span>
+                                <span>Move Anywhere</span>
                             </div>
                             <div class="img-overlay-align-bar">
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-align-free" title="Free Float Anywhere"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle;margin-right:2px;"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Free</button>
                                 <button type="button" class="img-overlay-btn" id="btn-overlay-align-left" title="Align Left">Left</button>
                                 <button type="button" class="img-overlay-btn" id="btn-overlay-align-center" title="Align Center">Center</button>
                                 <button type="button" class="img-overlay-btn" id="btn-overlay-align-right" title="Align Right">Right</button>
                                 <span class="img-overlay-divider"></span>
-                                <button type="button" class="img-overlay-btn" id="btn-overlay-move-up" title="Move Up Above Paragraph">⬆</button>
-                                <button type="button" class="img-overlay-btn" id="btn-overlay-move-down" title="Move Down Below Paragraph">⬇</button>
+                                <!-- Quick Rotate in overlay -->
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-rotate-left" title="Rotate Counter-Clockwise (-45°)">
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                    <span>-45°</span>
+                                </button>
+                                <span class="img-overlay-badge" id="img-overlay-rotate-badge" title="Rotation Angle">0°</span>
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-rotate-right" title="Rotate Clockwise (+45°)">
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                                    <span>+45°</span>
+                                </button>
+                                <button type="button" class="img-overlay-btn" id="btn-overlay-rotate-reset" title="Reset Rotation to 0°">0°</button>
                             </div>
+                        </div>
+                        <!-- Rotation Stem and Handle -->
+                        <div class="img-rotate-stem"></div>
+                        <div class="img-rotate-handle" id="img-rotate-handle" title="Drag to rotate freely 360° (Hold Shift to snap 15°)">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                         </div>
                         <div class="img-resize-handle handle-nw" data-handle="nw"></div>
                         <div class="img-resize-handle handle-ne" data-handle="ne"></div>
@@ -1314,14 +1420,15 @@
                             <!-- Quick Theme Picker Row inside Mobile Tools Drawer -->
                             <div class="m-drawer-subrow">
                                 <span class="m-subrow-label">Theme:</span>
-                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="dark" onclick="applyTheme('dark')">🌑 Cyber</button>
-                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="cyberpunk" onclick="applyTheme('cyberpunk')">⚡ Neon</button>
-                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="ocean" onclick="applyTheme('ocean')">🌊 Ocean</button>
-                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="emerald" onclick="applyTheme('emerald')">🌲 Matrix</button>
-                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="dracula" onclick="applyTheme('dracula')">🔮 Purple</button>
-                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="sunset" onclick="applyTheme('sunset')">🌹 Sunset</button>
-                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="sepia" onclick="applyTheme('sepia')">📜 Sepia</button>
-                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="light" onclick="applyTheme('light')">☀️ Light</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="dark" onclick="applyTheme('dark')">Dark</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="custom" onclick="applyTheme('custom')">Custom</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="cyberpunk" onclick="applyTheme('cyberpunk')">Neon</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="ocean" onclick="applyTheme('ocean')">Ocean</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="emerald" onclick="applyTheme('emerald')">Matrix</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="dracula" onclick="applyTheme('dracula')">Purple</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="sunset" onclick="applyTheme('sunset')">Sunset</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="sepia" onclick="applyTheme('sepia')">Sepia</button>
+                                <button type="button" class="m-pill-btn theme-choice-pill" data-theme="light" onclick="applyTheme('light')">Light</button>
                             </div>
                             <div class="m-drawer-grid">
                                 <button type="button" class="m-drawer-card" onclick="closeMobileToolbarDrawer(); applyAutoStyle('smart');">
@@ -1634,37 +1741,117 @@
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="6"/></svg>
                                 <span>Round</span>
                             </button>
-                            <button type="button" class="shape-opt-btn" data-shape="circle" title="Circle / Ellipse">
+                            <button type="button" class="shape-opt-btn" data-shape="circle" title="Circle">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
                                 <span>Circle</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="oval" title="Oval / Ellipse">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="10" ry="6"/></svg>
+                                <span>Oval</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="diamond" title="Diamond / Decision">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 12 12 22 2 12"/></svg>
+                                <span>Diamond</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="parallelogram" title="Parallelogram (Data / IO)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7 4 22 4 17 20 2 20"/></svg>
+                                <span>Data</span>
                             </button>
                             <button type="button" class="shape-opt-btn" data-shape="triangle" title="Triangle">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 3 22 21 2 21"/></svg>
                                 <span>Triangle</span>
                             </button>
-                            <button type="button" class="shape-opt-btn" data-shape="star" title="5-Point Star">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                                <span>Star</span>
-                            </button>
-                            <button type="button" class="shape-opt-btn" data-shape="diamond" title="Diamond / Rhombus">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 12 12 22 2 12"/></svg>
-                                <span>Diamond</span>
+                            <button type="button" class="shape-opt-btn" data-shape="triangle-right" title="Right Triangle / Play">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 21 12 5 21"/></svg>
+                                <span>Play</span>
                             </button>
                             <button type="button" class="shape-opt-btn" data-shape="hexagon" title="Hexagon">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 21 7.2 21 16.8 12 22 3 16.8 3 7.2"/></svg>
                                 <span>Hexagon</span>
                             </button>
+                            <button type="button" class="shape-opt-btn" data-shape="cylinder" title="Database / Cylinder">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+                                <span>Database</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="cloud" title="Cloud Network / Storage">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                                <span>Cloud</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="document" title="Document">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span>Doc</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="actor" title="Stick Figure / Actor">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="5" y1="11" x2="19" y2="11"/><line x1="12" y1="16" x2="6" y2="22"/><line x1="12" y1="16" x2="18" y2="22"/></svg>
+                                <span>Actor</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="cube" title="3D Cube / Box">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="12 2 22 7 22 17 12 22 2 17 2 7 12 2"/><line x1="12" y1="12" x2="22" y2="7"/><line x1="12" y1="12" x2="12" y2="22"/><line x1="12" y1="12" x2="2" y2="7"/></svg>
+                                <span>Cube</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="speech" title="Speech Callout Bubble">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                <span>Callout</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="trapezoid" title="Trapezoid">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 4 18 4 22 20 2 20"/></svg>
+                                <span>Trapezoid</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="internal-storage" title="Internal Storage">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="17" y2="20"/></svg>
+                                <span>Storage</span>
+                            </button>
                             <button type="button" class="shape-opt-btn" data-shape="arrow" title="Right Directional Arrow">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="14 6 20 12 14 18"/></svg>
-                                <span>Arrow</span>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="2 9 14 9 14 4 22 12 14 20 14 15 2 15"/></svg>
+                                <span>Arrow R</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="arrow-left" title="Left Directional Arrow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 9 10 9 10 4 2 12 10 20 10 15 22 15"/></svg>
+                                <span>Arrow L</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="arrow-up" title="Up Directional Arrow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="9 22 9 10 4 10 12 2 20 10 15 10 15 22"/></svg>
+                                <span>Arrow U</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="arrow-down" title="Down Directional Arrow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="9 2 9 14 4 14 12 22 20 14 15 14 15 2"/></svg>
+                                <span>Arrow D</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="arrow-diagonal" title="Diagonal Arrow (Up-Left / Free Rotate)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 19 17 21 6 10 3 13 2 2 13 3 10 6"/></svg>
+                                <span>Diagonal</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="arrow-double" title="Double Arrow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="2 12 7 6 7 9 17 9 17 6 22 12 17 18 17 15 7 15 7 18"/></svg>
+                                <span>Double</span>
                             </button>
                             <button type="button" class="shape-opt-btn" data-shape="line" title="Straight Horizontal Line">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"/></svg>
                                 <span>Line</span>
                             </button>
-                            <button type="button" class="shape-opt-btn" data-shape="speech" title="Speech Callout Bubble">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                                <span>Callout</span>
+                            <button type="button" class="shape-opt-btn" data-shape="line-arrow" title="Line Arrow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+                                <span>Pointer</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="line-double-arrow" title="Double Line Arrow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="10 7 5 12 10 17"/><polyline points="14 7 19 12 14 17"/></svg>
+                                <span>2-Way</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="line-curved-arrow" title="Curved S-Arrow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19c0-6 12-4 12-12"/><polyline points="11 8 16 3 19 8"/></svg>
+                                <span>Curve</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="star" title="5-Point Star">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                <span>Star</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="cross" title="Plus / Cross">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="8 2 16 2 16 8 22 8 22 16 16 16 16 22 8 22 8 16 2 16 2 8 8 8"/></svg>
+                                <span>Cross</span>
+                            </button>
+                            <button type="button" class="shape-opt-btn" data-shape="heart" title="Heart">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                <span>Heart</span>
                             </button>
                         </div>
                     </div>
@@ -2856,17 +3043,28 @@
     <!-- Theme Picker Popover Menu -->
     <div id="theme-picker-popover" class="theme-picker-popover" style="display: none;">
         <div class="theme-picker-header">
-            <span class="theme-picker-title">🎨 Select App Theme</span>
+            <span class="theme-picker-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg>
+                <span>Select App Theme</span>
+            </span>
             <button type="button" class="theme-picker-close" onclick="closeThemePickerPopover()">✕</button>
         </div>
         <div class="theme-picker-grid">
             <button type="button" class="theme-option-card" data-theme="dark" onclick="applyTheme('dark'); closeThemePickerPopover();">
                 <span class="theme-swatch-preview">
-                    <span class="swatch-sidebar" style="background: #0f1120;"></span>
-                    <span class="swatch-editor" style="background: #1e1f30;"></span>
-                    <span class="swatch-accent" style="background: #89b4fa;"></span>
+                    <span class="swatch-sidebar" style="background: #1e1f22;"></span>
+                    <span class="swatch-editor" style="background: #131416;"></span>
+                    <span class="swatch-accent" style="background: #8ab4f8;"></span>
                 </span>
-                <span class="theme-option-name">Cyber Dark</span>
+                <span class="theme-option-name">Google Dark</span>
+            </button>
+            <button type="button" class="theme-option-card theme-option-custom" id="theme-card-custom" data-theme="custom" onclick="applyTheme('custom'); closeThemePickerPopover();">
+                <span class="theme-swatch-preview">
+                    <span class="swatch-sidebar" id="custom-swatch-sidebar" style="background: #1e1f22;"></span>
+                    <span class="swatch-editor" id="custom-swatch-editor" style="background: #131416;"></span>
+                    <span class="swatch-accent" id="custom-swatch-accent" style="background: #8ab4f8;"></span>
+                </span>
+                <span class="theme-option-name">Custom Palette</span>
             </button>
             <button type="button" class="theme-option-card" data-theme="cyberpunk" onclick="applyTheme('cyberpunk'); closeThemePickerPopover();">
                 <span class="theme-swatch-preview">
@@ -2925,11 +3123,163 @@
                 <span class="theme-option-name">Clean Light</span>
             </button>
         </div>
+        <div class="theme-picker-footer" style="padding: 10px 12px; border-top: 1px solid var(--border-color); margin-top: 6px;">
+            <button type="button" id="btn-open-theme-customizer" class="btn btn-primary btn-sm" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="openThemeCustomizerModal(); closeThemePickerPopover();">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>Customize Colors &amp; Presets...</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Theme Color Customizer Modal (User Personalized Palette + Cloud Drive Auto-Sync) -->
+    <div id="theme-customizer-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 620px; width: 92vw; padding: 22px 26px;">
+            <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 18px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg>
+                        Customize Theme Colors
+                    </span>
+                    <span class="badge" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: var(--accent); border: 1px solid rgba(59, 130, 246, 0.3);">Drive Auto-Sync</span>
+                </div>
+                <button type="button" class="icon-btn-header" onclick="closeThemeCustomizerModal()" title="Close">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="customizer-body" style="display: flex; flex-direction: column; gap: 16px;">
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0; line-height: 1.45;">
+                    Personalize your interface colors below. Changes apply live immediately, and are automatically backed up to your <b>Google Drive</b> so any device you sign in from adapts to your custom theme automatically!
+                </p>
+
+                <!-- Color Controls Grid -->
+                <div class="customizer-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+                    <!-- 1. Header & Sidebar (Outer Frame) -->
+                    <div class="customizer-item" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary);">Header &amp; Sidebar Frame</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">Outer navigation shell</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="color" id="picker-frame-bg" value="#1e1f22" style="width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; background: transparent; padding: 0;">
+                            <input type="text" id="hex-frame-bg" value="#1e1f22" maxlength="7" style="width: 68px; font-size: 0.76rem; font-family: monospace; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 6px; text-transform: uppercase;">
+                        </div>
+                    </div>
+
+                    <!-- 2. Editor Canvas Background -->
+                    <div class="customizer-item" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary);">Editor Workspace</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">Typing document canvas</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="color" id="picker-editor-bg" value="#131416" style="width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; background: transparent; padding: 0;">
+                            <input type="text" id="hex-editor-bg" value="#131416" maxlength="7" style="width: 68px; font-size: 0.76rem; font-family: monospace; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 6px; text-transform: uppercase;">
+                        </div>
+                    </div>
+
+                    <!-- 3. Ribbon & Tools Surface -->
+                    <div class="customizer-item" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary);">Toolbar &amp; Ribbon</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">Formatting tools surface</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="color" id="picker-toolbar-bg" value="#26282d" style="width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; background: transparent; padding: 0;">
+                            <input type="text" id="hex-toolbar-bg" value="#26282d" maxlength="7" style="width: 68px; font-size: 0.76rem; font-family: monospace; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 6px; text-transform: uppercase;">
+                        </div>
+                    </div>
+
+                    <!-- 4. Accent Color -->
+                    <div class="customizer-item" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary);">Accent &amp; Highlights</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">Buttons, active links &amp; badges</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="color" id="picker-accent" value="#8ab4f8" style="width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; background: transparent; padding: 0;">
+                            <input type="text" id="hex-accent" value="#8ab4f8" maxlength="7" style="width: 68px; font-size: 0.76rem; font-family: monospace; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 6px; text-transform: uppercase;">
+                        </div>
+                    </div>
+
+                    <!-- 5. Text Primary Color -->
+                    <div class="customizer-item" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary);">Primary Text Color</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">Main document text</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="color" id="picker-text" value="#f1f3f4" style="width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; background: transparent; padding: 0;">
+                            <input type="text" id="hex-text" value="#f1f3f4" maxlength="7" style="width: 68px; font-size: 0.76rem; font-family: monospace; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 6px; text-transform: uppercase;">
+                        </div>
+                    </div>
+
+                    <!-- 6. Borders & Dividers -->
+                    <div class="customizer-item" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary);">Borders &amp; Dividers</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">Separators &amp; panel edges</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="color" id="picker-border" value="#2b2d31" style="width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; background: transparent; padding: 0;">
+                            <input type="text" id="hex-border" value="#2b2d31" maxlength="7" style="width: 68px; font-size: 0.76rem; font-family: monospace; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 6px; text-transform: uppercase;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Presets -->
+                <div>
+                    <span style="font-size: 0.76rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Quick Starting Palettes:</span>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setCustomPalettePreset('gcloud')">Google Dark</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setCustomPalettePreset('obsidian')">Pure Obsidian</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setCustomPalettePreset('forest')">Emerald Forest</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setCustomPalettePreset('dracula')">Dracula Navy</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="setCustomPalettePreset('amber')">Cyber Amber</button>
+                    </div>
+                </div>
+
+                <!-- Live Mini Preview -->
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px;">
+                    <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">LIVE PREVIEW OF CUSTOM PALETTE:</div>
+                    <div id="theme-mini-preview" style="border: 1px solid #2b2d31; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; height: 90px;">
+                        <div id="prev-header" style="height: 24px; background: #1e1f22; display: flex; align-items: center; padding: 0 10px; justify-content: space-between; border-bottom: 1px solid #2b2d31;">
+                            <span id="prev-logo" style="font-size: 0.72rem; font-weight: 700; color: #8ab4f8;">CyberNote</span>
+                            <span id="prev-accent-btn" style="background: #8ab4f8; color: #000; font-size: 0.65rem; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Button</span>
+                        </div>
+                        <div style="flex: 1; display: flex;">
+                            <div id="prev-sidebar" style="width: 70px; background: #1e1f22; border-right: 1px solid #2b2d31; padding: 6px 6px; display: flex; flex-direction: column; gap: 4px;">
+                                <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px;"></div>
+                                <div id="prev-active-item" style="height: 8px; background: rgba(138,180,248,0.2); border-radius: 3px;"></div>
+                            </div>
+                            <div style="flex: 1; display: flex; flex-direction: column;">
+                                <div id="prev-toolbar" style="height: 18px; background: #26282d; border-bottom: 1px solid #2b2d31; display: flex; align-items: center; padding: 0 8px; gap: 4px;">
+                                    <div style="width: 10px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 2px;"></div>
+                                    <div style="width: 10px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 2px;"></div>
+                                </div>
+                                <div id="prev-editor" style="flex: 1; background: #131416; padding: 8px 10px;">
+                                    <div id="prev-text" style="font-size: 0.72rem; color: #f1f3f4; line-height: 1.2;">Your document canvas text sample.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="resetCustomPaletteToDefault()">Reset Defaults</button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeThemeCustomizerModal()">Cancel</button>
+                    <button type="button" id="btn-save-custom-theme" class="btn btn-primary btn-sm" onclick="saveAndApplyCustomTheme()">Save &amp; Sync to Drive</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notification Container -->
     <div id="cybernote-toast" class="cybernote-toast"></div>
 
-    <script src="app.js?v=20261021_mirror_sites_v21"></script>
+    <script src="app.js?v=20261021_gcloud_v29"></script>
 </body>
 </html>
