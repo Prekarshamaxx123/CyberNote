@@ -27,6 +27,23 @@ const ICON_MAP = {
     'bulb': '💡'
 };
 
+// Toast Notifications System (Clean, No Emojis, Auto-dismissing)
+let toastTimeout = null;
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('cybernote-toast');
+    if (!toast) {
+        console.log(`[Toast] ${message}`);
+        return;
+    }
+    const isError = type === true || type === 'error' || type === 'danger';
+    toast.textContent = message;
+    toast.className = 'cybernote-toast show' + (isError ? ' toast-error' : '');
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+        toast.className = 'cybernote-toast';
+    }, 3200);
+}
+
 // Vector SVG Icon Definitions & Color Palette for Modern Clean UI
 const SVG_ICON_COLORS = {
     'file-text': '#89b4fa',
@@ -239,6 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupPaintStudio();
     setupShapeStudio();
+    setupThemeCustomizerEventListeners();
     initGoogleAuth();
     initApp();
 });
@@ -270,6 +288,7 @@ async function initApp() {
                 setupSSE();
                 await loadTree();
                 if (state.googleAccessToken && isGoogleSessionValid()) {
+                    await restoreThemePreferencesFromDrive().catch(console.warn);
                     await downloadAllNotesFromDrive(true).catch(console.warn);
                     await uploadPendingNotesToDrive().catch(console.warn);
                 }
@@ -292,15 +311,16 @@ async function initApp() {
     checkShowStarBanner();
 
     if (state.googleAccessToken && isGoogleSessionValid()) {
+        await restoreThemePreferencesFromDrive().catch(console.warn);
         await downloadAllNotesFromDrive(true).catch(console.warn);
         await uploadPendingNotesToDrive().catch(console.warn);
     }
 }
 
-// --- Theme Management (8 Curated Themes with Distinct Contrasting Sidebar) ---
-const VALID_THEMES = ['dark', 'cyberpunk', 'ocean', 'emerald', 'dracula', 'sunset', 'sepia', 'light'];
+// --- Theme Management (8 Curated Themes + User Custom Theme Builder & Cloud Sync) ---
+const VALID_THEMES = ['dark', 'cyberpunk', 'ocean', 'emerald', 'dracula', 'sunset', 'sepia', 'light', 'custom'];
 const THEME_META_COLORS = {
-    dark: '#151624',
+    dark: '#1e1f22',
     cyberpunk: '#0d0722',
     ocean: '#091929',
     emerald: '#0a1c15',
@@ -310,7 +330,77 @@ const THEME_META_COLORS = {
     light: '#f1f5f9'
 };
 
-function applyTheme(theme) {
+const DEFAULT_CUSTOM_THEME = {
+    frame: '#1e1f22',
+    editor: '#131416',
+    toolbar: '#26282d',
+    accent: '#8ab4f8',
+    text: '#f1f3f4',
+    border: '#2b2d31'
+};
+
+const CUSTOM_THEME_PRESETS = {
+    gcloud: { frame: '#1e1f22', editor: '#131416', toolbar: '#26282d', accent: '#8ab4f8', text: '#f1f3f4', border: '#2b2d31' },
+    obsidian: { frame: '#161618', editor: '#0f0f10', toolbar: '#1e1e22', accent: '#a78bfa', text: '#f3f4f6', border: '#27272a' },
+    forest: { frame: '#0f1f17', editor: '#0a1410', toolbar: '#162b20', accent: '#34d399', text: '#e6f4ea', border: '#1c3d2e' },
+    dracula: { frame: '#191528', editor: '#120d20', toolbar: '#241e3a', accent: '#c084fc', text: '#f5f3ff', border: '#31274f' },
+    amber: { frame: '#201810', editor: '#140f0a', toolbar: '#2c2217', accent: '#fbbf24', text: '#fef3c7', border: '#3d2e1d' }
+};
+
+function isHexColorLight(hex) {
+    if (!hex || typeof hex !== 'string') return false;
+    let c = hex.replace('#', '').trim();
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    if (c.length !== 6) return false;
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return yiq >= 150;
+}
+
+function getStoredCustomTheme() {
+    try {
+        const raw = localStorage.getItem('cybernote_custom_theme');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                return { ...DEFAULT_CUSTOM_THEME, ...parsed };
+            }
+        }
+    } catch (_) {}
+    return { ...DEFAULT_CUSTOM_THEME };
+}
+
+function applyCustomThemeVariables(cfg) {
+    const theme = { ...DEFAULT_CUSTOM_THEME, ...(cfg || {}) };
+    const root = document.documentElement;
+    root.style.setProperty('--custom-bg-frame', theme.frame);
+    root.style.setProperty('--custom-bg-editor', theme.editor);
+    root.style.setProperty('--custom-bg-toolbar', theme.toolbar);
+    root.style.setProperty('--custom-accent', theme.accent);
+    root.style.setProperty('--custom-text', theme.text);
+    root.style.setProperty('--custom-border', theme.border);
+
+    // Update custom card mini swatches in popover
+    const swSidebar = document.getElementById('custom-swatch-sidebar');
+    const swEditor = document.getElementById('custom-swatch-editor');
+    const swAccent = document.getElementById('custom-swatch-accent');
+    if (swSidebar) swSidebar.style.background = theme.frame;
+    if (swEditor) swEditor.style.background = theme.editor;
+    if (swAccent) swAccent.style.background = theme.accent;
+
+    // Mobile / PWA meta theme-color
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', theme.frame);
+    }
+
+    return theme;
+}
+
+function applyTheme(theme, customColors = null, syncToDrive = true) {
     const validTheme = VALID_THEMES.includes(theme) ? theme : 'dark';
     state.theme = validTheme;
 
@@ -318,14 +408,22 @@ function applyTheme(theme) {
     VALID_THEMES.forEach(t => document.body.classList.remove(`theme-${t}`));
     document.body.classList.remove('light-theme');
     document.body.classList.add(`theme-${validTheme}`);
-    if (validTheme === 'light' || validTheme === 'sepia') {
-        document.body.classList.add('light-theme');
-    }
 
-    // Sync mobile browser / PWA status bar color
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    if (metaThemeColor && THEME_META_COLORS[validTheme]) {
-        metaThemeColor.setAttribute('content', THEME_META_COLORS[validTheme]);
+    if (validTheme === 'custom') {
+        const customConfig = customColors || getStoredCustomTheme();
+        applyCustomThemeVariables(customConfig);
+        if (isHexColorLight(customConfig.editor)) {
+            document.body.classList.add('light-theme');
+        }
+    } else {
+        if (validTheme === 'light' || validTheme === 'sepia') {
+            document.body.classList.add('light-theme');
+        }
+        // Sync mobile browser / PWA status bar color
+        const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+        if (metaThemeColor && THEME_META_COLORS[validTheme]) {
+            metaThemeColor.setAttribute('content', THEME_META_COLORS[validTheme]);
+        }
     }
 
     // Highlight active theme in Theme Picker Popover & Mobile Drawer Pills
@@ -339,6 +437,11 @@ function applyTheme(theme) {
     try {
         localStorage.setItem('cybernote_theme', validTheme);
     } catch (_) {}
+
+    // Cloud Auto-Sync: automatically backup user preferences to Google Drive
+    if (syncToDrive && isGoogleSessionValid()) {
+        debounceSyncThemePreferencesToDrive();
+    }
 }
 
 function toggleThemePickerPopover(e) {
@@ -360,6 +463,338 @@ function toggleTheme(e) {
 window.applyTheme = applyTheme;
 window.toggleThemePickerPopover = toggleThemePickerPopover;
 window.closeThemePickerPopover = closeThemePickerPopover;
+
+// --- Theme Preferences Google Drive Cloud Synchronization ---
+let drivePreferencesFileId = null;
+let _drivePrefSyncDebounce = null;
+
+function debounceSyncThemePreferencesToDrive() {
+    if (_drivePrefSyncDebounce) clearTimeout(_drivePrefSyncDebounce);
+    _drivePrefSyncDebounce = setTimeout(() => {
+        syncThemePreferencesToDrive(true).catch(err => {
+            console.warn('[CyberNote] Auto-sync theme preferences to Drive warning:', err);
+        });
+    }, 1200);
+}
+
+async function syncThemePreferencesToDrive(silent = true) {
+    if (!state.googleAccessToken || !isGoogleSessionValid()) return null;
+    try {
+        const folderId = await ensureDriveCyberNoteFolder();
+        const activeTheme = state.theme || localStorage.getItem('cybernote_theme') || 'dark';
+        const customTheme = getStoredCustomTheme();
+
+        const preferencesPayload = JSON.stringify({
+            version: 1,
+            type: 'cybernote_preferences',
+            updated_at: Date.now(),
+            active_theme: activeTheme,
+            custom_theme: customTheme
+        }, null, 2);
+
+        const fileName = 'cn_preferences.json';
+
+        if (!drivePreferencesFileId) {
+            const q = `'${folderId}' in parents and name = '${fileName}' and trashed = false`;
+            const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=10`);
+            if (searchRes.ok) {
+                const sData = await searchRes.json();
+                if (sData.files && sData.files.length > 0) {
+                    drivePreferencesFileId = sData.files[0].id;
+                    for (let i = 1; i < sData.files.length; i++) {
+                        deleteNodeFromDrive(sData.files[i].id);
+                    }
+                }
+            }
+        }
+
+        if (drivePreferencesFileId) {
+            const patchRes = await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${drivePreferencesFileId}?uploadType=media`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: preferencesPayload
+            });
+            if (patchRes.ok) {
+                if (!silent) showToast('Theme preferences synced to Google Drive');
+                return drivePreferencesFileId;
+            }
+            if (patchRes.status === 404 || patchRes.status === 403) {
+                drivePreferencesFileId = null;
+            }
+        }
+
+        const metaRes = await driveApiFetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: fileName,
+                parents: [folderId],
+                mimeType: 'application/json'
+            })
+        });
+        if (metaRes.ok) {
+            const meta = await metaRes.json();
+            drivePreferencesFileId = meta.id;
+            await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${drivePreferencesFileId}?uploadType=media`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: preferencesPayload
+            });
+            if (!silent) showToast('Theme preferences saved to Google Drive');
+        }
+        return drivePreferencesFileId;
+    } catch (e) {
+        console.warn('[CyberNote] Error syncing theme preferences to Drive:', e);
+        return null;
+    }
+}
+
+async function restoreThemePreferencesFromDrive(targetFolderId = null) {
+    if (!state.googleAccessToken || !isGoogleSessionValid()) return null;
+    try {
+        const folderId = targetFolderId || await ensureDriveCyberNoteFolder();
+        const fileName = 'cn_preferences.json';
+
+        if (!drivePreferencesFileId) {
+            const q = `'${folderId}' in parents and name = '${fileName}' and trashed = false`;
+            const searchRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+            if (searchRes.ok) {
+                const sData = await searchRes.json();
+                if (sData.files && sData.files.length > 0) {
+                    drivePreferencesFileId = sData.files[0].id;
+                }
+            }
+        }
+
+        if (!drivePreferencesFileId) return null;
+
+        const dlRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${drivePreferencesFileId}?alt=media`);
+        if (!dlRes.ok) {
+            if (dlRes.status === 404 || dlRes.status === 403) drivePreferencesFileId = null;
+            return null;
+        }
+
+        const prefs = await dlRes.json();
+        if (prefs && prefs.type === 'cybernote_preferences') {
+            console.log('[CyberNote] Successfully restored user theme preferences from Google Drive:', prefs);
+            if (prefs.custom_theme && typeof prefs.custom_theme === 'object') {
+                try {
+                    localStorage.setItem('cybernote_custom_theme', JSON.stringify(prefs.custom_theme));
+                } catch (_) {}
+                applyCustomThemeVariables(prefs.custom_theme);
+                syncCustomizerInputs(prefs.custom_theme);
+            }
+            if (prefs.active_theme && VALID_THEMES.includes(prefs.active_theme)) {
+                applyTheme(prefs.active_theme, prefs.custom_theme || null, false);
+            }
+            return prefs;
+        }
+        return null;
+    } catch (e) {
+        console.warn('[CyberNote] Failed to restore theme preferences from Drive:', e);
+        return null;
+    }
+}
+
+// --- Theme Color Customizer Modal Controls ---
+function openThemeCustomizerModal() {
+    const modal = document.getElementById('theme-customizer-modal');
+    if (!modal) return;
+    const currentCustom = getStoredCustomTheme();
+    syncCustomizerInputs(currentCustom);
+    modal.style.display = 'flex';
+}
+
+function closeThemeCustomizerModal() {
+    const modal = document.getElementById('theme-customizer-modal');
+    if (modal) modal.style.display = 'none';
+    if (state.theme !== 'custom') {
+        // Leave active theme as is
+    } else {
+        applyCustomThemeVariables(getStoredCustomTheme());
+    }
+}
+
+function getInputsCustomTheme() {
+    const normalizeHex = (hex, fallback) => {
+        if (!hex || typeof hex !== 'string') return fallback;
+        let val = hex.trim();
+        if (!val.startsWith('#')) val = '#' + val;
+        if (/^#[0-9a-fA-F]{6}$/.test(val)) return val.toLowerCase();
+        return fallback;
+    };
+    const def = DEFAULT_CUSTOM_THEME;
+    return {
+        frame: normalizeHex(document.getElementById('picker-frame-bg')?.value || document.getElementById('hex-frame-bg')?.value, def.frame),
+        editor: normalizeHex(document.getElementById('picker-editor-bg')?.value || document.getElementById('hex-editor-bg')?.value, def.editor),
+        toolbar: normalizeHex(document.getElementById('picker-toolbar-bg')?.value || document.getElementById('hex-toolbar-bg')?.value, def.toolbar),
+        accent: normalizeHex(document.getElementById('picker-accent')?.value || document.getElementById('hex-accent')?.value, def.accent),
+        text: normalizeHex(document.getElementById('picker-text')?.value || document.getElementById('hex-text')?.value, def.text),
+        border: normalizeHex(document.getElementById('picker-border')?.value || document.getElementById('hex-border')?.value, def.border)
+    };
+}
+
+function syncCustomizerInputs(cfg) {
+    const theme = { ...DEFAULT_CUSTOM_THEME, ...(cfg || {}) };
+    const pairs = [
+        ['picker-frame-bg', 'hex-frame-bg', theme.frame],
+        ['picker-editor-bg', 'hex-editor-bg', theme.editor],
+        ['picker-toolbar-bg', 'hex-toolbar-bg', theme.toolbar],
+        ['picker-accent', 'hex-accent', theme.accent],
+        ['picker-text', 'hex-text', theme.text],
+        ['picker-border', 'hex-border', theme.border]
+    ];
+    pairs.forEach(([pId, hId, val]) => {
+        const pEl = document.getElementById(pId);
+        const hEl = document.getElementById(hId);
+        if (pEl) pEl.value = val;
+        if (hEl) hEl.value = val.toUpperCase();
+    });
+    updateCustomizerLivePreview(theme);
+}
+
+function updateCustomizerLivePreview(theme) {
+    const t = { ...DEFAULT_CUSTOM_THEME, ...(theme || {}) };
+    const prevHeader = document.getElementById('prev-header');
+    const prevLogo = document.getElementById('prev-logo');
+    const prevBtn = document.getElementById('prev-accent-btn');
+    const prevSidebar = document.getElementById('prev-sidebar');
+    const prevActive = document.getElementById('prev-active-item');
+    const prevToolbar = document.getElementById('prev-toolbar');
+    const prevEditor = document.getElementById('prev-editor');
+    const prevText = document.getElementById('prev-text');
+    const prevContainer = document.getElementById('theme-mini-preview');
+
+    if (prevHeader) {
+        prevHeader.style.background = t.frame;
+        prevHeader.style.borderBottomColor = t.border;
+    }
+    if (prevLogo) prevLogo.style.color = t.accent;
+    if (prevBtn) {
+        prevBtn.style.background = t.accent;
+        prevBtn.style.color = isHexColorLight(t.accent) ? '#000000' : '#ffffff';
+    }
+    if (prevSidebar) {
+        prevSidebar.style.background = t.frame;
+        prevSidebar.style.borderRightColor = t.border;
+    }
+    if (prevActive) {
+        prevActive.style.background = t.accent + '33';
+    }
+    if (prevToolbar) {
+        prevToolbar.style.background = t.toolbar;
+        prevToolbar.style.borderBottomColor = t.border;
+    }
+    if (prevEditor) {
+        prevEditor.style.background = t.editor;
+    }
+    if (prevText) {
+        prevText.style.color = t.text;
+    }
+    if (prevContainer) {
+        prevContainer.style.borderColor = t.border;
+    }
+}
+
+function setCustomPalettePreset(presetKey) {
+    const preset = CUSTOM_THEME_PRESETS[presetKey];
+    if (!preset) return;
+    syncCustomizerInputs(preset);
+    applyCustomThemeVariables(preset);
+    if (state.theme === 'custom') {
+        if (isHexColorLight(preset.editor)) {
+            document.body.classList.add('light-theme');
+        } else {
+            document.body.classList.remove('light-theme');
+        }
+    }
+}
+
+function resetCustomPaletteToDefault() {
+    syncCustomizerInputs(DEFAULT_CUSTOM_THEME);
+    applyCustomThemeVariables(DEFAULT_CUSTOM_THEME);
+    if (state.theme === 'custom') {
+        document.body.classList.remove('light-theme');
+    }
+}
+
+function saveAndApplyCustomTheme() {
+    const cfg = getInputsCustomTheme();
+    try {
+        localStorage.setItem('cybernote_custom_theme', JSON.stringify(cfg));
+    } catch (_) {}
+
+    applyTheme('custom', cfg, true);
+    closeThemeCustomizerModal();
+    showToast('Custom theme saved and synced to Google Drive');
+}
+
+function setupThemeCustomizerEventListeners() {
+    const fields = [
+        { pickerId: 'picker-frame-bg', hexId: 'hex-frame-bg', key: 'frame' },
+        { pickerId: 'picker-editor-bg', hexId: 'hex-editor-bg', key: 'editor' },
+        { pickerId: 'picker-toolbar-bg', hexId: 'hex-toolbar-bg', key: 'toolbar' },
+        { pickerId: 'picker-accent', hexId: 'hex-accent', key: 'accent' },
+        { pickerId: 'picker-text', hexId: 'hex-text', key: 'text' },
+        { pickerId: 'picker-border', hexId: 'hex-border', key: 'border' }
+    ];
+
+    fields.forEach(({ pickerId, hexId, key }) => {
+        const picker = document.getElementById(pickerId);
+        const hex = document.getElementById(hexId);
+        if (!picker || !hex) return;
+
+        picker.addEventListener('input', () => {
+            hex.value = picker.value.toUpperCase();
+            const current = getInputsCustomTheme();
+            updateCustomizerLivePreview(current);
+            if (state.theme === 'custom') {
+                applyCustomThemeVariables(current);
+            }
+        });
+
+        hex.addEventListener('input', () => {
+            let val = hex.value.trim();
+            if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+            if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+                picker.value = val.toLowerCase();
+                const current = getInputsCustomTheme();
+                updateCustomizerLivePreview(current);
+                if (state.theme === 'custom') {
+                    applyCustomThemeVariables(current);
+                }
+            }
+        });
+
+        hex.addEventListener('blur', () => {
+            let val = hex.value.trim();
+            if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+            if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+                hex.value = val.toUpperCase();
+                picker.value = val.toLowerCase();
+            } else {
+                hex.value = picker.value.toUpperCase();
+            }
+        });
+    });
+
+    const modal = document.getElementById('theme-customizer-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeThemeCustomizerModal();
+            }
+        });
+    }
+}
+
+window.openThemeCustomizerModal = openThemeCustomizerModal;
+window.closeThemeCustomizerModal = closeThemeCustomizerModal;
+window.setCustomPalettePreset = setCustomPalettePreset;
+window.resetCustomPaletteToDefault = resetCustomPaletteToDefault;
+window.saveAndApplyCustomTheme = saveAndApplyCustomTheme;
+window.syncThemePreferencesToDrive = syncThemePreferencesToDrive;
+window.restoreThemePreferencesFromDrive = restoreThemePreferencesFromDrive;
 
 // --- Google Authentication & Google Drive Integration ---
 function getEffectiveGoogleClientId() {
@@ -2339,6 +2774,7 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
         const folderId = await ensureDriveCyberNoteFolder();
         await cleanAndImportRootBackup(folderId);
         await warmDriveFileCache(folderId);
+        await restoreThemePreferencesFromDrive(folderId).catch(console.warn);
 
         // Fetch manifest and drive files in parallel
         if (!silent) updateSyncProgress(30, 'Step 2/3: Scanning notes on Drive...', 'Checking all note files on Google Drive...');
@@ -2616,6 +3052,7 @@ async function autoRestoreFromDriveOnSignIn() {
     try {
         const folderId = await ensureDriveCyberNoteFolder();
         await cleanAndImportRootBackup(folderId);
+        await restoreThemePreferencesFromDrive(folderId).catch(console.warn);
 
         // Check what exists on Drive
         const manifest = await downloadTreeManifestFromDrive().catch(() => null);
@@ -3328,7 +3765,7 @@ async function loadLocalNodes() {
 
     renderTree();
     const lastActive = localStorage.getItem('cybernote_active');
-    if (lastActive === '__all_notes__') {
+    if (window.location.hash === '#all-notes' || lastActive === '__all_notes__') {
         showAllNotesView();
     } else if (lastActive && state.nodes.has(lastActive)) {
         selectNode(lastActive);
@@ -3391,7 +3828,7 @@ async function loadTree() {
         renderTree();
 
         const lastActive = localStorage.getItem('cybernote_active');
-        if (lastActive === '__all_notes__') {
+        if (window.location.hash === '#all-notes' || lastActive === '__all_notes__') {
             showAllNotesView();
         } else if (lastActive && state.nodes.has(lastActive)) {
             selectNode(lastActive);
@@ -4750,24 +5187,26 @@ function updateBreadcrumbs(id) {
     }
 
     breadcrumbs.innerHTML = '';
-    crumbs.forEach((c, idx) => {
-        const span = document.createElement('span');
-        span.textContent = c.title;
-        if (idx === crumbs.length - 1) {
-            span.className = 'crumb-active';
-        } else {
+    const ancestors = crumbs.slice(0, -1);
+    if (ancestors.length > 0) {
+        breadcrumbs.style.display = 'inline-flex';
+        ancestors.forEach((c) => {
+            const span = document.createElement('span');
+            span.textContent = c.title;
             span.style.cursor = 'pointer';
+            span.className = 'crumb-parent';
+            span.title = `Jump to ${c.title}`;
             span.onclick = () => selectNode(c.id);
-        }
-        breadcrumbs.appendChild(span);
+            breadcrumbs.appendChild(span);
 
-        if (idx < crumbs.length - 1) {
             const sep = document.createElement('span');
             sep.textContent = ' / ';
-            sep.style.color = 'var(--text-muted)';
+            sep.className = 'crumb-sep';
             breadcrumbs.appendChild(sep);
-        }
-    });
+        });
+    } else {
+        breadcrumbs.style.display = 'none';
+    }
 }
 
 // --- Delta Sync Logic with Transparent On-The-Fly GZIP Compression ---
@@ -6420,14 +6859,15 @@ function updateDocumentStats() {
     const text = noteEditor.innerText || '';
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
+    const lines = text.length > 0 ? text.split(/\r\n|\r|\n/).length : 0;
     const readTime = Math.max(1, Math.ceil(words / 200));
     if (badge) {
-        badge.textContent = `${words} words • ${readTime}m read`;
-        badge.title = `${words} words, ${chars} characters, ~${readTime} min read time`;
+        badge.textContent = `${lines} lines • ${words} words • ${readTime}m read`;
+        badge.title = `${lines} lines, ${words} words, ${chars} characters, ~${readTime} min read time`;
     }
     if (quickBadge) {
-        quickBadge.textContent = `${words} words`;
-        quickBadge.title = `${words} words, ${chars} characters, ~${readTime} min read time`;
+        quickBadge.textContent = `${lines} lines • ${words} words`;
+        quickBadge.title = `${lines} lines, ${words} words, ${chars} characters, ~${readTime} min read time`;
     }
 }
 
@@ -6456,6 +6896,7 @@ window.openPaintModal = openPaintModal;
 window.closePaintModal = closePaintModal;
 window.openShapeModal = openShapeModal;
 window.closeShapeModal = closeShapeModal;
+window.insertShapeDirect = insertShapeDirect;
 window.exportNoteAs = exportNoteAs;
 window.insertTimeline = insertTimeline;
 window.insertQuoteCard = insertQuoteCard;
@@ -6737,11 +7178,31 @@ function setupImageInteractions() {
 
     setupImageResizeHandles();
     setupImageMoveInteractions();
+    setupImageRotationInteractions();
+    setupShapeToolbarControls();
+    setupNoteShapeDrawing();
+
+    const editorScrollArea = document.getElementById('editor-scroll-area');
+    if (editorScrollArea) {
+        editorScrollArea.addEventListener('click', (e) => {
+            if (e.target === editorScrollArea && !state.isReadOnly) {
+                noteEditor.focus();
+                const sel = window.getSelection();
+                if (sel) {
+                    const range = document.createRange();
+                    range.selectNodeContents(noteEditor);
+                    range.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            }
+        });
+    }
 }
 
 function updateAlignmentButtonsUI(alignment) {
     const align = alignment || 'center';
-    ['left', 'center', 'right'].forEach(al => {
+    ['left', 'center', 'right', 'free'].forEach(al => {
         const tbBtn = document.getElementById(`btn-img-align-${al}`);
         if (tbBtn) tbBtn.classList.toggle('active', al === align);
         const ovBtn = document.getElementById(`btn-overlay-align-${al}`);
@@ -6760,9 +7221,10 @@ function selectImageElement(img) {
     img.classList.add('selected-img');
 
     // Customize title label dynamically for Shape / Signature / Drawing / Photo
+    const isShape = img.classList.contains('note-vector-shape') || !!img.closest('.editor-shape-wrap');
     const typeLabel = document.getElementById('img-tb-type-label');
     if (typeLabel) {
-        if (img.classList.contains('note-vector-shape') || img.closest('.editor-shape-wrap')) {
+        if (isShape) {
             typeLabel.textContent = 'Shape:';
         } else if (img.classList.contains('note-signature-img') || img.closest('.editor-signature-wrap')) {
             typeLabel.textContent = 'Signature:';
@@ -6772,6 +7234,20 @@ function selectImageElement(img) {
             typeLabel.textContent = 'Image:';
         }
     }
+
+    // Toggle dedicated shape in-place styler
+    const shapeControls = document.getElementById('shape-tb-controls');
+    if (shapeControls) {
+        shapeControls.style.display = isShape ? 'inline-flex' : 'none';
+        if (isShape) {
+            syncShapeToolbarUI(img);
+        }
+    }
+
+    const btnUp = document.getElementById('btn-img-move-up');
+    const btnDown = document.getElementById('btn-img-move-down');
+    if (btnUp) btnUp.style.display = isShape ? 'none' : 'inline-flex';
+    if (btnDown) btnDown.style.display = isShape ? 'none' : 'inline-flex';
 
     const wrap = img.closest('.editor-img-wrap') || img;
     const curAlign = wrap.getAttribute('data-align') || (wrap.style.textAlign || 'center');
@@ -6789,6 +7265,8 @@ function hideImageToolbar() {
     imageToolbar.style.display = 'none';
     const overlay = document.getElementById('image-resize-overlay');
     if (overlay) overlay.style.display = 'none';
+    const dropLine = document.getElementById('editor-drop-line');
+    if (dropLine) dropLine.style.display = 'none';
 }
 
 function updateImageResizeOverlay() {
@@ -6802,26 +7280,57 @@ function updateImageResizeOverlay() {
     }
 
     const img = state.activeImageElement;
-    const imgRect = img.getBoundingClientRect();
-    const scrollRect = scrollArea.getBoundingClientRect();
+    const wrap = img.closest('.editor-img-wrap') || img;
+    const curRotate = parseInt(wrap.getAttribute('data-rotate') || '0', 10) || 0;
 
-    if (imgRect.width === 0 || imgRect.height === 0) {
+    const scrollRect = scrollArea.getBoundingClientRect();
+    let left = 0;
+    let top = 0;
+    let width = 0;
+    let height = 0;
+
+    if (wrap.getAttribute('data-align') === 'free' && wrap.style.position === 'absolute' && wrap.parentNode === noteEditor) {
+        const edRect = noteEditor.getBoundingClientRect();
+        const edOffsetX = edRect.left - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
+        const edOffsetY = edRect.top - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
+
+        left = edOffsetX + parseFloat(wrap.style.left || 0);
+        top = edOffsetY + parseFloat(wrap.style.top || 0);
+        width = wrap.offsetWidth;
+        height = wrap.offsetHeight;
+    } else {
+        const imgRect = img.getBoundingClientRect();
+        left = imgRect.left - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
+        top = imgRect.top - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
+        width = imgRect.width;
+        height = imgRect.height;
+    }
+
+    if (width === 0 || height === 0) {
         overlay.style.display = 'none';
         return;
     }
 
     overlay.style.display = 'block';
-    const left = imgRect.left - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
-    const top = imgRect.top - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
-
     overlay.style.left = `${Math.round(left)}px`;
     overlay.style.top = `${Math.round(top)}px`;
-    overlay.style.width = `${Math.round(imgRect.width)}px`;
-    overlay.style.height = `${Math.round(imgRect.height)}px`;
+    overlay.style.width = `${Math.round(width)}px`;
+    overlay.style.height = `${Math.round(height)}px`;
+    overlay.style.transform = `rotate(${curRotate}deg)`;
+    overlay.style.transformOrigin = 'center center';
 
     const badge = document.getElementById('img-dimension-badge');
     if (badge) {
-        badge.textContent = `${Math.round(imgRect.width)} × ${Math.round(imgRect.height)}`;
+        badge.textContent = `${Math.round(width)} × ${Math.round(height)}`;
+    }
+
+    const rotBadge = document.getElementById('img-overlay-rotate-badge');
+    if (rotBadge) {
+        rotBadge.textContent = `${curRotate}°`;
+    }
+    const tbRotBadge = document.getElementById('img-tb-rotate-badge');
+    if (tbRotBadge) {
+        tbRotBadge.textContent = `${curRotate}°`;
     }
 
     const controls = document.getElementById('img-overlay-controls');
@@ -6993,7 +7502,7 @@ function moveActiveImageUp() {
         updateImageResizeOverlay();
         flushAndPersistActiveNode();
         handleEditorInput();
-        showToast('⬆ Moved Up');
+        showToast('Moved Up');
     }
 }
 
@@ -7009,7 +7518,7 @@ function moveActiveImageDown() {
         updateImageResizeOverlay();
         flushAndPersistActiveNode();
         handleEditorInput();
-        showToast('⬇ Moved Down');
+        showToast('Moved Down');
     }
 }
 
@@ -7020,41 +7529,72 @@ function setImageAlign(alignment) {
 
     wrap.setAttribute('data-align', alignment);
 
-    if (alignment === 'left') {
-        wrap.style.display = 'block';
-        wrap.style.float = 'none';
-        wrap.style.margin = '14px 0';
-        wrap.style.textAlign = 'left';
-        img.style.margin = '0';
-        img.style.display = 'inline-block';
-    } else if (alignment === 'center') {
-        wrap.style.display = 'block';
-        wrap.style.float = 'none';
-        wrap.style.margin = '14px auto';
-        wrap.style.textAlign = 'center';
-        img.style.margin = '0 auto';
-        img.style.display = 'inline-block';
-    } else if (alignment === 'right') {
-        wrap.style.display = 'block';
-        wrap.style.float = 'none';
-        wrap.style.margin = '14px 0 14px auto';
-        wrap.style.textAlign = 'right';
-        img.style.margin = '0 0 0 auto';
-        img.style.display = 'inline-block';
-    } else if (alignment === 'float-left') {
+    if (alignment === 'free') {
+        if (wrap.parentNode !== noteEditor) {
+            const wrapRect = wrap.getBoundingClientRect();
+            const edRect = noteEditor.getBoundingClientRect();
+            const curL = wrapRect.left - edRect.left;
+            const curT = wrapRect.top - edRect.top;
+            noteEditor.appendChild(wrap);
+            wrap.style.left = `${Math.round(Math.max(0, curL))}px`;
+            wrap.style.top = `${Math.round(Math.max(0, curT))}px`;
+        } else if (!wrap.style.left || wrap.style.left === 'auto') {
+            const wrapRect = wrap.getBoundingClientRect();
+            const edRect = noteEditor.getBoundingClientRect();
+            wrap.style.left = `${Math.round(Math.max(0, wrapRect.left - edRect.left))}px`;
+            wrap.style.top = `${Math.round(Math.max(0, wrapRect.top - edRect.top))}px`;
+        }
+        wrap.style.position = 'absolute';
+        wrap.style.margin = '0';
+        wrap.style.zIndex = '15';
         wrap.style.display = 'inline-block';
-        wrap.style.float = 'left';
-        wrap.style.margin = '4px 16px 12px 0';
+        wrap.style.float = 'none';
         wrap.style.textAlign = 'left';
-        img.style.margin = '0';
         img.style.display = 'block';
-    } else if (alignment === 'float-right') {
-        wrap.style.display = 'inline-block';
-        wrap.style.float = 'right';
-        wrap.style.margin = '4px 0 12px 16px';
-        wrap.style.textAlign = 'right';
         img.style.margin = '0';
-        img.style.display = 'block';
+        showToast('Free Float Mode: Drag anywhere on canvas');
+    } else {
+        wrap.style.position = 'relative';
+        wrap.style.left = 'auto';
+        wrap.style.top = 'auto';
+        wrap.style.zIndex = 'auto';
+
+        if (alignment === 'left') {
+            wrap.style.display = 'block';
+            wrap.style.float = 'none';
+            wrap.style.margin = '14px 0';
+            wrap.style.textAlign = 'left';
+            img.style.margin = '0';
+            img.style.display = 'inline-block';
+        } else if (alignment === 'center') {
+            wrap.style.display = 'block';
+            wrap.style.float = 'none';
+            wrap.style.margin = '14px auto';
+            wrap.style.textAlign = 'center';
+            img.style.margin = '0 auto';
+            img.style.display = 'inline-block';
+        } else if (alignment === 'right') {
+            wrap.style.display = 'block';
+            wrap.style.float = 'none';
+            wrap.style.margin = '14px 0 14px auto';
+            wrap.style.textAlign = 'right';
+            img.style.margin = '0 0 0 auto';
+            img.style.display = 'inline-block';
+        } else if (alignment === 'float-left') {
+            wrap.style.display = 'inline-block';
+            wrap.style.float = 'left';
+            wrap.style.margin = '4px 16px 12px 0';
+            wrap.style.textAlign = 'left';
+            img.style.margin = '0';
+            img.style.display = 'block';
+        } else if (alignment === 'float-right') {
+            wrap.style.display = 'inline-block';
+            wrap.style.float = 'right';
+            wrap.style.margin = '4px 0 12px 16px';
+            wrap.style.textAlign = 'right';
+            img.style.margin = '0';
+            img.style.display = 'block';
+        }
     }
     updateAlignmentButtonsUI(alignment);
     updateImageResizeOverlay();
@@ -7078,116 +7618,147 @@ function setupImageMoveInteractions() {
     if (!moveHandle || !dropLine || !scrollArea) return;
 
     let isMoving = false;
-    let currentDropTarget = null;
+    let hasMoved = false;
     let activeWrap = null;
+    let mouseOffsetX = 0;
+    let mouseOffsetY = 0;
+    let startClientX = 0;
+    let startClientY = 0;
+    let curTargetLeft = 0;
+    let curTargetTop = 0;
 
-    const startMove = (clientY) => {
+    const startMove = (clientX, clientY) => {
         if (!state.activeImageElement || state.isReadOnly) return;
         activeWrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+        if (!activeWrap) return;
+
         isMoving = true;
-        currentDropTarget = null;
+        hasMoved = false;
+        startClientX = clientX;
+        startClientY = clientY;
         document.body.style.userSelect = 'none';
         moveHandle.classList.add('dragging');
-        if (activeWrap) activeWrap.classList.add('moving-active');
+
+        // Ensure activeWrap is positioned directly relative to noteEditor
+        const rect = activeWrap.getBoundingClientRect();
+        const edRect = noteEditor.getBoundingClientRect();
+        const startL = rect.left - edRect.left;
+        const startT = rect.top - edRect.top;
+
+        if (activeWrap.parentNode !== noteEditor) {
+            noteEditor.appendChild(activeWrap);
+        }
+
+        mouseOffsetX = clientX - rect.left;
+        mouseOffsetY = clientY - rect.top;
+
+        curTargetLeft = Math.max(0, startL);
+        curTargetTop = Math.max(0, startT);
+
+        activeWrap.setAttribute('data-align', 'free');
+        activeWrap.style.position = 'absolute';
+        activeWrap.style.margin = '0';
+        activeWrap.style.display = 'inline-block';
+        activeWrap.style.left = `${Math.round(curTargetLeft)}px`;
+        activeWrap.style.top = `${Math.round(curTargetTop)}px`;
+        activeWrap.style.zIndex = '1000';
+        activeWrap.classList.add('moving-active');
+
+        updateAlignmentButtonsUI('free');
+        updateImageResizeOverlay();
     };
 
     const handlePointerMove = (clientX, clientY) => {
         if (!isMoving || !activeWrap) return;
 
-        // Find candidate block elements in noteEditor
-        const blocks = Array.from(noteEditor.children).filter(el => 
-            el !== activeWrap && 
-            el.id !== 'editor-drop-line' && 
-            el.id !== 'image-resize-overlay' && 
-            el.id !== 'table-resize-overlay' &&
-            !el.classList.contains('image-resize-overlay') &&
-            !el.classList.contains('table-resize-overlay')
-        );
+        const dist = Math.hypot(clientX - startClientX, clientY - startClientY);
+        if (dist < 4 && !hasMoved) return;
+        hasMoved = true;
 
-        if (blocks.length === 0) {
-            currentDropTarget = null;
-            dropLine.style.display = 'none';
-            return;
-        }
+        const editorRect = noteEditor.getBoundingClientRect();
+        let targetLeft = clientX - mouseOffsetX - editorRect.left;
+        let targetTop = clientY - mouseOffsetY - editorRect.top;
 
-        let bestBlock = null;
-        let bestDist = Infinity;
-        let insertBefore = true;
+        const maxLeft = Math.max(0, noteEditor.clientWidth - activeWrap.offsetWidth - 5);
+        targetLeft = Math.max(0, Math.min(targetLeft, maxLeft));
+        targetTop = Math.max(0, targetTop);
 
-        for (const block of blocks) {
-            const rect = block.getBoundingClientRect();
-            const midY = rect.top + rect.height / 2;
-            const dist = Math.abs(clientY - midY);
-            if (dist < bestDist) {
-                bestDist = dist;
-                bestBlock = block;
-                insertBefore = clientY < midY;
-            }
-        }
+        curTargetLeft = targetLeft;
+        curTargetTop = targetTop;
 
-        if (bestBlock) {
-            const blockRect = bestBlock.getBoundingClientRect();
+        activeWrap.style.left = `${Math.round(targetLeft)}px`;
+        activeWrap.style.top = `${Math.round(targetTop)}px`;
+
+        // Smoothly update resize overlay so handles & controls follow in real-time
+        updateImageResizeOverlay();
+
+        // Position elegant floating coordinate badge only during active drag
+        if (dropLine) {
             const scrollRect = scrollArea.getBoundingClientRect();
-            const left = blockRect.left - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
-            const targetY = insertBefore ? blockRect.top : blockRect.bottom;
-            const top = targetY - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
+            const badgeLeft = clientX - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
+            const badgeTop = clientY - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
 
             dropLine.style.display = 'flex';
-            dropLine.style.left = `${Math.round(left)}px`;
-            dropLine.style.top = `${Math.round(top - 1)}px`;
-            dropLine.style.width = `${Math.round(blockRect.width)}px`;
+            dropLine.style.left = `${Math.round(badgeLeft + 15)}px`;
+            dropLine.style.top = `${Math.round(badgeTop - 34)}px`;
+            dropLine.style.width = 'auto';
+            dropLine.style.height = 'auto';
+            dropLine.style.background = 'transparent';
+            dropLine.style.border = 'none';
+            dropLine.style.boxShadow = 'none';
 
-            currentDropTarget = { block: bestBlock, insertBefore };
+            const badge = dropLine.querySelector('.editor-drop-badge');
+            if (badge) {
+                badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle;margin-right:3px;"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>X: ${Math.round(targetLeft)}px, Y: ${Math.round(targetTop)}px`;
+            }
         }
     };
 
     const finishMove = () => {
+        // Unconditionally hide coordinate badge
+        if (dropLine) dropLine.style.display = 'none';
         if (!isMoving) return;
         isMoving = false;
+        hasMoved = false;
         document.body.style.userSelect = '';
         moveHandle.classList.remove('dragging');
-        if (activeWrap) activeWrap.classList.remove('moving-active');
-        dropLine.style.display = 'none';
-
-        if (currentDropTarget && currentDropTarget.block && activeWrap) {
-            const { block, insertBefore } = currentDropTarget;
-            if (insertBefore) {
-                block.parentNode.insertBefore(activeWrap, block);
-            } else {
-                block.parentNode.insertBefore(activeWrap, block.nextSibling);
-            }
+        if (activeWrap) {
+            activeWrap.classList.remove('moving-active');
+            activeWrap.style.zIndex = '15';
+            activeWrap.style.left = `${Math.round(curTargetLeft)}px`;
+            activeWrap.style.top = `${Math.round(curTargetTop)}px`;
+            updateAlignmentButtonsUI('free');
             updateImageResizeOverlay();
             flushAndPersistActiveNode();
             handleEditorInput();
-            showToast('✓ Element Moved Freely');
-        } else if (activeWrap) {
-            updateImageResizeOverlay();
+            showToast(`Placed at (${Math.round(curTargetLeft)}px, ${Math.round(curTargetTop)}px)`);
         }
-        currentDropTarget = null;
         activeWrap = null;
     };
 
     moveHandle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        startMove(e.clientY);
+        startMove(e.clientX, e.clientY);
     });
 
     moveHandle.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) return;
-        startMove(e.touches[0].clientY);
+        startMove(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: true });
 
     // Allow dragging selected image/shape directly
     noteEditor.addEventListener('mousedown', (e) => {
         if (e.target.tagName === 'IMG' && e.target === state.activeImageElement) {
-            startMove(e.clientY);
+            e.preventDefault();
+            e.stopPropagation();
+            startMove(e.clientX, e.clientY);
         }
     });
 
     noteEditor.addEventListener('touchstart', (e) => {
         if (e.touches.length === 1 && e.target.tagName === 'IMG' && e.target === state.activeImageElement) {
-            startMove(e.touches[0].clientY);
+            startMove(e.touches[0].clientX, e.touches[0].clientY);
         }
     }, { passive: true });
 
@@ -7204,8 +7775,248 @@ function setupImageMoveInteractions() {
         }
     }, { passive: false });
 
-    window.addEventListener('mouseup', finishMove);
-    window.addEventListener('touchend', finishMove);
+    window.addEventListener('mouseup', () => {
+        if (dropLine) dropLine.style.display = 'none';
+        finishMove();
+    });
+    window.addEventListener('touchend', () => {
+        if (dropLine) dropLine.style.display = 'none';
+        finishMove();
+    });
+}
+
+// --- 360° Rotation Interactions for Shapes & Images ---
+function setupImageRotationInteractions() {
+    const rotateHandle = document.getElementById('img-rotate-handle');
+    if (!rotateHandle) return;
+
+    let isRotating = false;
+    let activeWrap = null;
+    let centerX = 0;
+    let centerY = 0;
+
+    const startRotate = (clientX, clientY) => {
+        if (!state.activeImageElement || state.isReadOnly) return;
+        activeWrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+        if (!activeWrap) return;
+
+        isRotating = true;
+        rotateHandle.classList.add('rotating');
+        document.body.style.userSelect = 'none';
+
+        const rect = activeWrap.getBoundingClientRect();
+        centerX = rect.left + rect.width / 2;
+        centerY = rect.top + rect.height / 2;
+    };
+
+    const handleRotateMove = (clientX, clientY, shiftKey) => {
+        if (!isRotating || !activeWrap) return;
+        const rad = Math.atan2(clientY - centerY, clientX - centerX);
+        let deg = Math.round(rad * (180 / Math.PI)) + 90;
+        deg = ((deg % 360) + 360) % 360;
+
+        if (shiftKey) {
+            deg = Math.round(deg / 15) * 15;
+        }
+
+        rotateActiveImage(deg);
+    };
+
+    const finishRotate = () => {
+        if (!isRotating) return;
+        isRotating = false;
+        rotateHandle.classList.remove('rotating');
+        document.body.style.userSelect = '';
+        flushAndPersistActiveNode();
+        handleEditorInput();
+        activeWrap = null;
+    };
+
+    rotateHandle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startRotate(e.clientX, e.clientY);
+    });
+
+    rotateHandle.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        startRotate(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('mousemove', (e) => {
+        if (isRotating) {
+            handleRotateMove(e.clientX, e.clientY, e.shiftKey);
+        }
+    });
+
+    window.addEventListener('touchmove', (e) => {
+        if (isRotating && e.touches.length === 1) {
+            handleRotateMove(e.touches[0].clientX, e.touches[0].clientY, false);
+        }
+    }, { passive: true });
+
+    window.addEventListener('mouseup', finishRotate);
+    window.addEventListener('touchend', finishRotate);
+
+    // Overlay Rotate buttons
+    const btnOvRotLeft = document.getElementById('btn-overlay-rotate-left');
+    if (btnOvRotLeft) btnOvRotLeft.onclick = () => stepActiveImageRotation(-45);
+
+    const btnOvRotRight = document.getElementById('btn-overlay-rotate-right');
+    if (btnOvRotRight) btnOvRotRight.onclick = () => stepActiveImageRotation(45);
+
+    const btnOvRotReset = document.getElementById('btn-overlay-rotate-reset');
+    if (btnOvRotReset) btnOvRotReset.onclick = () => {
+        rotateActiveImage(0);
+        flushAndPersistActiveNode();
+        handleEditorInput();
+        showToast('Rotation reset to 0°');
+    };
+
+    // Toolbar Rotate buttons
+    const btnTbRotLeft = document.getElementById('btn-img-rotate-left');
+    if (btnTbRotLeft) btnTbRotLeft.onclick = () => stepActiveImageRotation(-45);
+
+    const btnTbRotRight = document.getElementById('btn-img-rotate-right');
+    if (btnTbRotRight) btnTbRotRight.onclick = () => stepActiveImageRotation(45);
+
+    const btnTbRotReset = document.getElementById('btn-img-rotate-reset');
+    if (btnTbRotReset) btnTbRotReset.onclick = () => {
+        rotateActiveImage(0);
+        flushAndPersistActiveNode();
+        handleEditorInput();
+        showToast('Rotation reset to 0°');
+    };
+}
+
+function rotateActiveImage(deg) {
+    if (!state.activeImageElement) return;
+    const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+    const normalized = ((Math.round(deg) % 360) + 360) % 360;
+
+    wrap.setAttribute('data-rotate', normalized);
+    wrap.style.transform = `rotate(${normalized}deg)`;
+    wrap.style.transformOrigin = 'center center';
+
+    const overlay = document.getElementById('image-resize-overlay');
+    if (overlay) {
+        overlay.style.transform = `rotate(${normalized}deg)`;
+        overlay.style.transformOrigin = 'center center';
+    }
+
+    const ovBadge = document.getElementById('img-overlay-rotate-badge');
+    if (ovBadge) ovBadge.textContent = `${normalized}°`;
+
+    const tbBadge = document.getElementById('img-tb-rotate-badge');
+    if (tbBadge) tbBadge.textContent = `${normalized}°`;
+}
+
+function stepActiveImageRotation(delta) {
+    if (!state.activeImageElement) return;
+    const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+    const cur = parseInt(wrap.getAttribute('data-rotate') || '0', 10) || 0;
+    const next = cur + delta;
+    rotateActiveImage(next);
+    flushAndPersistActiveNode();
+    handleEditorInput();
+    showToast(`Rotated to ${((next % 360) + 360) % 360}°`);
+}
+
+// In-Place Shape Toolbar Controls (Draw.io basic styles)
+function setupShapeToolbarControls() {
+    const colorInput = document.getElementById('shape-tb-color');
+    if (colorInput) {
+        colorInput.oninput = (e) => {
+            updateActiveShapeStyle({ color: e.target.value });
+        };
+    }
+
+    const btnMode = document.getElementById('btn-shape-tb-mode');
+    if (btnMode) {
+        btnMode.onclick = () => {
+            if (!state.activeImageElement) return;
+            const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+            const curMode = wrap.getAttribute('data-shape-mode') || 'none';
+            const modes = ['none', 'tint', 'solid'];
+            const nextMode = modes[(modes.indexOf(curMode) + 1) % modes.length];
+            updateActiveShapeStyle({ mode: nextMode });
+        };
+    }
+
+    const btnWidth = document.getElementById('btn-shape-tb-width');
+    if (btnWidth) {
+        btnWidth.onclick = () => {
+            if (!state.activeImageElement) return;
+            const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+            const curWidth = parseFloat(wrap.getAttribute('data-shape-width')) || 3;
+            const widths = [1.5, 3, 5, 8];
+            const nextWidth = widths[(widths.indexOf(curWidth) + 1) % widths.length] || 3;
+            updateActiveShapeStyle({ strokeWidth: nextWidth });
+        };
+    }
+
+    const btnStyle = document.getElementById('btn-shape-tb-style');
+    if (btnStyle) {
+        btnStyle.onclick = () => {
+            if (!state.activeImageElement) return;
+            const wrap = state.activeImageElement.closest('.editor-img-wrap') || state.activeImageElement;
+            const curStyle = wrap.getAttribute('data-shape-style') || 'solid';
+            const styles = ['solid', 'dashed', 'dotted'];
+            const nextStyle = styles[(styles.indexOf(curStyle) + 1) % styles.length];
+            updateActiveShapeStyle({ strokeStyle: nextStyle });
+        };
+    }
+}
+
+function updateActiveShapeStyle(newProps = {}) {
+    if (!state.activeImageElement) return;
+    const img = state.activeImageElement;
+    const wrap = img.closest('.editor-img-wrap') || img;
+
+    const shape = wrap.getAttribute('data-shape-type') || 'rect';
+    const color = newProps.color !== undefined ? newProps.color : (wrap.getAttribute('data-shape-color') || '#00ffff');
+    const mode = newProps.mode !== undefined ? newProps.mode : (wrap.getAttribute('data-shape-mode') || 'none');
+    const strokeWidth = newProps.strokeWidth !== undefined ? newProps.strokeWidth : (parseFloat(wrap.getAttribute('data-shape-width')) || 3);
+    const strokeStyle = newProps.strokeStyle !== undefined ? newProps.strokeStyle : (wrap.getAttribute('data-shape-style') || 'solid');
+
+    wrap.setAttribute('data-shape-color', color);
+    wrap.setAttribute('data-shape-mode', mode);
+    wrap.setAttribute('data-shape-width', strokeWidth);
+    wrap.setAttribute('data-shape-style', strokeStyle);
+
+    const curWidth = img.offsetWidth || 200;
+    const { fullSvg } = generateShapeSvg(shape, color, mode, strokeWidth, curWidth, strokeStyle);
+    img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(fullSvg);
+
+    syncShapeToolbarUI(img);
+    flushAndPersistActiveNode();
+    handleEditorInput();
+}
+
+function syncShapeToolbarUI(img) {
+    const wrap = img.closest('.editor-img-wrap') || img;
+    const color = wrap.getAttribute('data-shape-color') || '#00ffff';
+    const mode = wrap.getAttribute('data-shape-mode') || 'none';
+    const strokeWidth = wrap.getAttribute('data-shape-width') || '3';
+    const strokeStyle = wrap.getAttribute('data-shape-style') || 'solid';
+
+    const colorInput = document.getElementById('shape-tb-color');
+    if (colorInput) colorInput.value = color;
+
+    const modeLabel = document.getElementById('shape-tb-mode-label');
+    if (modeLabel) {
+        modeLabel.textContent = mode === 'solid' ? 'Solid' : (mode === 'tint' ? 'Tint' : 'Outline');
+    }
+
+    const widthLabel = document.getElementById('shape-tb-width-label');
+    if (widthLabel) {
+        widthLabel.textContent = `${strokeWidth}px`;
+    }
+
+    const styleLabel = document.getElementById('shape-tb-style-label');
+    if (styleLabel) {
+        styleLabel.textContent = strokeStyle === 'dashed' ? 'Dashed' : (strokeStyle === 'dotted' ? 'Dotted' : 'Solid');
+    }
 }
 
 // --- Draw / Insert Table Studio ---
@@ -8111,8 +8922,8 @@ function insertPaintDrawingElement(src, alt, align = 'center') {
     handleEditorInput();
 }
 
-// --- Dedicated Geometric Shape Studio ---
-function generateShapeSvg(shape, color, mode, strokeWidth, size) {
+// --- Dedicated Geometric Shape Studio & Direct In-Note Shape Library ---
+function generateShapeSvg(shape, color, mode, strokeWidth, size, strokeStyle = 'solid') {
     let fillAttr = 'none';
     let fillOpacity = '0';
     if (mode === 'solid') {
@@ -8124,7 +8935,13 @@ function generateShapeSvg(shape, color, mode, strokeWidth, size) {
     }
 
     const strokeAttr = color;
-    const sw = strokeWidth;
+    const sw = strokeWidth || 3;
+    let dashAttr = '';
+    if (strokeStyle === 'dashed') {
+        dashAttr = `stroke-dasharray="${sw * 3.5}, ${sw * 2}"`;
+    } else if (strokeStyle === 'dotted') {
+        dashAttr = `stroke-dasharray="${sw * 1.2}, ${sw * 1.8}"`;
+    }
 
     let vbW = 200;
     let vbH = 200;
@@ -8132,43 +8949,119 @@ function generateShapeSvg(shape, color, mode, strokeWidth, size) {
 
     switch (shape) {
         case 'rect':
-            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="3" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="3" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} />`;
             break;
         case 'rounded':
-            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="32" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="28" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} />`;
             break;
         case 'circle':
-            innerSvg = `<circle cx="100" cy="100" r="84" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+            innerSvg = `<circle cx="100" cy="100" r="84" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} />`;
             break;
-        case 'triangle':
-            innerSvg = `<polygon points="100,16 186,184 14,184" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
-            break;
-        case 'star':
-            innerSvg = `<polygon points="100,12 126,68 188,76 143,120 154,182 100,152 46,182 57,120 12,76 74,68" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+        case 'oval':
+            vbW = 200; vbH = 120;
+            innerSvg = `<ellipse cx="100" cy="60" rx="86" ry="46" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} />`;
             break;
         case 'diamond':
-            innerSvg = `<polygon points="100,14 186,100 100,186 14,100" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            innerSvg = `<polygon points="100,14 186,100 100,186 14,100" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'parallelogram':
+            innerSvg = `<polygon points="48,22 186,22 152,178 14,178" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'triangle':
+            innerSvg = `<polygon points="100,16 186,184 14,184" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'triangle-right':
+            innerSvg = `<polygon points="20,16 184,100 20,184" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
             break;
         case 'hexagon':
-            innerSvg = `<polygon points="100,14 182,60 182,140 100,186 18,140 18,60" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            innerSvg = `<polygon points="100,14 182,60 182,140 100,186 18,140 18,60" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'cylinder':
+            vbW = 160; vbH = 200;
+            innerSvg = `<ellipse cx="80" cy="40" rx="64" ry="24" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} /><path d="M 16 40 L 16 160 A 64 24 0 0 0 144 160 L 144 40" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} /><ellipse cx="80" cy="40" rx="64" ry="24" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+            break;
+        case 'cloud':
+            vbW = 200; vbH = 140;
+            innerSvg = `<path d="M 50 110 A 30 30 0 0 1 40 60 A 35 35 0 0 1 85 30 A 45 45 0 0 1 155 45 A 35 35 0 0 1 180 90 A 30 30 0 0 1 150 125 L 50 125 Z" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'document':
+            vbW = 160; vbH = 200;
+            innerSvg = `<path d="M 20 16 L 105 16 L 142 53 L 142 184 L 20 184 Z" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} /><polyline points="105,16 105,53 142,53" fill="none" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+            break;
+        case 'actor':
+            vbW = 120; vbH = 200;
+            innerSvg = `<circle cx="60" cy="36" r="22" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} /><line x1="60" y1="58" x2="60" y2="130" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" /><line x1="16" y1="84" x2="104" y2="84" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" /><line x1="60" y1="130" x2="24" y2="186" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" /><line x1="60" y1="130" x2="96" y2="186" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" />`;
+            break;
+        case 'cube':
+            vbW = 200; vbH = 200;
+            innerSvg = `<polygon points="100,18 178,58 100,98 22,58" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} /><polygon points="22,58 100,98 100,182 22,142" fill="${fillAttr}" fill-opacity="${mode === 'tint' ? '0.35' : fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} /><polygon points="100,98 178,58 178,142 100,182" fill="${fillAttr}" fill-opacity="${mode === 'tint' ? '0.15' : fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'callout':
+        case 'speech':
+            vbW = 200; vbH = 170;
+            innerSvg = `<path d="M 22 18 L 178 18 C 185 18 188 22 188 28 L 188 122 C 188 128 185 132 178 132 L 80 132 L 40 162 L 52 132 L 22 132 C 15 132 12 128 12 122 L 12 28 C 12 22 15 18 22 18 Z" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'trapezoid':
+            vbW = 200; vbH = 150;
+            innerSvg = `<polygon points="46,18 154,18 186,134 14,134" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'internal-storage':
+            vbW = 200; vbH = 140;
+            innerSvg = `<rect x="14" y="14" width="172" height="112" rx="3" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} /><line x1="44" y1="14" x2="44" y2="126" stroke="${strokeAttr}" stroke-width="${sw}" /><line x1="156" y1="14" x2="156" y2="126" stroke="${strokeAttr}" stroke-width="${sw}" />`;
             break;
         case 'arrow':
-            vbW = 200;
-            vbH = 110;
-            innerSvg = `<polygon points="16,36 120,36 120,16 184,55 120,94 120,74 16,74" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+        case 'arrow-right':
+            vbW = 200; vbH = 110;
+            innerSvg = `<polygon points="16,36 120,36 120,16 186,55 120,94 120,74 16,74" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'arrow-left':
+            vbW = 200; vbH = 110;
+            innerSvg = `<polygon points="184,36 80,36 80,16 14,55 80,94 80,74 184,74" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'arrow-up':
+            vbW = 110; vbH = 200;
+            innerSvg = `<polygon points="36,184 36,80 16,80 55,14 94,80 74,80 74,184" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'arrow-down':
+            vbW = 110; vbH = 200;
+            innerSvg = `<polygon points="36,16 36,120 16,120 55,186 94,120 74,120 74,16" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'arrow-diagonal':
+            vbW = 160; vbH = 160;
+            innerSvg = `<polygon points="140,140 126,154 50,78 26,102 18,18 102,26 78,50 154,126" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'arrow-double':
+            vbW = 200; vbH = 110;
+            innerSvg = `<polygon points="14,55 58,18 58,38 142,38 142,18 186,55 142,92 142,72 58,72 58,92" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
             break;
         case 'line':
-            vbW = 200;
-            vbH = 40;
-            innerSvg = `<line x1="16" y1="20" x2="184" y2="20" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" />`;
+            vbW = 200; vbH = 40;
+            innerSvg = `<line x1="14" y1="20" x2="186" y2="20" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" ${dashAttr} />`;
             break;
-        case 'speech':
-            vbW = 200;
-            vbH = 180;
-            innerSvg = `<path d="M 24,18 C 18,18 14,22 14,28 L 14,124 C 14,130 18,134 24,134 L 56,134 L 44,166 L 90,134 L 176,134 C 182,134 186,130 186,124 L 186,28 C 186,22 182,18 176,18 Z" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" />`;
+        case 'line-arrow':
+            vbW = 200; vbH = 60;
+            innerSvg = `<line x1="14" y1="30" x2="166" y2="30" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" ${dashAttr} /><polygon points="156,18 188,30 156,42" fill="${color}" stroke="${strokeAttr}" stroke-width="1" stroke-linejoin="round" />`;
+            break;
+        case 'line-double-arrow':
+            vbW = 200; vbH = 60;
+            innerSvg = `<line x1="34" y1="30" x2="166" y2="30" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" ${dashAttr} /><polygon points="12,30 42,18 42,42" fill="${color}" stroke="${strokeAttr}" stroke-width="1" stroke-linejoin="round" /><polygon points="188,30 158,18 158,42" fill="${color}" stroke="${strokeAttr}" stroke-width="1" stroke-linejoin="round" />`;
+            break;
+        case 'line-curved-arrow':
+            vbW = 180; vbH = 180;
+            innerSvg = `<path d="M 24 156 C 24 80, 156 160, 156 46" fill="none" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linecap="round" ${dashAttr} /><polygon points="156,22 142,48 170,48" fill="${color}" stroke="${strokeAttr}" stroke-width="1" stroke-linejoin="round" />`;
+            break;
+        case 'star':
+            innerSvg = `<polygon points="100,12 126,68 188,76 143,120 154,182 100,152 46,182 57,120 12,76 74,68" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'cross':
+            innerSvg = `<polygon points="68,16 132,16 132,68 184,68 184,132 132,132 132,184 68,184 68,132 16,132 16,68 68,68" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
+            break;
+        case 'heart':
+            vbW = 200; vbH = 180;
+            innerSvg = `<path d="M 100 162 C 22 108, 16 48, 56 24 C 80 10, 95 30, 100 46 C 105 30, 120 10, 144 24 C 184 48, 178 108, 100 162 Z" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" stroke-linejoin="round" ${dashAttr} />`;
             break;
         default:
-            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="3" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" />`;
+            innerSvg = `<rect x="15" y="15" width="170" height="170" rx="3" fill="${fillAttr}" fill-opacity="${fillOpacity}" stroke="${strokeAttr}" stroke-width="${sw}" ${dashAttr} />`;
     }
 
     const calcW = size;
@@ -8290,6 +9183,202 @@ function insertShapeElement(src, alt, width) {
     const html = `<p><br></p><div class="editor-img-wrap editor-shape-wrap" style="margin: 14px 0; display: inline-block; max-width: 100%; border: none; background: transparent;"><img class="note-vector-shape" src="${src}" alt="${alt || 'Shape'}" style="width: ${w}; max-width: 100%; height: auto; display: block; border: none; background: transparent; box-shadow: none;"></div><p><br></p>`;
     document.execCommand('insertHTML', false, html);
     handleEditorInput();
+}
+
+// Direct In-Note Shape Insertion (Draw.io style free positioning & rotation)
+function insertShapeDirect(shapeType = 'rect', customColor = null, optWidth = null, optHeight = null, optLeft = null, optTop = null) {
+    if (state.isReadOnly) return;
+    noteEditor.focus();
+
+    const color = customColor || state.shapeDirectColor || '#00ffff';
+    const initialWidth = optWidth || 200;
+    const mode = 'none';
+    const strokeWidth = 3;
+    const strokeStyle = 'solid';
+
+    const { fullSvg, calcW } = generateShapeSvg(shapeType, color, mode, strokeWidth, initialWidth, strokeStyle);
+    const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(fullSvg);
+
+    // Compute pleasant placement in noteEditor
+    const scrollArea = document.getElementById('editor-scroll-area');
+    const scrollY = scrollArea ? scrollArea.scrollTop : 0;
+    const posX = optLeft != null ? optLeft : 60;
+    const posY = optTop != null ? optTop : (scrollY + 50);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'editor-img-wrap editor-shape-wrap';
+    wrap.setAttribute('data-align', 'free');
+    wrap.setAttribute('data-rotate', '0');
+    wrap.setAttribute('data-shape-type', shapeType);
+    wrap.setAttribute('data-shape-color', color);
+    wrap.setAttribute('data-shape-mode', mode);
+    wrap.setAttribute('data-shape-width', strokeWidth);
+    wrap.setAttribute('data-shape-style', strokeStyle);
+
+    wrap.style.position = 'absolute';
+    wrap.style.left = `${Math.round(posX)}px`;
+    wrap.style.top = `${Math.round(posY)}px`;
+    wrap.style.zIndex = '15';
+    wrap.style.margin = '0';
+    wrap.style.display = 'inline-block';
+    wrap.style.transform = 'rotate(0deg)';
+    wrap.style.transformOrigin = 'center center';
+    wrap.style.background = 'transparent';
+    wrap.style.border = 'none';
+
+    const img = document.createElement('img');
+    img.className = 'note-vector-shape';
+    img.src = dataUrl;
+    img.alt = `${shapeType} shape`;
+    img.style.width = `${calcW}px`;
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.display = 'block';
+    img.style.background = 'transparent';
+    img.style.border = 'none';
+    img.style.boxShadow = 'none';
+
+    wrap.appendChild(img);
+    noteEditor.appendChild(wrap);
+
+    closeAllRibbonPopovers();
+    selectImageElement(img);
+    updateAlignmentButtonsUI('free');
+    updateImageResizeOverlay();
+    flushAndPersistActiveNode();
+    handleEditorInput();
+    showToast(`Placed ${shapeType} shape on note`);
+}
+
+// Direct In-Note Drag-to-Draw Interaction
+function setupNoteShapeDrawing() {
+    state.isDrawingShapeMode = false;
+    state.drawingShapeType = 'rect';
+    state.shapeDirectColor = '#00ffff';
+    state.shapePaletteMode = 'click';
+
+    const pillClick = document.getElementById('pill-shape-click');
+    const pillDraw = document.getElementById('pill-shape-draw');
+    if (pillClick && pillDraw) {
+        pillClick.onclick = () => {
+            pillClick.classList.add('active');
+            pillDraw.classList.remove('active');
+            state.shapePaletteMode = 'click';
+        };
+        pillDraw.onclick = () => {
+            pillDraw.classList.add('active');
+            pillClick.classList.remove('active');
+            state.shapePaletteMode = 'draw';
+        };
+    }
+
+    document.querySelectorAll('.palette-color-dot').forEach(dot => {
+        dot.onclick = () => {
+            document.querySelectorAll('.palette-color-dot').forEach(d => d.classList.remove('active'));
+            dot.classList.add('active');
+            state.shapeDirectColor = dot.dataset.color || '#00ffff';
+        };
+    });
+
+    document.querySelectorAll('.shape-palette-btn').forEach(btn => {
+        btn.onclick = () => {
+            const shapeType = btn.dataset.shape || 'rect';
+            if (state.shapePaletteMode === 'draw') {
+                state.isDrawingShapeMode = true;
+                state.drawingShapeType = shapeType;
+                closeAllRibbonPopovers();
+                noteEditor.style.cursor = 'crosshair';
+                showToast(`Draw Mode Active: Drag on note to draw ${shapeType} (Esc to cancel)`);
+            } else {
+                insertShapeDirect(shapeType, state.shapeDirectColor);
+            }
+        };
+    });
+
+    let isDrawing = false;
+    let startX = 0;
+    let startY = 0;
+    let ghost = null;
+
+    noteEditor.addEventListener('mousedown', (e) => {
+        if (!state.isDrawingShapeMode || state.isReadOnly) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        isDrawing = true;
+        const edRect = noteEditor.getBoundingClientRect();
+        startX = e.clientX - edRect.left;
+        startY = e.clientY - edRect.top;
+
+        ghost = document.createElement('div');
+        ghost.id = 'shape-draw-ghost';
+        ghost.style.left = `${Math.round(startX)}px`;
+        ghost.style.top = `${Math.round(startY)}px`;
+        ghost.style.width = '0px';
+        ghost.style.height = '0px';
+        ghost.innerHTML = `<span style="position:absolute;top:-24px;left:0;background:#0f172a;color:#00ffff;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid #00ffff;white-space:nowrap;" id="ghost-dim">0 × 0</span>`;
+        noteEditor.appendChild(ghost);
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isDrawing || !ghost) return;
+        const edRect = noteEditor.getBoundingClientRect();
+        const curX = e.clientX - edRect.left;
+        const curY = e.clientY - edRect.top;
+
+        const left = Math.min(startX, curX);
+        const top = Math.min(startY, curY);
+        const width = Math.abs(curX - startX);
+        const height = Math.abs(curY - startY);
+
+        ghost.style.left = `${Math.round(left)}px`;
+        ghost.style.top = `${Math.round(top)}px`;
+        ghost.style.width = `${Math.round(width)}px`;
+        ghost.style.height = `${Math.round(height)}px`;
+
+        const dim = document.getElementById('ghost-dim');
+        if (dim) dim.textContent = `${Math.round(width)} × ${Math.round(height)}`;
+    });
+
+    const finishDrawing = () => {
+        if (!isDrawing) return;
+        isDrawing = false;
+
+        let finalW = 180;
+        let finalL = startX;
+        let finalT = startY;
+
+        if (ghost) {
+            finalL = parseFloat(ghost.style.left) || startX;
+            finalT = parseFloat(ghost.style.top) || startY;
+            finalW = parseFloat(ghost.style.width) || 0;
+            ghost.remove();
+            ghost = null;
+        }
+
+        state.isDrawingShapeMode = false;
+        noteEditor.style.cursor = '';
+
+        if (finalW < 18) {
+            finalW = 200;
+        }
+
+        insertShapeDirect(state.drawingShapeType || 'rect', state.shapeDirectColor || '#00ffff', Math.round(finalW), null, Math.round(finalL), Math.round(finalT));
+    };
+
+    window.addEventListener('mouseup', finishDrawing);
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && state.isDrawingShapeMode) {
+            state.isDrawingShapeMode = false;
+            noteEditor.style.cursor = '';
+            if (ghost) {
+                ghost.remove();
+                ghost = null;
+            }
+            showToast('Shape drawing mode cancelled');
+        }
+    });
 }
 
 
@@ -8902,19 +9991,20 @@ function updateWordStats() {
     const text = noteEditor.innerText || '';
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
+    const lines = text.length > 0 ? text.split(/\r\n|\r|\n/).length : 0;
     const ribbonBadge = document.getElementById('ribbon-word-count');
     const quickBadge = document.getElementById('ribbon-quick-word-count');
     if (ribbonBadge) {
-        ribbonBadge.textContent = `${words} words`;
+        ribbonBadge.textContent = `${lines} lines • ${words} words`;
     }
     if (quickBadge) {
-        quickBadge.textContent = `${words} words`;
+        quickBadge.textContent = `${lines} lines • ${words} words`;
     }
     if (chars > 3000) {
         const estCompressedKb = Math.max(1, Math.round((chars * 0.04) / 1024));
-        footerStats.textContent = `${words} words, ${chars} chars (~${(chars / 1024).toFixed(1)} KB) • Compressed: ~${estCompressedKb} KB (< 0.05 B/char)`;
+        footerStats.textContent = `${lines} lines, ${words} words, ${chars} chars (~${(chars / 1024).toFixed(1)} KB) • Compressed: ~${estCompressedKb} KB (< 0.05 B/char)`;
     } else {
-        footerStats.textContent = `${words} words, ${chars} characters`;
+        footerStats.textContent = `${lines} lines, ${words} words, ${chars} characters`;
     }
 }
 
@@ -10266,7 +11356,7 @@ function setupEventListeners() {
     if (btnShapes) btnShapes.onclick = (e) => toggleRibbonPopover('shapes-dropdown-menu', btnShapes, e);
 
     const btnDrawShape = document.getElementById('btn-draw-shape');
-    if (btnDrawShape) btnDrawShape.onclick = () => openShapeModal('rect');
+    if (btnDrawShape) btnDrawShape.onclick = (e) => toggleRibbonPopover('shape-palette-popover', btnDrawShape, e);
 
     const btnTimeline = document.getElementById('btn-insert-timeline');
     if (btnTimeline) btnTimeline.onclick = insertTimeline;
@@ -10353,6 +11443,8 @@ function setupEventListeners() {
     document.getElementById('btn-img-size-25').onclick = () => setImageSize('25%');
     document.getElementById('btn-img-size-50').onclick = () => setImageSize('50%');
     document.getElementById('btn-img-size-100').onclick = () => setImageSize('100%');
+    const btnImgAlignFree = document.getElementById('btn-img-align-free');
+    if (btnImgAlignFree) btnImgAlignFree.onclick = () => setImageAlign('free');
     document.getElementById('btn-img-align-left').onclick = () => setImageAlign('left');
     document.getElementById('btn-img-align-center').onclick = () => setImageAlign('center');
     document.getElementById('btn-img-align-right').onclick = () => setImageAlign('right');
@@ -10365,6 +11457,10 @@ function setupEventListeners() {
     document.getElementById('btn-img-delete').onclick = deleteActiveImage;
 
     // Image / Signature / Drawing Overlay Quick Actions
+    const overlayAlignFree = document.getElementById('btn-overlay-align-free');
+    if (overlayAlignFree) {
+        overlayAlignFree.onclick = (e) => { e.preventDefault(); e.stopPropagation(); setImageAlign('free'); };
+    }
     const overlayAlignLeft = document.getElementById('btn-overlay-align-left');
     if (overlayAlignLeft) {
         overlayAlignLeft.onclick = (e) => { e.preventDefault(); e.stopPropagation(); setImageAlign('left'); };
