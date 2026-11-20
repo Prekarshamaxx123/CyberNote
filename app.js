@@ -288,10 +288,14 @@ async function initApp() {
                 state.isServerMode = true;
                 setupSSE();
                 await loadTree();
-                if (state.googleAccessToken && isGoogleSessionValid()) {
-                    await restoreThemePreferencesFromDrive().catch(console.warn);
-                    await uploadPendingNotesToDrive().catch(console.warn);
-                    await downloadAllNotesFromDrive(true).catch(console.warn);
+                if (isUserSignedIn()) {
+                    ensureGoogleTokenValid().then(async (valid) => {
+                        if (valid) {
+                            await restoreThemePreferencesFromDrive().catch(console.warn);
+                            await uploadPendingNotesToDrive().catch(console.warn);
+                            await downloadAllNotesFromDrive(true).catch(console.warn);
+                        }
+                    }).catch(console.warn);
                 }
                 return;
             }
@@ -301,7 +305,7 @@ async function initApp() {
     }
 
     state.isServerMode = false;
-    if (state.googleAccessToken && isGoogleSessionValid()) {
+    if (isUserSignedIn()) {
         setSyncStatus('live', 'CyberNote Cloud Mode');
     } else if (localStorage.getItem('cybernote_logged_out') === '1') {
         setSyncStatus('offline', 'Signed out — Sign In to sync');
@@ -311,10 +315,14 @@ async function initApp() {
     await loadLocalNodes();
     checkShowStarBanner();
 
-    if (state.googleAccessToken && isGoogleSessionValid()) {
-        await restoreThemePreferencesFromDrive().catch(console.warn);
-        await uploadPendingNotesToDrive().catch(console.warn);
-        await downloadAllNotesFromDrive(true).catch(console.warn);
+    if (isUserSignedIn()) {
+        ensureGoogleTokenValid().then(async (valid) => {
+            if (valid) {
+                await restoreThemePreferencesFromDrive().catch(console.warn);
+                await uploadPendingNotesToDrive().catch(console.warn);
+                await downloadAllNotesFromDrive(true).catch(console.warn);
+            }
+        }).catch(console.warn);
     }
 }
 
@@ -440,7 +448,7 @@ function applyTheme(theme, customColors = null, syncToDrive = true) {
     } catch (_) {}
 
     // Cloud Auto-Sync: automatically backup user preferences to Google Drive
-    if (syncToDrive && isGoogleSessionValid()) {
+    if (syncToDrive && isUserSignedIn()) {
         debounceSyncThemePreferencesToDrive();
     }
 }
@@ -479,7 +487,7 @@ function debounceSyncThemePreferencesToDrive() {
 }
 
 async function syncThemePreferencesToDrive(silent = true) {
-    if (!state.googleAccessToken || !isGoogleSessionValid()) return null;
+    if (!await ensureGoogleTokenValid()) return null;
     try {
         const folderId = await ensureDriveCyberNoteFolder();
         const activeTheme = state.theme || localStorage.getItem('cybernote_theme') || 'dark';
@@ -551,7 +559,7 @@ async function syncThemePreferencesToDrive(silent = true) {
 }
 
 async function restoreThemePreferencesFromDrive(targetFolderId = null) {
-    if (!state.googleAccessToken || !isGoogleSessionValid()) return null;
+    if (!await ensureGoogleTokenValid()) return null;
     try {
         const folderId = targetFolderId || await ensureDriveCyberNoteFolder();
         const fileName = 'cn_preferences.json';
@@ -829,6 +837,12 @@ window.copyCurrentOrigin = function() {
 // Strictly user-gesture based authorization: Google Identity Services (GIS)
 // requires user-initiated popup clicks. Automatic background calls cause intrusive popups.
 
+function isUserSignedIn() {
+    const isLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
+    if (isLoggedOut) return false;
+    return Boolean(state.googleUser || localStorage.getItem('cybernote_user') || localStorage.getItem('cybernote_user_email'));
+}
+
 function isGoogleSessionValid() {
     const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
     const token = state.googleAccessToken || localStorage.getItem('cybernote_google_token');
@@ -885,6 +899,11 @@ function restorePreservedOfflineNotes() {
 }
 
 function handleExpiredGoogleSession({ silent = false } = {}) {
+    if (!navigator.onLine) {
+        setSyncStatus('offline', 'Offline (Saved locally)');
+        return;
+    }
+
     if (tokenRefreshTimer) {
         clearTimeout(tokenRefreshTimer);
         tokenRefreshTimer = null;
@@ -913,12 +932,132 @@ function handleExpiredGoogleSession({ silent = false } = {}) {
     setSyncStatus('offline', 'Sync paused (Click Sync to reconnect)');
 }
 
+async function waitForGIS(timeoutMs = 4000) {
+    if (state.tokenClient) return true;
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        if (state.tokenClient) return true;
+        if (window.google?.accounts?.oauth2) {
+            try {
+                const clientId = getEffectiveGoogleClientId();
+                state.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: clientId,
+                    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                    callback: handleGoogleTokenResponse
+                });
+                return true;
+            } catch (e) {
+                console.warn('waitForGIS init error:', e);
+            }
+        }
+        await new Promise(r => setTimeout(r, 100));
+    }
+    return Boolean(state.tokenClient);
+}
+
 let isSilentRefreshing = false;
 let silentRefreshPromise = null;
 
 // Silently renew Google OAuth 2.0 access token in background without popups or prompts
-// Background silent token renewal is disabled to prevent intrusive hourly browser popups
+// Keeps user logged in persistently (months/lifetime) like GitHub/Google services
 async function requestSilentTokenRefresh() {
+    if (isSilentRefreshing && silentRefreshPromise) {
+        return silentRefreshPromise;
+    }
+    const isLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
+    if (isLoggedOut) return false;
+
+    const savedEmail = state.googleUser?.email || 
+                       JSON.parse(localStorage.getItem('cybernote_user') || '{}')?.email || 
+                       localStorage.getItem('cybernote_user_email');
+    if (!savedEmail) return false;
+
+    const gisReady = await waitForGIS(4000);
+    if (!gisReady || !state.tokenClient) return false;
+
+    isSilentRefreshing = true;
+    silentRefreshPromise = new Promise((resolve) => {
+        let finished = false;
+        const timer = setTimeout(() => {
+            if (finished) return;
+            finished = true;
+            isSilentRefreshing = false;
+            silentRefreshPromise = null;
+            if (state.tokenClient) state.tokenClient.callback = handleGoogleTokenResponse;
+            console.warn('[CyberNote] Silent token refresh timed out (12s).');
+            resolve(false);
+        }, 12000);
+
+        state.tokenClient.callback = async (tokenResponse) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            isSilentRefreshing = false;
+            silentRefreshPromise = null;
+            if (state.tokenClient) state.tokenClient.callback = handleGoogleTokenResponse;
+
+            if (tokenResponse && tokenResponse.access_token && !tokenResponse.error) {
+                try {
+                    await handleGoogleTokenResponse(tokenResponse, { isSilentRefresh: true });
+                    resolve(true);
+                } catch (err) {
+                    console.warn('[CyberNote] Error processing silent token response:', err);
+                    resolve(true);
+                }
+            } else {
+                console.warn('[CyberNote] Silent token refresh result:', tokenResponse?.error || 'No token');
+                resolve(false);
+            }
+        };
+
+        try {
+            state.tokenClient.requestAccessToken({
+                prompt: 'none',
+                login_hint: savedEmail
+            });
+        } catch (e) {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            isSilentRefreshing = false;
+            silentRefreshPromise = null;
+            if (state.tokenClient) state.tokenClient.callback = handleGoogleTokenResponse;
+            console.warn('[CyberNote] Exception triggering silent token refresh:', e);
+            resolve(false);
+        }
+    });
+
+    return silentRefreshPromise;
+}
+
+// Ensures Google access token is valid, silently acquiring/refreshing it in background if needed
+async function ensureGoogleTokenValid() {
+    if (!isUserSignedIn()) return false;
+
+    const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
+    const token = state.googleAccessToken || localStorage.getItem('cybernote_google_token');
+
+    // 1. If we currently have a token valid for at least another 90 seconds, use it immediately
+    if (token && expiry > (Date.now() + 90000)) {
+        if (!state.googleAccessToken) state.googleAccessToken = token;
+        return true;
+    }
+
+    // 2. If online, attempt silent background renewal
+    if (navigator.onLine) {
+        await waitForGIS(3000);
+        const refreshed = await requestSilentTokenRefresh();
+        if (refreshed && state.googleAccessToken) {
+            return true;
+        }
+    }
+
+    // 3. Fallback: if token hasn't reached its exact expiry timestamp yet
+    if (token && expiry > Date.now()) {
+        if (!state.googleAccessToken) state.googleAccessToken = token;
+        return true;
+    }
+
     return false;
 }
 
@@ -937,14 +1076,37 @@ function scheduleSessionExpiryWatch() {
 
     const remainingMs = expiry - Date.now();
     if (remainingMs <= 0) {
-        handleExpiredGoogleSession({ silent: true });
+        if (navigator.onLine) {
+            requestSilentTokenRefresh().catch(() => {
+                handleExpiredGoogleSession({ silent: true });
+            });
+        } else {
+            handleExpiredGoogleSession({ silent: true });
+        }
         return;
     }
 
-    // Quietly mark token as expired after 1 hour without any disruptive popups or forced logouts
-    tokenRefreshTimer = setTimeout(() => {
-        handleExpiredGoogleSession({ silent: true });
-    }, remainingMs + 500);
+    // Proactively renew token 5 minutes before 1-hour expiry (remainingMs - 300,000)
+    // Google tokens last 3600s (60 mins). Renewing at 55 mins keeps the session perpetually alive!
+    const refreshDelayMs = Math.max(10000, remainingMs - 300000);
+
+    tokenRefreshTimer = setTimeout(async () => {
+        if (localStorage.getItem('cybernote_logged_out') === '1') return;
+        if (navigator.onLine) {
+            console.log('[CyberNote] Proactively renewing Google session token in background...');
+            const success = await requestSilentTokenRefresh();
+            if (!success) {
+                // If proactive refresh failed, retry 1 minute before expiry
+                const retryMs = Math.max(5000, expiry - Date.now() - 60000);
+                tokenRefreshTimer = setTimeout(async () => {
+                    const retrySuccess = await requestSilentTokenRefresh();
+                    if (!retrySuccess && Date.now() >= expiry) {
+                        handleExpiredGoogleSession({ silent: true });
+                    }
+                }, retryMs);
+            }
+        }
+    }, refreshDelayMs);
 }
 
 let sessionListenersAttached = false;
@@ -952,12 +1114,13 @@ function setupSessionExpiryListeners() {
     if (sessionListenersAttached) return;
     sessionListenersAttached = true;
 
-    const checkExpiryOnWake = () => {
+    const checkExpiryOnWake = async () => {
         if (!navigator.onLine) return;
         if (localStorage.getItem('cybernote_logged_out') === '1') return;
         const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
-        if (expiry && Date.now() >= expiry && state.googleAccessToken) {
-            handleExpiredGoogleSession({ silent: true });
+        if (isUserSignedIn() && (!state.googleAccessToken || Date.now() >= (expiry - 120000))) {
+            console.log('[CyberNote] Device woke or tab focused. Silently renewing token if needed...');
+            await ensureGoogleTokenValid().catch(() => {});
         }
     };
 
@@ -970,7 +1133,8 @@ function setupSessionExpiryListeners() {
 
     window.addEventListener('online', async () => {
         setSyncStatus('syncing', 'Internet restored...');
-        if (!isGoogleSessionValid()) {
+        const valid = await ensureGoogleTokenValid();
+        if (!valid) {
             setSyncStatus('offline', 'Sync paused (Click Sync to reconnect)');
             return;
         }
@@ -983,7 +1147,6 @@ function setupSessionExpiryListeners() {
         setSyncStatus('offline', 'Offline (Saved locally)');
     });
 }
-
 
 function initGoogleAuth() {
     setupSessionExpiryListeners();
@@ -1005,7 +1168,7 @@ function initGoogleAuth() {
     if (!isLoggedOut && savedUser) {
         try { state.googleUser = JSON.parse(savedUser); } catch(e) {}
     }
-    if (!isLoggedOut && savedToken && Date.now() < expiry) {
+    if (!isLoggedOut && savedToken && Date.now() < (expiry - 60000)) {
         state.googleAccessToken = savedToken;
         scheduleSessionExpiryWatch();
     } else {
@@ -1028,6 +1191,19 @@ function initGoogleAuth() {
                     scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
                     callback: handleGoogleTokenResponse
                 });
+
+                // Auto silent-renew if user is signed in but token is expired or expiring soon
+                if (!isLoggedOut && (state.googleUser || savedEmail) && (!state.googleAccessToken || Date.now() >= (expiry - 60000))) {
+                    requestSilentTokenRefresh().then((refreshed) => {
+                        if (refreshed) {
+                            console.log('[CyberNote] Restored Google session silently in background.');
+                            if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+                                uploadPendingNotesToDrive().catch(() => {});
+                            }
+                            downloadAllNotesFromDrive(true).catch(() => {});
+                        }
+                    }).catch(() => {});
+                }
             } catch (err) {
                 console.warn('GIS Token client init:', err);
             }
@@ -1084,16 +1260,11 @@ function updateDriveModalStatus(isSignedIn) {
     const isExplicitlyLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
 
     if (state.googleUser && !isExplicitlyLoggedOut) {
-        const isValid = isGoogleSessionValid();
         if (nameEl) {
-            nameEl.innerHTML = isValid 
-                ? `<span style="color:var(--success);">● Connected:</span> ${state.googleUser.name} (${state.googleUser.email})`
-                : `<span style="color:var(--warning);">● Connected (Sync Paused):</span> ${state.googleUser.name} (${state.googleUser.email})`;
+            nameEl.innerHTML = `<span style="color:var(--success);">● Connected:</span> ${state.googleUser.name} (${state.googleUser.email})`;
         }
         if (detailEl) {
-            detailEl.textContent = isValid
-                ? 'Automatic Google Drive backup active. Changes are synced seamlessly.'
-                : 'Drive token expired. Click "Sync" in header to reconnect cloud backup.';
+            detailEl.textContent = 'Automatic Google Drive backup active. Changes are synced seamlessly.';
         }
     } else {
         if (nameEl) nameEl.textContent = 'Not Signed In';
@@ -1489,13 +1660,11 @@ function flushEditorToState() {
     flushAndPersistActiveNode();
 }
 
-// Drive API fetch wrapper (strict user-gesture auth model; zero background popups)
+// Drive API fetch wrapper (seamless silent token auto-renewal; zero disruptive popups)
 async function driveApiFetch(url, options = {}) {
-    let expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
-    let savedToken = localStorage.getItem('cybernote_google_token');
-
-    // If token is expired, pause cloud sync without wiping notes or triggering popups
-    if (!state.googleAccessToken || Date.now() >= expiry) {
+    // Ensure we have a valid token (silently renewing in background if needed)
+    const hasValidToken = await ensureGoogleTokenValid();
+    if (!hasValidToken || !state.googleAccessToken) {
         handleExpiredGoogleSession({ silent: true });
         const expErr = new Error('Google Drive session expired. Click Sync to reconnect.');
         expErr.isSessionExpired = true;
@@ -1528,13 +1697,20 @@ async function driveApiFetch(url, options = {}) {
         res = await fetch(url, reqInit);
     }
 
-    // If 401 Unauthorized, token was revoked or expired on server
+    // If 401 Unauthorized, token was revoked or expired on server: attempt silent renewal and retry once
     if (res.status === 401) {
-        console.warn('Google Drive API 401: Token invalid or expired.');
-        handleExpiredGoogleSession({ silent: true });
-        const expErr = new Error('Google Drive session expired. Click Sync to reconnect.');
-        expErr.isSessionExpired = true;
-        throw expErr;
+        console.warn('Google Drive API 401: Token invalid or expired. Attempting silent renewal...');
+        const refreshed = await requestSilentTokenRefresh();
+        if (refreshed && state.googleAccessToken) {
+            reqInit.headers.Authorization = `Bearer ${state.googleAccessToken}`;
+            res = await fetch(url, reqInit);
+        }
+        if (res.status === 401) {
+            handleExpiredGoogleSession({ silent: true });
+            const expErr = new Error('Google Drive session expired. Click Sync to reconnect.');
+            expErr.isSessionExpired = true;
+            throw expErr;
+        }
     }
 
     return res;
@@ -2266,7 +2442,9 @@ async function downloadTreeManifestFromDrive() {
 
 // Upload a single note to Google Drive (on-demand per-note save)
 async function uploadSingleNodeToDrive(nodeId, silent = true) {
-    if (!isGoogleSessionValid() || !nodeId) return;
+    if (!nodeId) return;
+    const valid = await ensureGoogleTokenValid();
+    if (!valid) return;
     const node = state.nodes.get(nodeId);
     if (!node) return;
     // Never upload a stub note whose content hasn't been downloaded yet
@@ -2310,7 +2488,12 @@ async function uploadSingleNodeToDrive(nodeId, silent = true) {
 
 // Download a single note from Google Drive (on-demand per-note download)
 async function downloadSingleNoteFromDrive(nodeId, { silent = false } = {}) {
-    if (!isGoogleSessionValid() || !nodeId) return;
+    if (!nodeId) return;
+    const valid = await ensureGoogleTokenValid();
+    if (!valid) {
+        if (!silent) requestGoogleLogin();
+        return;
+    }
 
     if (!silent) {
         setSyncStatus('syncing', 'Downloading note from Drive...');
@@ -2450,7 +2633,8 @@ async function downloadSingleNoteFromDrive(nodeId, { silent = false } = {}) {
 
 // Upload all pending offline notes to Google Drive when internet comes back
 async function uploadPendingNotesToDrive() {
-    if (!isGoogleSessionValid()) return;
+    const valid = await ensureGoogleTokenValid();
+    if (!valid) return;
     const pending = Array.from(state.pendingUploadNodeIds || []);
     if (pending.length === 0) return;
 
@@ -2483,7 +2667,8 @@ async function uploadPendingNotesToDrive() {
 // Save all notes to Drive (used by Drive Modal or when no note selected)
 async function saveAllNotesToDrive(silent = false, { forceAll = false, manageOverlay = true } = {}) {
     if (state.isSyncing) return;
-    if (!isGoogleSessionValid()) {
+    const valid = await ensureGoogleTokenValid();
+    if (!valid) {
         if (!silent) requestGoogleLogin();
         return;
     }
@@ -2589,7 +2774,9 @@ let isPrefetchingNotes = false;
 // Background prefetch engine: downloads note bodies in the background and saves to IndexedDB
 // Ensures 100% full content availability when the device goes offline or into airplane mode
 async function prefetchAllNoteContentsInBackground() {
-    if (isPrefetchingNotes || !isGoogleSessionValid()) return;
+    if (isPrefetchingNotes || !isUserSignedIn()) return;
+    const valid = await ensureGoogleTokenValid();
+    if (!valid) return;
     isPrefetchingNotes = true;
     try {
         const unloadedNodes = Array.from(state.nodes.values()).filter(n =>
@@ -2600,7 +2787,6 @@ async function prefetchAllNoteContentsInBackground() {
         // Fetch in batches of 3 to avoid overwhelming mobile network connections
         const batchSize = 3;
         for (let i = 0; i < unloadedNodes.length; i += batchSize) {
-            if (!isGoogleSessionValid()) break;
             const batch = unloadedNodes.slice(i, i + batchSize);
             await Promise.allSettled(batch.map(node => downloadSingleNoteFromDrive(node.id, { silent: true })));
             await new Promise(r => setTimeout(r, 180));
@@ -2616,7 +2802,8 @@ async function prefetchAllNoteContentsInBackground() {
 // Download all notes from Drive (100% Real, Complete Content Download)
 async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true, forceDownload = false } = {}) {
     if (state.isSyncing) return;
-    if (!isGoogleSessionValid()) {
+    const valid = await ensureGoogleTokenValid();
+    if (!valid) {
         if (!silent) requestGoogleLogin();
         return;
     }
@@ -3038,7 +3225,8 @@ async function autoRestoreFromDriveOnSignIn() {
 
 // Two-way sync: merges cloud updates and uploads local notes
 async function triggerTwoWaySync(silent = false) {
-    if (!isGoogleSessionValid()) {
+    const valid = await ensureGoogleTokenValid();
+    if (!valid) {
         if (!silent) {
             showToast('Sign in with Google to sync notes with Google Drive', 'info');
             requestGoogleLogin();
@@ -3066,11 +3254,9 @@ async function triggerTwoWaySync(silent = false) {
         await downloadAllNotesFromDrive(silent, { manageOverlay: false });
         await saveAllNotesToDrive(silent, { forceAll: false, manageOverlay: false });
         if (!silent) hideSyncOverlay();
-        if (isGoogleSessionValid()) {
-            const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            setSyncStatus('live', `Synced (${nowStr})`);
-            if (!silent) showToast('✓ Notes synced with Google Drive!', 'success');
-        }
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setSyncStatus('live', `Synced (${nowStr})`);
+        if (!silent) showToast('✓ Notes synced with Google Drive!', 'success');
     } catch (err) {
         if (err && err.isSessionExpired) {
             if (!silent) hideSyncOverlay();
@@ -3093,7 +3279,7 @@ async function triggerTwoWaySync(silent = false) {
 
 // Debounced auto-save to Drive (fires 1.2 seconds after editing pauses on active note)
 function scheduleDriveAutoBackup() {
-    if (!isGoogleSessionValid() || !state.activeNodeId) return;
+    if (!isUserSignedIn() || !state.activeNodeId) return;
     const node = state.nodes.get(state.activeNodeId);
     if (!node) return;
 
@@ -3111,7 +3297,7 @@ function scheduleDriveAutoBackup() {
     setSyncStatus('pending', 'Changes pending...');
     clearTimeout(state.driveSaveTimer);
     state.driveSaveTimer = setTimeout(async () => {
-        if (state.activeNodeId && isGoogleSessionValid()) {
+        if (state.activeNodeId && await ensureGoogleTokenValid()) {
             flushEditorToState();
             await uploadSingleNodeToDrive(state.activeNodeId, true);
         }
@@ -3129,7 +3315,7 @@ function handleEditorFieldBlur() {
     const hasChanged = (node.content !== curContent || node.title !== curTitle || (node.tags || '') !== curTags);
     if (hasChanged) {
         flushAndPersistActiveNode();
-        if (isGoogleSessionValid()) {
+        if (isUserSignedIn()) {
             clearTimeout(state.driveSaveTimer);
             uploadSingleNodeToDrive(state.activeNodeId, true);
         }
@@ -3154,7 +3340,7 @@ async function triggerDriveSave() {
     }
 
     // 2. If Google Drive is not connected, save locally and inform user
-    if (!state.googleAccessToken || !isGoogleSessionValid()) {
+    if (!isUserSignedIn()) {
         setTimeout(() => {
             if (btn) btn.classList.remove('syncing');
             if (svg) svg.classList.remove('spinning');
@@ -3214,7 +3400,8 @@ async function triggerDriveDownload() {
 
 // ---- Dedicated Active Note Direct Sync (Single-Note Two-Way Cloud Sync) ----
 async function syncActiveNoteDirectly() {
-    if (!state.googleAccessToken || !isGoogleSessionValid()) {
+    const valid = await ensureGoogleTokenValid();
+    if (!valid) {
         showToast('Sign in with Google to sync this note with Google Drive', 'info');
         requestGoogleLogin();
         return;
@@ -4707,7 +4894,7 @@ function renderAllNotesView() {
             othersGrid.appendChild(createKeepCard(node));
         });
     } else if (pinnedNodes.length === 0) {
-        const isSignedOut = localStorage.getItem('cybernote_logged_out') === '1' && !isGoogleSessionValid();
+        const isSignedOut = localStorage.getItem('cybernote_logged_out') === '1' && !isUserSignedIn();
         // Empty state when user has zero notes
         othersGrid.innerHTML = isSignedOut ? `
             <div class="keep-empty-state">
@@ -5066,7 +5253,7 @@ function selectNode(id) {
             prevNodeChanged = true;
         }
         // Only upload previous note to Google Drive when moving away if it was modified or pending
-        if ((prevNodeChanged || (state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(prevId))) && isGoogleSessionValid()) {
+        if ((prevNodeChanged || (state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(prevId))) && isUserSignedIn()) {
             uploadSingleNodeToDrive(prevId, true);
         }
     }
@@ -5080,7 +5267,7 @@ function selectNode(id) {
         const noNoteTitle = document.getElementById('no-note-title');
         const noNoteDesc = document.getElementById('no-note-desc');
         const btnNoNoteSignin = document.getElementById('btn-no-note-signin');
-        if (localStorage.getItem('cybernote_logged_out') === '1' && !isGoogleSessionValid()) {
+        if (localStorage.getItem('cybernote_logged_out') === '1' && !isUserSignedIn()) {
             if (noNoteTitle) noNoteTitle.textContent = 'Signed Out';
             if (noNoteDesc) noNoteDesc.textContent = 'Your Google Drive session has ended. Sign in with Google to view and sync your notes.';
             if (btnNoNoteSignin) btnNoNoteSignin.style.display = 'inline-flex';
@@ -5102,7 +5289,7 @@ function selectNode(id) {
     if (!node._lastSyncedSig && (!state.pendingUploadNodeIds || !state.pendingUploadNodeIds.has(id))) {
         node._lastSyncedSig = `${node.title || ''}|${node.tags || ''}|${node.content || ''}`;
     }
-    if (isGoogleSessionValid()) {
+    if (isUserSignedIn()) {
         if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(id)) {
             setSyncStatus('pending', 'Pending Drive Sync');
         } else {
@@ -5509,7 +5696,7 @@ function flushActiveNodeBeforeUnload() {
     }
 
     // 4. Immediate Google Drive cloud push when leaving/hiding active note
-    if (isGoogleSessionValid() && navigator.onLine) {
+    if (isUserSignedIn() && navigator.onLine) {
         uploadSingleNodeToDrive(activeId, true).catch(() => {});
     } else {
         cur._offlineEdited = true;
@@ -11113,11 +11300,16 @@ function setupEventListeners() {
     if (btnOpenSettings) btnOpenSettings.onclick = () => openSettingsModal('tab-gdrive');
     const syncStatusBadge = document.getElementById('sync-status');
     if (syncStatusBadge) {
-        syncStatusBadge.onclick = () => {
-            if (!isGoogleSessionValid()) {
+        syncStatusBadge.onclick = async () => {
+            if (!isUserSignedIn()) {
                 requestGoogleLogin();
             } else {
-                openSettingsModal('tab-gdrive');
+                const valid = await ensureGoogleTokenValid();
+                if (!valid) {
+                    requestGoogleLogin();
+                } else {
+                    openSettingsModal('tab-gdrive');
+                }
             }
         };
     }
@@ -11156,7 +11348,7 @@ function setupEventListeners() {
             await downloadAllNotesFromDrive(false, { manageOverlay: false });
             await saveAllNotesToDrive(false, { forceAll: false, manageOverlay: false });
             hideSyncOverlay();
-            if (isGoogleSessionValid()) {
+            if (isUserSignedIn()) {
                 showToast('✓ Successfully merged local notes with Google Drive!', 'success');
             }
         };
@@ -11169,7 +11361,7 @@ function setupEventListeners() {
             clearAllLocalNotesData();
             await downloadAllNotesFromDrive(false, { manageOverlay: false });
             hideSyncOverlay();
-            if (isGoogleSessionValid()) {
+            if (isUserSignedIn()) {
                 showToast('✓ Loaded notes from Google Drive.', 'info');
             }
         };
@@ -11181,7 +11373,7 @@ function setupEventListeners() {
             showSyncOverlay('Uploading to Drive...', 'Overwriting Drive with local notes...');
             await saveAllNotesToDrive(false, { forceAll: true, manageOverlay: false });
             hideSyncOverlay();
-            if (isGoogleSessionValid()) {
+            if (isUserSignedIn()) {
                 showToast('✓ Uploaded local notes to Google Drive.', 'success');
             }
         };
@@ -11950,13 +12142,13 @@ function setupEventListeners() {
 
     // Sync any pending offline notes to Drive when switching back to the window
     window.addEventListener('focus', () => {
-        if (isGoogleSessionValid() && state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+        if (isUserSignedIn() && state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
             uploadPendingNotesToDrive();
         }
     });
 
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && isGoogleSessionValid() && state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+        if (document.visibilityState === 'visible' && isUserSignedIn() && state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
             uploadPendingNotesToDrive();
         }
     });
