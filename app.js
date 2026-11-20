@@ -1075,6 +1075,7 @@ function updateGoogleUserUI() {
     }
 
     if (typeof updateSettingsUI === 'function') updateSettingsUI();
+    if (typeof checkMandatoryLogin === 'function') checkMandatoryLogin();
 }
 
 function updateDriveModalStatus(isSignedIn) {
@@ -10005,16 +10006,36 @@ function setupTagInteractions() {
     });
 }
 
-// --- First-Visit Welcome Modal ---
+// --- Mandatory Google Authentication Gateway Modal ---
+function checkMandatoryLogin() {
+    const isExplicitlyLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
+    const welcomeModal = document.getElementById('welcome-modal');
+    if (!welcomeModal) return;
+
+    if (!state.googleUser || isExplicitlyLoggedOut) {
+        welcomeModal.style.display = 'flex';
+        welcomeModal.classList.add('mandatory-auth-active');
+    } else {
+        welcomeModal.style.display = 'none';
+        welcomeModal.classList.remove('mandatory-auth-active');
+    }
+}
+
 function checkFirstVisitWelcome() {
-    // CyberNote is 100% accessible and offline-first without requiring user authentication.
-    // To comply with Google OAuth guidelines, never show a blocking login/welcome overlay on initial visit.
-    // Users can access the welcome guide and sign-in anytime via the header buttons or settings.
+    checkMandatoryLogin();
 }
 
 function closeWelcomeModal() {
+    const isExplicitlyLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
+    if (!state.googleUser || isExplicitlyLoggedOut) {
+        // Enforce mandatory authentication: cannot dismiss without logging in
+        return;
+    }
     const welcomeModal = document.getElementById('welcome-modal');
-    if (welcomeModal) welcomeModal.style.display = 'none';
+    if (welcomeModal) {
+        welcomeModal.style.display = 'none';
+        welcomeModal.classList.remove('mandatory-auth-active');
+    }
     localStorage.setItem('cybernote_welcome_dismissed', '1');
     checkShowStarBanner();
 }
@@ -10895,14 +10916,41 @@ function setupEventListeners() {
     const btnBugReport = document.getElementById('btn-open-bug-report');
     if (btnBugReport) btnBugReport.onclick = openBugReportPage;
 
-    // First-Visit Welcome Gateway Modal Buttons
+    // Mandatory Authentication Gateway Modal Buttons & Backdrop Shield
     const btnWelcomeSignin = document.getElementById('btn-welcome-google-signin');
-    if (btnWelcomeSignin) btnWelcomeSignin.onclick = () => {
-        closeWelcomeModal();
-        requestGoogleLogin();
-    };
+    if (btnWelcomeSignin) {
+        btnWelcomeSignin.onclick = () => {
+            requestGoogleLogin();
+        };
+    }
     const btnWelcomeSkip = document.getElementById('btn-welcome-skip');
-    if (btnWelcomeSkip) btnWelcomeSkip.onclick = closeWelcomeModal;
+    if (btnWelcomeSkip) {
+        btnWelcomeSkip.onclick = () => {
+            const isExplicitlyLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
+            if (state.googleUser && !isExplicitlyLoggedOut) {
+                closeWelcomeModal();
+            }
+        };
+    }
+
+    // Shield mandatory authentication modal against backdrop clicks and Escape key dismiss
+    window.addEventListener('click', (e) => {
+        const welcomeModal = document.getElementById('welcome-modal');
+        if (welcomeModal && e.target === welcomeModal && welcomeModal.classList.contains('mandatory-auth-active')) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    }, true);
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const welcomeModal = document.getElementById('welcome-modal');
+            if (welcomeModal && welcomeModal.classList.contains('mandatory-auth-active') && welcomeModal.style.display !== 'none') {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        }
+    }, true);
 
     // E2EE Toggles & Passwords
     const e2eeToggle = document.getElementById('e2ee-toggle');
