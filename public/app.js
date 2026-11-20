@@ -2733,6 +2733,26 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
                 return;
             }
 
+            // Smart Delta Sync: Check if note is already cached locally and matches cloud modifiedTime
+            const localNode = state.nodes.get(nodeId);
+            const isLocalPending = state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(nodeId);
+            if (localNode && localNode._contentLoaded !== false && typeof localNode.content === 'string') {
+                const cloudModified = fileInfo?.modifiedTime ? new Date(fileInfo.modifiedTime).getTime() : 0;
+                const localModified = localNode.updated_at || localNode.created_at || 0;
+                if (isLocalPending || (cloudModified > 0 && localModified >= cloudModified - 1500)) {
+                    if (mNode) {
+                        Object.assign(localNode, {
+                            title: mNode.title || localNode.title,
+                            icon: mNode.icon || localNode.icon,
+                            color: mNode.color || localNode.color,
+                            parent_id: mNode.parent_id !== undefined ? mNode.parent_id : localNode.parent_id
+                        });
+                    }
+                    downloadedCount++;
+                    return;
+                }
+            }
+
             try {
                 const dlRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
                 if (dlRes && dlRes.ok) {
@@ -2787,6 +2807,17 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
         for (let i = 0; i < nodeIdsList.length; i += BATCH_SIZE) {
             const batch = nodeIdsList.slice(i, i + BATCH_SIZE);
             await Promise.allSettled(batch.map(downloadSingleTask));
+        }
+
+        // Clean up notes that were deleted on another device (absent from cloud and not pending local upload)
+        for (const [localId, localNode] of state.nodes.entries()) {
+            if (localId === 'welcome-root') continue;
+            const isPending = state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(localId);
+            if (!allCloudNodeIds.has(localId) && !isPending) {
+                state.nodes.delete(localId);
+                if (typeof idbDeleteNote === 'function') idbDeleteNote(localId);
+                try { localStorage.removeItem(`cybernote_node_${localId}`); } catch (e) {}
+            }
         }
 
         // If default welcome root was there and cloud has real notes, remove default welcome
