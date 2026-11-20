@@ -1461,6 +1461,9 @@ function flushAndPersistActiveNode() {
         contentVal = repairEscapedHtml(contentVal);
     }
 
+    const hasChanged = (node.title !== titleVal || node.content !== contentVal || (node.tags || '') !== tagsVal);
+    if (!hasChanged) return;
+
     node.title = titleVal;
     node.content = contentVal;
     node.tags = tagsVal;
@@ -1501,7 +1504,10 @@ async function driveApiFetch(url, options = {}) {
 
     const reqInit = {
         ...options,
+        cache: 'no-store',
         headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
             Authorization: `Bearer ${state.googleAccessToken}`,
             ...(options.headers || {})
         }
@@ -2036,13 +2042,19 @@ async function uploadNodeToDrive(folderId, node) {
 
     if (fileId) {
         // Update existing file content via PATCH media
-        const patchRes = await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        const patchRes = await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,modifiedTime`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: payload
         });
         if (patchRes.ok) {
+            const patchData = await patchRes.json().catch(() => null);
+            if (patchData && patchData.modifiedTime) {
+                node._lastCloudModifiedTime = patchData.modifiedTime;
+            }
             node._lastSyncedSig = `${node.title || ''}|${node.tags || ''}|${node.content || ''}`;
+            idbPutNote(node);
+            try { localStorage.setItem(`cybernote_node_${node.id}`, JSON.stringify(node)); } catch (e) {}
             return fileId;
         }
         if (patchRes.status === 404 || patchRes.status === 403) {
@@ -2090,7 +2102,7 @@ async function uploadNodeToDrive(folderId, node) {
     driveFileIdCache.set(node.id, fileId);
 
     // Upload content payload into the created file
-    const uploadRes = await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+    const uploadRes = await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,modifiedTime`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: payload
@@ -2098,7 +2110,13 @@ async function uploadNodeToDrive(folderId, node) {
     if (!uploadRes.ok) {
         throw new Error(`Content upload failed (${uploadRes.status})`);
     }
+    const uploadData = await uploadRes.json().catch(() => null);
+    if (uploadData && uploadData.modifiedTime) {
+        node._lastCloudModifiedTime = uploadData.modifiedTime;
+    }
     node._lastSyncedSig = `${node.title || ''}|${node.tags || ''}|${node.content || ''}`;
+    idbPutNote(node);
+    try { localStorage.setItem(`cybernote_node_${node.id}`, JSON.stringify(node)); } catch (e) {}
     return fileId;
 }
 
@@ -2590,7 +2608,7 @@ async function prefetchAllNoteContentsInBackground() {
 }
 
 // Download all notes from Drive (100% Real, Complete Content Download)
-async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true } = {}) {
+async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true, forceDownload = false } = {}) {
     if (state.isSyncing) return;
     if (!isGoogleSessionValid()) {
         if (!silent) requestGoogleLogin();
@@ -2736,21 +2754,30 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
             // Smart Delta Sync: Check if note is already cached locally and matches cloud modifiedTime
             const localNode = state.nodes.get(nodeId);
             const isLocalPending = state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(nodeId);
-            if (localNode && localNode._contentLoaded !== false && typeof localNode.content === 'string') {
-                const cloudModified = fileInfo?.modifiedTime ? new Date(fileInfo.modifiedTime).getTime() : 0;
-                const localModified = localNode.updated_at || localNode.created_at || 0;
-                if (isLocalPending || (cloudModified > 0 && localModified >= cloudModified - 1500)) {
-                    if (mNode) {
-                        Object.assign(localNode, {
-                            title: mNode.title || localNode.title,
-                            icon: mNode.icon || localNode.icon,
-                            color: mNode.color || localNode.color,
-                            parent_id: mNode.parent_id !== undefined ? mNode.parent_id : localNode.parent_id
-                        });
-                    }
-                    downloadedCount++;
-                    return;
+            
+            // Only skip downloading if:
+            // 1. NOT a forced or manual download (!forceDownload && silent)
+            // 2. Note body is already loaded as a string
+            // 3. No local changes are pending upload
+            // 4. Exact cloud modifiedTime matches the cached _lastCloudModifiedTime
+            const canSkipDelta = !forceDownload && silent && !isLocalPending && localNode &&
+                localNode._contentLoaded !== false &&
+                typeof localNode.content === 'string' &&
+                localNode._lastCloudModifiedTime &&
+                fileInfo?.modifiedTime &&
+                localNode._lastCloudModifiedTime === fileInfo.modifiedTime;
+
+            if (canSkipDelta) {
+                if (mNode) {
+                    Object.assign(localNode, {
+                        title: mNode.title || localNode.title,
+                        icon: mNode.icon || localNode.icon,
+                        color: mNode.color || localNode.color,
+                        parent_id: mNode.parent_id !== undefined ? mNode.parent_id : localNode.parent_id
+                    });
                 }
+                downloadedCount++;
+                return;
             }
 
             try {
@@ -2762,6 +2789,9 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
                             cloudNode.content = repairEscapedHtml(cloudNode.content);
                         }
                         cloudNode._contentLoaded = true;
+                        if (fileInfo?.modifiedTime) {
+                            cloudNode._lastCloudModifiedTime = fileInfo.modifiedTime;
+                        }
 
                         const localNode = state.nodes.get(cloudNode.id);
                         if (!localNode) {
@@ -2771,11 +2801,13 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
                             const cloudTime = cloudNode.updated_at || cloudNode.created_at || 0;
                             const localTime = localNode.updated_at || localNode.created_at || 0;
                             const isLocalPending = state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(cloudNode.id);
-                            // If local has newer offline edits, keep local edits!
-                            if (isLocalPending && localTime > cloudTime) {
-                                // keep local
-                            } else {
+                            
+                            // If user explicitly requested download (forceDownload or !silent), or local is not pending newer edits
+                            if (forceDownload || !silent || !isLocalPending || cloudTime >= localTime) {
                                 Object.assign(localNode, cloudNode);
+                                if (isLocalPending && (forceDownload || !silent || cloudTime >= localTime)) {
+                                    state.pendingUploadNodeIds.delete(cloudNode.id);
+                                }
                                 updatedCount++;
                             }
                             localNode._contentLoaded = true;
@@ -2783,6 +2815,9 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
 
                         const targetNode = state.nodes.get(cloudNode.id) || cloudNode;
                         targetNode._lastSyncedSig = `${targetNode.title || ''}|${targetNode.tags || ''}|${targetNode.content || ''}`;
+                        if (fileInfo?.modifiedTime) {
+                            targetNode._lastCloudModifiedTime = fileInfo.modifiedTime;
+                        }
                         idbPutNote(targetNode);
                         try {
                             localStorage.setItem(`cybernote_node_${cloudNode.id}`, JSON.stringify(targetNode));
@@ -2830,12 +2865,20 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true 
         saveLocalNodesBackup();
         renderTree();
 
-        // Select active or first note - content is ALREADY downloaded!
-        const lastActive = localStorage.getItem('cybernote_active');
-        if (lastActive && state.nodes.has(lastActive)) {
-            selectNode(lastActive);
-        } else if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
-            selectNode(state.activeNodeId);
+        // Refresh currently active note editor directly with freshly synced cloud content!
+        const targetActiveId = state.activeNodeId || localStorage.getItem('cybernote_active');
+        if (targetActiveId && state.nodes.has(targetActiveId)) {
+            const activeNode = state.nodes.get(targetActiveId);
+            state.activeNodeId = targetActiveId;
+            if (activeNode) {
+                noteTitleInput.value = activeNode.title || '';
+                if (noteTagsInput) noteTagsInput.value = activeNode.tags || '';
+                renderTagChips(activeNode.tags || '');
+                applyReadOnlyState(!!activeNode.is_readonly);
+                updatePinButtonUI(!!activeNode.is_pinned);
+                setEditorContent(activeNode.content || '');
+                updateWordStats();
+            }
         } else if (state.nodes.size > 0) {
             const firstId = state.nodes.keys().next().value;
             selectNode(firstId);
@@ -3066,7 +3109,25 @@ function scheduleDriveAutoBackup() {
             flushEditorToState();
             await uploadSingleNodeToDrive(state.activeNodeId, true);
         }
-    }, 1200);
+    }, 500);
+}
+
+// Immediately flush and sync active note when user finishes editing / taps outside or switches apps
+function handleEditorFieldBlur() {
+    if (!state.activeNodeId || state.isReadOnly) return;
+    const node = state.nodes.get(state.activeNodeId);
+    if (!node) return;
+    const curTitle = noteTitleInput ? noteTitleInput.value : (node.title || '');
+    const curContent = noteEditor ? noteEditor.innerHTML : (node.content || '');
+    const curTags = noteTagsInput ? noteTagsInput.value : (node.tags || '');
+    const hasChanged = (node.content !== curContent || node.title !== curTitle || (node.tags || '') !== curTags);
+    if (hasChanged) {
+        flushAndPersistActiveNode();
+        if (isGoogleSessionValid()) {
+            clearTimeout(state.driveSaveTimer);
+            uploadSingleNodeToDrive(state.activeNodeId, true);
+        }
+    }
 }
 
 // ---- Header "Save" Button Handler ----
@@ -3135,11 +3196,7 @@ async function triggerDriveDownload() {
     if (txt) txt.textContent = 'Downloading...';
 
     try {
-        if (state.activeNodeId && state.activeNodeId !== 'welcome-root' && state.nodes.size > 1) {
-            await downloadSingleNoteFromDrive(state.activeNodeId, { silent: false });
-        } else {
-            await downloadAllNotesFromDrive(false);
-        }
+        await downloadAllNotesFromDrive(false, { forceDownload: true, manageOverlay: true });
     } finally {
         setTimeout(() => {
             if (btn) btn.classList.remove('syncing');
@@ -5207,8 +5264,11 @@ function flushActiveNodeBeforeUnload() {
     }
     const curTitle = noteTitleInput ? noteTitleInput.value : cur.title;
     const curTags = noteTagsInput ? noteTagsInput.value : cur.tags;
-    const now = Date.now();
 
+    const hasChanged = (cur.content !== curContent || cur.title !== curTitle || (cur.tags || '') !== (curTags || ''));
+    if (!hasChanged) return;
+
+    const now = Date.now();
     cur.content = curContent;
     cur.title = curTitle;
     cur.tags = curTags;
@@ -11042,12 +11102,14 @@ function setupEventListeners() {
             if (itemLabel) itemLabel.textContent = e.target.value || 'Untitled Note';
         }
     });
+    noteTitleInput.addEventListener('blur', handleEditorFieldBlur);
 
     // Tags editing
     noteTagsInput.addEventListener('input', (e) => {
         if (state.isReadOnly) return;
         scheduleSave('tags', e.target.value);
     });
+    noteTagsInput.addEventListener('blur', handleEditorFieldBlur);
 
     let lastReadOnlyNoticeTime = 0;
     function notifyReadOnlyNotice() {
@@ -11116,6 +11178,7 @@ function setupEventListeners() {
 
     // Editor content editing
     noteEditor.addEventListener('input', handleEditorInput);
+    noteEditor.addEventListener('blur', handleEditorFieldBlur);
     noteEditor.addEventListener('paste', handleClipboardPaste);
 
     // Tab & Enter key handling in editor (Smart Column Tab Stop, Table Navigation & Multi-line Indent)
