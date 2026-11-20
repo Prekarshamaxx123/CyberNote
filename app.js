@@ -3328,11 +3328,15 @@ function scheduleDriveAutoBackup() {
 
 // Immediately flush and sync active note when user finishes editing / taps outside or switches apps
 function handleEditorFieldBlur() {
+    if (isNoteDirectSyncing) return;
     if (!state.activeNodeId || state.isReadOnly) return;
     const node = state.nodes.get(state.activeNodeId);
-    if (!node) return;
+    if (!node || !node._userActuallyTyped) return;
     const curTitle = noteTitleInput ? noteTitleInput.value : (node.title || '');
-    const curContent = noteEditor ? noteEditor.innerHTML : (node.content || '');
+    let curContent = noteEditor ? noteEditor.innerHTML : (node.content || '');
+    if (curContent && hasEscapedHtmlTags(curContent)) {
+        curContent = repairEscapedHtml(curContent);
+    }
     const curTags = noteTagsInput ? noteTagsInput.value : (node.tags || '');
     const hasChanged = (node.content !== curContent || node.title !== curTitle || (node.tags || '') !== curTags);
     if (hasChanged) {
@@ -3464,10 +3468,9 @@ async function syncActiveNoteDirectly() {
         const curText = (noteEditor ? (noteEditor.innerText || '') : '').trim();
         const isLocalEmpty = (curText === '' && curTitle.trim() === '' && curTags.trim() === '');
 
-        // Has the user actually typed or edited locally in this session or pending upload?
+        // Has the user actually typed or edited locally on this device?
         const hasLocalEdits = Boolean(
-            localNode._userEditedThisSession ||
-            (state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(nodeId)) ||
+            localNode._userActuallyTyped ||
             localNode._offlineEdited
         );
 
@@ -5354,6 +5357,7 @@ function selectNode(id) {
     noteView.style.display = 'flex';
 
     const node = state.nodes.get(id);
+    node._userActuallyTyped = false;
     if (!node._lastSyncedSig && (!state.pendingUploadNodeIds || !state.pendingUploadNodeIds.has(id))) {
         node._lastSyncedSig = `${node.title || ''}|${node.tags || ''}|${node.content || ''}`;
     }
@@ -10358,6 +10362,7 @@ function handleEditorInput() {
     if (state.isReadOnly) return;
     if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
         const node = state.nodes.get(state.activeNodeId);
+        node._userActuallyTyped = true;
         node._userEditedThisSession = true;
         node._contentLoaded = true;
     }
@@ -11585,6 +11590,7 @@ function setupEventListeners() {
         if (state.isReadOnly) return;
         if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
             const node = state.nodes.get(state.activeNodeId);
+            node._userActuallyTyped = true;
             node._userEditedThisSession = true;
             node._contentLoaded = true;
         }
@@ -11604,6 +11610,7 @@ function setupEventListeners() {
         if (state.isReadOnly) return;
         if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
             const node = state.nodes.get(state.activeNodeId);
+            node._userActuallyTyped = true;
             node._userEditedThisSession = true;
             node._contentLoaded = true;
         }
