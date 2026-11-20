@@ -179,14 +179,6 @@
                 <span class="sync-text" id="sync-status-text">Drive Ready</span>
             </div>
 
-            <!-- Sync Drive Button (Manual Two-Way Sync) -->
-            <button id="btn-header-sync" class="btn btn-secondary btn-sm" style="padding: 4px 9px; font-size: 0.78rem; align-items: center; gap: 5px; display: inline-flex;" title="Sync notes with Google Drive (Two-Way Cloud Sync)">
-                <svg id="header-sync-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-                </svg>
-                <span>Sync</span>
-            </button>
-
             <!-- User Profile Badge (Click to open Settings) -->
             <div id="user-profile-badge" class="user-profile-badge" style="display: none;" title="Google Account & Drive Settings">
                 <img id="user-avatar" class="user-avatar" src="" alt="Google User">
@@ -496,6 +488,12 @@
                             </button>
                         </div>
                         <div class="ribbon-tab-quick-tools">
+                            <button class="ribbon-quick-action-btn" id="btn-sync-active-note" onclick="syncActiveNoteDirectly()" title="Sync this Note with Google Drive">
+                                <svg id="sync-active-note-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                </svg>
+                                <span id="sync-active-note-text">Sync</span>
+                            </button>
                             <button class="ribbon-quick-action-btn" id="btn-quick-zen" onclick="toggleZenMode()" title="Focus Mode (Distraction-Free Writing)">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
                                 <span>Focus</span>
