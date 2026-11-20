@@ -958,106 +958,29 @@ async function waitForGIS(timeoutMs = 4000) {
 let isSilentRefreshing = false;
 let silentRefreshPromise = null;
 
-// Silently renew Google OAuth 2.0 access token in background without popups or prompts
-// Keeps user logged in persistently (months/lifetime) like GitHub/Google services
+// In modern browsers (Firefox, Chrome), calling requestAccessToken in the background without
+// a direct user click triggers browser popup blockers (e.g. "Firefox prevented this site from opening a pop-up window").
+// Therefore, access tokens are used directly from memory/localStorage while valid, and renewed
+// only upon user-initiated actions (clicking Sync, Save, or Sign-In).
 async function requestSilentTokenRefresh() {
-    if (isSilentRefreshing && silentRefreshPromise) {
-        return silentRefreshPromise;
-    }
-    const isLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
-    if (isLoggedOut) return false;
-
-    const savedEmail = state.googleUser?.email || 
-                       JSON.parse(localStorage.getItem('cybernote_user') || '{}')?.email || 
-                       localStorage.getItem('cybernote_user_email');
-    if (!savedEmail) return false;
-
-    const gisReady = await waitForGIS(4000);
-    if (!gisReady || !state.tokenClient) return false;
-
-    isSilentRefreshing = true;
-    silentRefreshPromise = new Promise((resolve) => {
-        let finished = false;
-        const timer = setTimeout(() => {
-            if (finished) return;
-            finished = true;
-            isSilentRefreshing = false;
-            silentRefreshPromise = null;
-            if (state.tokenClient) state.tokenClient.callback = handleGoogleTokenResponse;
-            console.warn('[CyberNote] Silent token refresh timed out (12s).');
-            resolve(false);
-        }, 12000);
-
-        state.tokenClient.callback = async (tokenResponse) => {
-            if (finished) return;
-            finished = true;
-            clearTimeout(timer);
-            isSilentRefreshing = false;
-            silentRefreshPromise = null;
-            if (state.tokenClient) state.tokenClient.callback = handleGoogleTokenResponse;
-
-            if (tokenResponse && tokenResponse.access_token && !tokenResponse.error) {
-                try {
-                    await handleGoogleTokenResponse(tokenResponse, { isSilentRefresh: true });
-                    resolve(true);
-                } catch (err) {
-                    console.warn('[CyberNote] Error processing silent token response:', err);
-                    resolve(true);
-                }
-            } else {
-                console.warn('[CyberNote] Silent token refresh result:', tokenResponse?.error || 'No token');
-                resolve(false);
-            }
-        };
-
-        try {
-            state.tokenClient.requestAccessToken({
-                prompt: 'none',
-                login_hint: savedEmail
-            });
-        } catch (e) {
-            if (finished) return;
-            finished = true;
-            clearTimeout(timer);
-            isSilentRefreshing = false;
-            silentRefreshPromise = null;
-            if (state.tokenClient) state.tokenClient.callback = handleGoogleTokenResponse;
-            console.warn('[CyberNote] Exception triggering silent token refresh:', e);
-            resolve(false);
-        }
-    });
-
-    return silentRefreshPromise;
+    return false;
 }
 
-// Ensures Google access token is valid, silently acquiring/refreshing it in background if needed
+// Ensures Google access token is valid (checks memory and localStorage)
 async function ensureGoogleTokenValid() {
     if (!isUserSignedIn()) return false;
 
     const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
     const token = state.googleAccessToken || localStorage.getItem('cybernote_google_token');
 
-    // 1. If we currently have a token valid for at least another 90 seconds, use it immediately
-    if (token && expiry > (Date.now() + 90000)) {
+    // 1. If we currently have a token valid for at least another 60 seconds, use it immediately
+    if (token && expiry > (Date.now() + 60000)) {
         if (!state.googleAccessToken) state.googleAccessToken = token;
         return true;
     }
 
-    // 2. If online, attempt silent background renewal
-    if (navigator.onLine) {
-        await waitForGIS(3000);
-        const refreshed = await requestSilentTokenRefresh();
-        if (refreshed && state.googleAccessToken) {
-            return true;
-        }
-    }
-
-    // 3. Fallback: if token hasn't reached its exact expiry timestamp yet
-    if (token && expiry > Date.now()) {
-        if (!state.googleAccessToken) state.googleAccessToken = token;
-        return true;
-    }
-
+    // 2. Token is expired or expiring soon: do NOT trigger background popups.
+    // Return false so caller knows user gesture is needed to refresh.
     return false;
 }
 
@@ -1076,38 +999,16 @@ function scheduleSessionExpiryWatch() {
 
     const remainingMs = expiry - Date.now();
     if (remainingMs <= 0) {
-        if (navigator.onLine) {
-            requestSilentTokenRefresh().catch(() => {
-                handleExpiredGoogleSession({ silent: true });
-            });
-        } else {
-            handleExpiredGoogleSession({ silent: true });
-        }
+        handleExpiredGoogleSession({ silent: true });
         return;
     }
 
-    // Proactively renew token 5 minutes before 1-hour expiry (remainingMs - 300,000)
-    // Google tokens last 3600s (60 mins). Renewing at 55 mins keeps the session perpetually alive!
-    const refreshDelayMs = Math.max(10000, remainingMs - 300000);
-
-    tokenRefreshTimer = setTimeout(async () => {
-        if (localStorage.getItem('cybernote_logged_out') === '1') return;
-        if (navigator.onLine) {
-            console.log('[CyberNote] Proactively renewing Google session token in background...');
-            const success = await requestSilentTokenRefresh();
-            if (!success) {
-                // If proactive refresh failed, retry 1 minute before expiry
-                const retryMs = Math.max(5000, expiry - Date.now() - 60000);
-                tokenRefreshTimer = setTimeout(async () => {
-                    const retrySuccess = await requestSilentTokenRefresh();
-                    if (!retrySuccess && Date.now() >= expiry) {
-                        handleExpiredGoogleSession({ silent: true });
-                    }
-                }, retryMs);
-            }
-        }
-    }, refreshDelayMs);
+    // When the 1-hour token expires, cleanly transition to expired session state without intrusive popups
+    tokenRefreshTimer = setTimeout(() => {
+        handleExpiredGoogleSession({ silent: true });
+    }, remainingMs);
 }
+
 
 let sessionListenersAttached = false;
 function setupSessionExpiryListeners() {
@@ -1118,9 +1019,8 @@ function setupSessionExpiryListeners() {
         if (!navigator.onLine) return;
         if (localStorage.getItem('cybernote_logged_out') === '1') return;
         const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
-        if (isUserSignedIn() && (!state.googleAccessToken || Date.now() >= (expiry - 120000))) {
-            console.log('[CyberNote] Device woke or tab focused. Silently renewing token if needed...');
-            await ensureGoogleTokenValid().catch(() => {});
+        if (isUserSignedIn() && (!state.googleAccessToken || Date.now() >= expiry)) {
+            handleExpiredGoogleSession({ silent: true });
         }
     };
 
@@ -1192,17 +1092,15 @@ function initGoogleAuth() {
                     callback: handleGoogleTokenResponse
                 });
 
-                // Auto silent-renew if user is signed in but token is expired or expiring soon
-                if (!isLoggedOut && (state.googleUser || savedEmail) && (!state.googleAccessToken || Date.now() >= (expiry - 60000))) {
-                    requestSilentTokenRefresh().then((refreshed) => {
-                        if (refreshed) {
-                            console.log('[CyberNote] Restored Google session silently in background.');
-                            if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
-                                uploadPendingNotesToDrive().catch(() => {});
-                            }
-                            downloadAllNotesFromDrive(true).catch(() => {});
-                        }
-                    }).catch(() => {});
+                // If user is logged in and token is currently active, run cloud sync
+                if (!isLoggedOut && state.googleAccessToken) {
+                    if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+                        uploadPendingNotesToDrive().catch(() => {});
+                    }
+                    downloadAllNotesFromDrive(true).catch(() => {});
+                } else if (!isLoggedOut && (state.googleUser || savedEmail)) {
+                    // Token expired while browser was closed: prompt user to reconnect
+                    setSyncStatus('offline', 'Session expired (Click Sync to reconnect)');
                 }
             } catch (err) {
                 console.warn('GIS Token client init:', err);
@@ -1699,20 +1597,13 @@ async function driveApiFetch(url, options = {}) {
         res = await fetch(url, reqInit);
     }
 
-    // If 401 Unauthorized, token was revoked or expired on server: attempt silent renewal and retry once
+    // If 401 Unauthorized, token was revoked or expired on server: cleanly mark session expired
     if (res.status === 401) {
-        console.warn('Google Drive API 401: Token invalid or expired. Attempting silent renewal...');
-        const refreshed = await requestSilentTokenRefresh();
-        if (refreshed && state.googleAccessToken) {
-            reqInit.headers.Authorization = `Bearer ${state.googleAccessToken}`;
-            res = await fetch(url, reqInit);
-        }
-        if (res.status === 401) {
-            handleExpiredGoogleSession({ silent: true });
-            const expErr = new Error('Google Drive session expired. Click Sync to reconnect.');
-            expErr.isSessionExpired = true;
-            throw expErr;
-        }
+        console.warn('Google Drive API 401: Token invalid or expired.');
+        handleExpiredGoogleSession({ silent: true });
+        const expErr = new Error('Google Drive session expired. Click Sync to reconnect.');
+        expErr.isSessionExpired = true;
+        throw expErr;
     }
 
     return res;
@@ -11423,6 +11314,9 @@ function setupEventListeners() {
     // Note-Level Fast Direct Sync Button (Next to Focus in editor ribbon)
     const btnSyncActiveNote = document.getElementById('btn-sync-active-note');
     if (btnSyncActiveNote) {
+        btnSyncActiveNote.addEventListener('mousedown', () => {
+            isNoteDirectSyncing = true;
+        });
         btnSyncActiveNote.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
