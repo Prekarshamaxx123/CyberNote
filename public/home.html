@@ -6,6 +6,59 @@
     <title>CyberNote 🛡️ - Secure Hierarchical Knowledge & Cloud Notes</title>
     <meta name="description" content="CyberNote is a free, privacy-focused hierarchical notebook and knowledge base with offline PWA support and optional Google Drive cloud backup. No login required.">
     <link rel="icon" href="icons/icon-192.png" type="image/png">
+
+    <!-- CyberNote Smart Failover & Main Web Redirection System -->
+    <script>
+    (function() {
+        try {
+            var host = window.location.hostname;
+            var isGitHubPages = host.endsWith('github.io') || host === 'prekarshamaxx123.github.io';
+            if (!isGitHubPages) return;
+            if (navigator.onLine === false) return;
+
+            var search = window.location.search || '';
+            var params = new URLSearchParams(search);
+            var isBypassed = params.has('backup') || params.has('direct') || params.has('stay') || 
+                             sessionStorage.getItem('cybernote_stay_backup') === '1';
+            if (isBypassed) return;
+
+            var mainOrigin = 'https://cybernote.cybertubelk.xyz';
+            var currentPath = window.location.pathname.replace(/^\/CyberNote(\/|$)/, '/');
+            if (!currentPath.startsWith('/')) currentPath = '/' + currentPath;
+            var targetUrl = mainOrigin + currentPath + search + window.location.hash;
+
+            var resolved = false;
+            var timeoutId = setTimeout(function() {
+                if (!resolved) {
+                    resolved = true;
+                    console.warn('[CyberNote Failover] Main web unreachable or timed out. Staying on GitHub Pages backup mirror.');
+                    sessionStorage.setItem('cybernote_stay_backup', '1');
+                }
+            }, 1800);
+
+            function handleMainSiteOnline() {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timeoutId);
+                window.location.replace(targetUrl);
+            }
+
+            var probeImg = new Image();
+            probeImg.onload = handleMainSiteOnline;
+            probeImg.onerror = function() {
+                try {
+                    fetch('https://cybernote.cybertubelk.xyz/index.html?probe=' + Date.now(), {
+                        mode: 'no-cors',
+                        cache: 'no-store'
+                    }).then(handleMainSiteOnline).catch(function() {});
+                } catch(e) {}
+            };
+            probeImg.src = 'https://cybernote.cybertubelk.xyz/icons/icon-192.png?probe=' + Date.now();
+        } catch (e) {
+            console.warn('[CyberNote Failover] Check error:', e);
+        }
+    })();
+    </script>
     <style>
         :root {
             --bg-body: #0c0e14;
