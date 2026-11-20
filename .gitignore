@@ -18,7 +18,6 @@ credentials*.json
 .DS_Store
 Thumbs.db
 
-# Test environment folders
-web_test/
-web test
+# Generated outputs & bundles
 cybernote_main_web_update.zip
+full web source/
