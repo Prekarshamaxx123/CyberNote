@@ -2226,7 +2226,7 @@ async function uploadNodeToDrive(folderId, node) {
         // Update existing file content via PATCH media
         const patchRes = await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,modifiedTime`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
             body: payload
         });
         if (patchRes.ok) {
@@ -2286,7 +2286,7 @@ async function uploadNodeToDrive(folderId, node) {
     // Upload content payload into the created file
     const uploadRes = await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,modifiedTime`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: payload
     });
     if (!uploadRes.ok) {
@@ -3398,26 +3398,12 @@ async function triggerDriveDownload() {
     }
 }
 
+let isNoteDirectSyncing = false;
+
 // ---- Dedicated Active Note Direct Sync (Single-Note Two-Way Cloud Sync) ----
 async function syncActiveNoteDirectly() {
-    const valid = await ensureGoogleTokenValid();
-    if (!valid) {
-        showToast('Sign in with Google to sync this note with Google Drive', 'info');
-        requestGoogleLogin();
-        return;
-    }
-
-    const nodeId = state.activeNodeId;
-    if (!nodeId) {
-        showToast('Select a note first to sync.', 'info');
-        return;
-    }
-
-    const localNode = state.nodes.get(nodeId);
-    if (!localNode) {
-        showToast('Active note not found.', 'warning');
-        return;
-    }
+    if (isNoteDirectSyncing) return;
+    isNoteDirectSyncing = true;
 
     const btn = document.getElementById('btn-sync-active-note');
     const svg = document.getElementById('sync-active-note-svg');
@@ -3427,12 +3413,47 @@ async function syncActiveNoteDirectly() {
     if (txt) txt.textContent = 'Syncing...';
 
     try {
-        // 1. Immediately flush editor DOM values into localNode and storage
-        if (state.activeNodeId === nodeId && !state.isReadOnly) {
-            if (noteTitleInput && noteTitleInput.value !== undefined) localNode.title = noteTitleInput.value;
-            if (noteEditor && noteEditor.innerHTML !== undefined) localNode.content = noteEditor.innerHTML;
-            if (noteTagsInput && noteTagsInput.value !== undefined) localNode.tags = noteTagsInput.value;
-            localNode.updated_at = Date.now();
+        const valid = await ensureGoogleTokenValid();
+        if (!valid) {
+            showToast('Sign in with Google to sync this note with Google Drive', 'info');
+            requestGoogleLogin();
+            return;
+        }
+
+        const nodeId = state.activeNodeId;
+        if (!nodeId) {
+            showToast('Select a note first to sync.', 'info');
+            return;
+        }
+
+        const localNode = state.nodes.get(nodeId);
+        if (!localNode) {
+            showToast('Active note not found.', 'warning');
+            return;
+        }
+
+        // 1. Inspect current editor content
+        const curTitle = noteTitleInput ? noteTitleInput.value : (localNode.title || '');
+        let curContent = noteEditor ? noteEditor.innerHTML : (localNode.content || '');
+        if (curContent && hasEscapedHtmlTags(curContent)) {
+            curContent = repairEscapedHtml(curContent);
+        }
+        const curTags = noteTagsInput ? noteTagsInput.value : (localNode.tags || '');
+        const curSig = `${curTitle}|${curTags}|${curContent}`;
+
+        // Has the user actually typed or edited locally since the last cloud sync?
+        const isLocallyModified = Boolean(
+            (localNode._lastSyncedSig && localNode._lastSyncedSig !== curSig) ||
+            (state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(nodeId)) ||
+            localNode._offlineEdited
+        );
+
+        // If user made active local modifications in editor, flush them to localNode
+        if (isLocallyModified && state.activeNodeId === nodeId && !state.isReadOnly) {
+            localNode.title = curTitle;
+            localNode.content = curContent;
+            localNode.tags = curTags;
+            localNode.updated_at = localNode.updated_at || Date.now();
             persistActiveNodeImmediately(nodeId, {
                 title: localNode.title,
                 content: localNode.content,
@@ -3480,11 +3501,25 @@ async function syncActiveNoteDirectly() {
             const cloudTime = cloudNode.updated_at || cloudNode.created_at || (cloudFileInfo?.modifiedTime ? new Date(cloudFileInfo.modifiedTime).getTime() : 0);
             const localTime = localNode.updated_at || localNode.created_at || 0;
             const cloudModified = cloudFileInfo?.modifiedTime ? new Date(cloudFileInfo.modifiedTime).getTime() : 0;
-            const lastLocalSync = localNode._lastCloudSyncTime || 0;
+            const lastCloudSync = localNode._lastCloudSyncTime || 0;
 
-            // Check if Cloud has newer edits than Local
-            if (cloudTime > localTime || (cloudModified > 0 && cloudModified > lastLocalSync && (!state.pendingUploadNodeIds || !state.pendingUploadNodeIds.has(nodeId)))) {
-                // Cloud is newer -> Download and apply to Editor!
+            const isCloudContentDifferent = (
+                cloudNode.content !== curContent ||
+                cloudNode.title !== curTitle ||
+                (cloudNode.tags || '') !== curTags
+            );
+
+            // Determine sync direction:
+            // 1. If local device has NOT modified the note, and Cloud has different content or newer timestamp -> MUST DOWNLOAD!
+            // 2. If local device HAS modified, but Cloud is even newer than localTime -> Download!
+            // 3. If local device HAS modified, and localTime >= cloudTime -> Upload local!
+            // 4. Neither modified or content is identical -> Already up to date!
+
+            const shouldDownloadFromCloud = (!isLocallyModified && (isCloudContentDifferent || cloudTime > lastCloudSync || cloudModified > lastCloudSync)) ||
+                                            (isLocallyModified && cloudTime > localTime && isCloudContentDifferent);
+
+            if (shouldDownloadFromCloud) {
+                // Cloud has newer updates from another device -> Download and apply to Editor!
                 Object.assign(localNode, cloudNode);
                 localNode._contentLoaded = true;
                 if (cloudFileInfo?.modifiedTime) {
@@ -3494,6 +3529,7 @@ async function syncActiveNoteDirectly() {
                 localNode._lastSyncedSig = `${localNode.title || ''}|${localNode.tags || ''}|${localNode.content || ''}`;
 
                 if (state.pendingUploadNodeIds) state.pendingUploadNodeIds.delete(nodeId);
+                localNode._offlineEdited = false;
 
                 // Update active editor UI immediately
                 if (state.activeNodeId === nodeId) {
@@ -3504,19 +3540,27 @@ async function syncActiveNoteDirectly() {
                     updatePinButtonUI(!!localNode.is_pinned);
                     setEditorContent(localNode.content || '');
                     updateWordStats();
+                    updateDocumentStats();
                 }
 
                 idbPutNote(localNode);
                 try { localStorage.setItem(`cybernote_node_${nodeId}`, JSON.stringify(localNode)); } catch (e) {}
                 renderTree();
                 showToast(`✓ Downloaded latest updates for "${localNode.title || 'Note'}" from Google Drive!`, 'success');
-            } else {
-                // Local is newer or equal -> Upload local edits to Google Drive!
+            } else if (isLocallyModified) {
+                // Local has fresh unsynced changes -> Upload local edits to Google Drive!
                 await uploadNodeToDrive(folderId, localNode);
                 localNode._lastCloudSyncTime = Date.now();
+                localNode._lastSyncedSig = curSig;
                 if (state.pendingUploadNodeIds) state.pendingUploadNodeIds.delete(nodeId);
+                localNode._offlineEdited = false;
                 scheduleManifestUploadToDrive();
                 showToast(`✓ Saved "${localNode.title || 'Note'}" to Google Drive!`, 'success');
+            } else {
+                // Local and Cloud are already identical!
+                localNode._lastCloudSyncTime = Date.now();
+                localNode._lastSyncedSig = curSig;
+                showToast(`✓ Note is already up to date with Google Drive!`, 'info');
             }
 
             const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3555,7 +3599,9 @@ async function syncActiveNoteDirectly() {
         await uploadNodeToDrive(folderId, localNode);
         localNode._wasSyncedToDrive = true;
         localNode._lastCloudSyncTime = Date.now();
+        localNode._lastSyncedSig = curSig;
         if (state.pendingUploadNodeIds) state.pendingUploadNodeIds.delete(nodeId);
+        localNode._offlineEdited = false;
         scheduleManifestUploadToDrive();
 
         const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3566,6 +3612,7 @@ async function syncActiveNoteDirectly() {
         console.error(`Sync active note ${nodeId} error:`, err);
         showToast(`Sync error: ${err.message}`, 'error');
     } finally {
+        isNoteDirectSyncing = false;
         setTimeout(() => {
             if (btn) btn.classList.remove('syncing');
             if (svg) svg.classList.remove('spinning');
@@ -7219,6 +7266,7 @@ window.insertFancyDivider = insertFancyDivider;
 window.toggleZenMode = toggleZenMode;
 window.performUndo = performUndo;
 window.performRedo = performRedo;
+window.syncActiveNoteDirectly = syncActiveNoteDirectly;
 
 function applyTextColorQuick(color) {
     if (state.isReadOnly) return;
@@ -11339,6 +11387,23 @@ function setupEventListeners() {
     const btnSettingsSync = document.getElementById('btn-settings-sync-now');
     if (btnSettingsSync) btnSettingsSync.onclick = () => triggerTwoWaySync(false);
 
+    // Note-Level Fast Direct Sync Button (Next to Focus in editor ribbon)
+    const btnSyncActiveNote = document.getElementById('btn-sync-active-note');
+    if (btnSyncActiveNote) {
+        btnSyncActiveNote.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            syncActiveNoteDirectly();
+        });
+    }
+    const btnQuickZen = document.getElementById('btn-quick-zen');
+    if (btnQuickZen) {
+        btnQuickZen.addEventListener('click', (e) => {
+            e.preventDefault();
+            toggleZenMode();
+        });
+    }
+
     // Sync Conflict / Merge Modal Actions
     const btnSyncMerge = document.getElementById('btn-sync-merge');
     if (btnSyncMerge) {
@@ -11488,22 +11553,26 @@ function setupEventListeners() {
     setupTagInteractions();
 
     // Title editing
-    noteTitleInput.addEventListener('input', (e) => {
+    const handleTitleCommit = (val) => {
         if (state.isReadOnly) return;
-        scheduleSave('title', e.target.value);
+        scheduleSave('title', val);
         if (state.activeNodeId && state.nodes.has(state.activeNodeId)) {
-            state.nodes.get(state.activeNodeId).title = e.target.value;
+            state.nodes.get(state.activeNodeId).title = val;
             const itemLabel = document.querySelector(`.tree-node[data-id="${state.activeNodeId}"] .tree-label`);
-            if (itemLabel) itemLabel.textContent = e.target.value || 'Untitled Note';
+            if (itemLabel) itemLabel.textContent = val || 'Untitled Note';
         }
-    });
+    };
+    noteTitleInput.addEventListener('input', (e) => handleTitleCommit(e.target.value));
+    noteTitleInput.addEventListener('compositionend', (e) => handleTitleCommit(e.target.value));
     noteTitleInput.addEventListener('blur', handleEditorFieldBlur);
 
     // Tags editing
-    noteTagsInput.addEventListener('input', (e) => {
+    const handleTagsCommit = (val) => {
         if (state.isReadOnly) return;
-        scheduleSave('tags', e.target.value);
-    });
+        scheduleSave('tags', val);
+    };
+    noteTagsInput.addEventListener('input', (e) => handleTagsCommit(e.target.value));
+    noteTagsInput.addEventListener('compositionend', (e) => handleTagsCommit(e.target.value));
     noteTagsInput.addEventListener('blur', handleEditorFieldBlur);
 
     let lastReadOnlyNoticeTime = 0;
@@ -11574,6 +11643,7 @@ function setupEventListeners() {
     // Editor content editing
     noteEditor.addEventListener('input', handleEditorInput);
     noteEditor.addEventListener('keyup', handleEditorInput);
+    noteEditor.addEventListener('compositionend', handleEditorInput);
     noteEditor.addEventListener('blur', handleEditorFieldBlur);
     noteEditor.addEventListener('paste', handleClipboardPaste);
 
