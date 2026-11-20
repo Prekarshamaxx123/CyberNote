@@ -290,8 +290,8 @@ async function initApp() {
                 await loadTree();
                 if (state.googleAccessToken && isGoogleSessionValid()) {
                     await restoreThemePreferencesFromDrive().catch(console.warn);
-                    await downloadAllNotesFromDrive(true).catch(console.warn);
                     await uploadPendingNotesToDrive().catch(console.warn);
+                    await downloadAllNotesFromDrive(true).catch(console.warn);
                 }
                 return;
             }
@@ -313,8 +313,8 @@ async function initApp() {
 
     if (state.googleAccessToken && isGoogleSessionValid()) {
         await restoreThemePreferencesFromDrive().catch(console.warn);
-        await downloadAllNotesFromDrive(true).catch(console.warn);
         await uploadPendingNotesToDrive().catch(console.warn);
+        await downloadAllNotesFromDrive(true).catch(console.warn);
     }
 }
 
