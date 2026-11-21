@@ -917,19 +917,16 @@ function handleExpiredGoogleSession({ silent = false } = {}) {
         state.driveSaveTimer = null;
     }
 
-    // Only clear the expired token — NEVER wipe user identity, local notes, or log the user out!
+    // Only clear the expired in-memory token — NEVER wipe user identity, local notes, or log the user out!
     state.googleAccessToken = null;
     state.driveFolderVerified = false;
-
-    localStorage.removeItem('cybernote_google_token');
-    localStorage.removeItem('cybernote_google_token_expiry');
 
     updateGoogleUserUI();
     if (typeof closeDriveModal === 'function') closeDriveModal();
     if (typeof closeSyncConflictModal === 'function') closeSyncConflictModal();
     if (typeof hideSyncOverlay === 'function') hideSyncOverlay();
 
-    setSyncStatus('offline', 'Sync paused (Click Sync to reconnect)');
+    setSyncStatus('live', 'Drive Connected (Click to sync)');
 }
 
 async function waitForGIS(timeoutMs = 4000) {
@@ -957,17 +954,38 @@ async function waitForGIS(timeoutMs = 4000) {
 
 let isSilentRefreshing = false;
 let silentRefreshPromise = null;
+let tokenRequestResolvers = [];
+let tokenRefreshPromise = null;
+
+async function requestGoogleLoginInteractive() {
+    if (tokenRefreshPromise) return tokenRefreshPromise;
+    tokenRefreshPromise = new Promise((resolve) => {
+        const timer = setTimeout(() => {
+            tokenRefreshPromise = null;
+            resolve(false);
+        }, 60000);
+
+        tokenRequestResolvers.push((success) => {
+            clearTimeout(timer);
+            tokenRefreshPromise = null;
+            resolve(success);
+        });
+
+        requestGoogleLogin({ interactive: true });
+    });
+    return tokenRefreshPromise;
+}
 
 // In modern browsers (Firefox, Chrome), calling requestAccessToken in the background without
 // a direct user click triggers browser popup blockers (e.g. "Firefox prevented this site from opening a pop-up window").
 // Therefore, access tokens are used directly from memory/localStorage while valid, and renewed
-// only upon user-initiated actions (clicking Sync, Save, or Sign-In).
+// seamlessly upon user-initiated actions (clicking Sync, Save, or Sign-In).
 async function requestSilentTokenRefresh() {
     return false;
 }
 
 // Ensures Google access token is valid (checks memory and localStorage)
-async function ensureGoogleTokenValid() {
+async function ensureGoogleTokenValid(options = {}) {
     if (!isUserSignedIn()) return false;
 
     const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
@@ -979,8 +997,19 @@ async function ensureGoogleTokenValid() {
         return true;
     }
 
-    // 2. Token is expired or expiring soon: do NOT trigger background popups.
-    // Return false so caller knows user gesture is needed to refresh.
+    // 2. If this is an interactive user action (clicking Sync, Save, Download), renew token seamlessly
+    if (options && options.interactive) {
+        const refreshed = await requestGoogleLoginInteractive();
+        return Boolean(refreshed && state.googleAccessToken);
+    }
+
+    // 3. Fallback: if token hasn't reached its exact expiry timestamp yet
+    if (token && expiry > Date.now()) {
+        if (!state.googleAccessToken) state.googleAccessToken = token;
+        return true;
+    }
+
+    // 4. Token expired and call is non-interactive: do NOT trigger popup in background
     return false;
 }
 
@@ -1099,8 +1128,8 @@ function initGoogleAuth() {
                     }
                     downloadAllNotesFromDrive(true).catch(() => {});
                 } else if (!isLoggedOut && (state.googleUser || savedEmail)) {
-                    // Token expired while browser was closed: prompt user to reconnect
-                    setSyncStatus('offline', 'Session expired (Click Sync to reconnect)');
+                    // Token expired while browser was closed: user remains signed in!
+                    setSyncStatus('live', 'Drive Connected (Click to sync)');
                 }
             } catch (err) {
                 console.warn('GIS Token client init:', err);
@@ -1207,6 +1236,13 @@ function requestGoogleLogin() {
 }
 
 async function handleGoogleTokenResponse(tokenResponse, { isSilentRefresh = false } = {}) {
+    const hasToken = Boolean(tokenResponse && tokenResponse.access_token);
+    if (tokenRequestResolvers.length > 0) {
+        const resolvers = tokenRequestResolvers;
+        tokenRequestResolvers = [];
+        resolvers.forEach(r => r(hasToken));
+    }
+
     if (tokenResponse.error) {
         console.error('Google Auth Error:', tokenResponse);
         if (!isSilentRefresh && tokenResponse.error !== 'user_closed_popup') {
@@ -1227,7 +1263,9 @@ async function handleGoogleTokenResponse(tokenResponse, { isSilentRefresh = fals
 
     scheduleSessionExpiryWatch();
 
-    if (isSilentRefresh) {
+    const isExistingUser = Boolean(state.googleUser || localStorage.getItem('cybernote_user'));
+
+    if (isSilentRefresh || isExistingUser) {
         if (!state.googleUser) {
             await fetchGoogleUserProfile();
         } else {
@@ -1239,10 +1277,8 @@ async function handleGoogleTokenResponse(tokenResponse, { isSilentRefresh = fals
         return;
     }
 
-    // Fetch user profile info on initial sign in
+    // Only on very first initial sign in
     await fetchGoogleUserProfile();
-
-    // Automatically Restore or Create Initial Backup on Drive!
     await autoRestoreFromDriveOnSignIn();
 }
 
@@ -2336,7 +2372,7 @@ async function downloadTreeManifestFromDrive() {
 // Upload a single note to Google Drive (on-demand per-note save)
 async function uploadSingleNodeToDrive(nodeId, silent = true) {
     if (!nodeId) return;
-    const valid = await ensureGoogleTokenValid();
+    const valid = await ensureGoogleTokenValid({ interactive: !silent });
     if (!valid) return;
     const node = state.nodes.get(nodeId);
     if (!node) return;
@@ -2563,9 +2599,8 @@ async function uploadPendingNotesToDrive() {
 // Save all notes to Drive (used by Drive Modal or when no note selected)
 async function saveAllNotesToDrive(silent = false, { forceAll = false, manageOverlay = true } = {}) {
     if (state.isSyncing) return;
-    const valid = await ensureGoogleTokenValid();
+    const valid = await ensureGoogleTokenValid({ interactive: !silent });
     if (!valid) {
-        if (!silent) requestGoogleLogin();
         return;
     }
 
@@ -2698,9 +2733,8 @@ async function prefetchAllNoteContentsInBackground() {
 // Download all notes from Drive (100% Real, Complete Content Download)
 async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true, forceDownload = false } = {}) {
     if (state.isSyncing) return;
-    const valid = await ensureGoogleTokenValid();
+    const valid = await ensureGoogleTokenValid({ interactive: !silent });
     if (!valid) {
-        if (!silent) requestGoogleLogin();
         return;
     }
 
@@ -3121,11 +3155,10 @@ async function autoRestoreFromDriveOnSignIn() {
 
 // Two-way sync: merges cloud updates and uploads local notes
 async function triggerTwoWaySync(silent = false) {
-    const valid = await ensureGoogleTokenValid();
+    const valid = await ensureGoogleTokenValid({ interactive: !silent });
     if (!valid) {
         if (!silent) {
             showToast('Sign in with Google to sync notes with Google Drive', 'info');
-            requestGoogleLogin();
         }
         return;
     }
@@ -3291,9 +3324,9 @@ async function triggerDriveSave() {
 
 // ---- Header "Download" Button Handler ----
 async function triggerDriveDownload() {
-    if (!state.googleAccessToken) {
+    const valid = await ensureGoogleTokenValid({ interactive: true });
+    if (!valid) {
         showToast('Sign in with Google to download notes from Google Drive', 'info');
-        requestGoogleLogin();
         return;
     }
 
@@ -3330,10 +3363,9 @@ async function syncActiveNoteDirectly() {
     if (txt) txt.textContent = 'Syncing...';
 
     try {
-        const valid = await ensureGoogleTokenValid();
+        const valid = await ensureGoogleTokenValid({ interactive: true });
         if (!valid) {
             showToast('Sign in with Google to sync this note with Google Drive', 'info');
-            requestGoogleLogin();
             return;
         }
 
@@ -10616,11 +10648,18 @@ function updateSettingsUI() {
     const sizeBytes = new Blob([minifiedJson]).size;
     const sizeKb = (sizeBytes / 1024).toFixed(1);
 
-    if (state.googleUser && state.googleAccessToken) {
+    const isExplicitlyLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
+
+    if (state.googleUser && !isExplicitlyLoggedOut) {
         if (nameEl) nameEl.textContent = state.googleUser.name || 'Google User';
         if (pillEl) {
-            pillEl.textContent = '● Connected';
-            pillEl.className = 'status-pill status-pill-online';
+            if (state.googleAccessToken) {
+                pillEl.textContent = '● Connected';
+                pillEl.className = 'status-pill status-pill-online';
+            } else {
+                pillEl.textContent = '● Ready to Sync';
+                pillEl.className = 'status-pill status-pill-online';
+            }
         }
         if (detailEl) detailEl.textContent = state.googleUser.email || 'Auto-Sync Active';
         if (avatarImg && state.googleUser.picture) {
@@ -11276,9 +11315,9 @@ function setupEventListeners() {
             if (!isUserSignedIn()) {
                 requestGoogleLogin();
             } else {
-                const valid = await ensureGoogleTokenValid();
-                if (!valid) {
-                    requestGoogleLogin();
+                const valid = await ensureGoogleTokenValid({ interactive: true });
+                if (valid) {
+                    triggerTwoWaySync(false);
                 } else {
                     openSettingsModal('tab-gdrive');
                 }
