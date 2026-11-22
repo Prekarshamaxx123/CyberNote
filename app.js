@@ -976,15 +976,68 @@ async function requestGoogleLoginInteractive() {
     return tokenRefreshPromise;
 }
 
-// In modern browsers (Firefox, Chrome), calling requestAccessToken in the background without
-// a direct user click triggers browser popup blockers (e.g. "Firefox prevented this site from opening a pop-up window").
-// Therefore, access tokens are used directly from memory/localStorage while valid, and renewed
-// seamlessly upon user-initiated actions (clicking Sync, Save, or Sign-In).
+// Silently refreshes Google Drive access token in the background using Google Identity Services (GIS).
+// Runs without intrusive popups by supplying prompt: '' with the user's existing email hint.
 async function requestSilentTokenRefresh() {
-    return false;
+    if (!isUserSignedIn()) return false;
+    if (localStorage.getItem('cybernote_logged_out') === '1') return false;
+
+    // Reuse existing in-flight silent refresh promise if one is already running
+    if (silentRefreshPromise) return silentRefreshPromise;
+
+    const savedEmail = state.googleUser?.email || 
+                       JSON.parse(localStorage.getItem('cybernote_user') || '{}')?.email || 
+                       localStorage.getItem('cybernote_user_email');
+
+    const hasGIS = await waitForGIS(4000);
+    if (!hasGIS || !state.tokenClient) return false;
+
+    silentRefreshPromise = new Promise((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            isSilentRefreshing = false;
+            if (!settled) {
+                settled = true;
+                silentRefreshPromise = null;
+                resolve(false);
+            }
+        }, 12000);
+
+        tokenRequestResolvers.push((success) => {
+            isSilentRefreshing = false;
+            if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                silentRefreshPromise = null;
+                resolve(success);
+            }
+        });
+
+        try {
+            isSilentRefreshing = true;
+            const tokenConfig = {
+                prompt: ''
+            };
+            if (savedEmail) {
+                tokenConfig.hint = savedEmail;
+            }
+            state.tokenClient.requestAccessToken(tokenConfig);
+        } catch (e) {
+            isSilentRefreshing = false;
+            console.warn('[CyberNote] Silent token refresh notice:', e);
+            if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                silentRefreshPromise = null;
+                resolve(false);
+            }
+        }
+    });
+
+    return silentRefreshPromise;
 }
 
-// Ensures Google access token is valid (checks memory and localStorage)
+// Ensures Google access token is valid (checks memory and localStorage, silently refreshes if needed)
 async function ensureGoogleTokenValid(options = {}) {
     if (!isUserSignedIn()) return false;
 
@@ -997,19 +1050,27 @@ async function ensureGoogleTokenValid(options = {}) {
         return true;
     }
 
-    // 2. Fallback: if token hasn't reached its exact expiry timestamp yet
+    // 2. Token is near expiry or expired: Attempt silent background refresh first without popups!
+    if (navigator.onLine && localStorage.getItem('cybernote_logged_out') !== '1') {
+        const refreshed = await requestSilentTokenRefresh();
+        if (refreshed && state.googleAccessToken) {
+            return true;
+        }
+    }
+
+    // 3. Fallback: if token hasn't reached its exact expiry timestamp yet
     if (token && expiry > Date.now()) {
         if (!state.googleAccessToken) state.googleAccessToken = token;
         return true;
     }
 
-    // 3. ONLY trigger login popup if the user explicitly clicked "Sign In" or "Connect Drive"
+    // 4. ONLY trigger login popup if the user explicitly clicked "Sign In" or "Connect Drive"
     if (options && options.explicitLoginPrompt) {
         const refreshed = await requestGoogleLoginInteractive();
         return Boolean(refreshed && state.googleAccessToken);
     }
 
-    // 4. Token expired during normal app usage: NEVER pop up login windows in user's face!
+    // 5. Offline or silent refresh unavailable: safe local fallback without popups
     return false;
 }
 
@@ -1028,13 +1089,38 @@ function scheduleSessionExpiryWatch() {
 
     const remainingMs = expiry - Date.now();
     if (remainingMs <= 0) {
-        handleExpiredGoogleSession({ silent: true });
+        // Token has already expired: attempt silent refresh now
+        requestSilentTokenRefresh().then(success => {
+            if (!success) {
+                handleExpiredGoogleSession({ silent: true });
+            }
+        }).catch(() => {
+            handleExpiredGoogleSession({ silent: true });
+        });
         return;
     }
 
-    // When the 1-hour token expires, cleanly transition to expired session state without intrusive popups
-    tokenRefreshTimer = setTimeout(() => {
-        handleExpiredGoogleSession({ silent: true });
+    // Proactively refresh 5 minutes before the 1-hour expiry (remainingMs - 300,000ms)
+    // This keeps the session alive forever so the user is never disconnected!
+    const proactiveRefreshDelay = Math.max(10000, remainingMs - 300000);
+
+    tokenPreExpirySyncTimer = setTimeout(async () => {
+        if (localStorage.getItem('cybernote_logged_out') === '1') return;
+        const refreshed = await requestSilentTokenRefresh();
+        if (refreshed) {
+            console.log('[CyberNote] Google Drive session proactively renewed in background.');
+        } else {
+            console.warn('[CyberNote] Proactive silent refresh was unable to renew, waiting for expiry.');
+        }
+    }, proactiveRefreshDelay);
+
+    // Hard fallback if proactive refresh didn't succeed by the time the token actually expires
+    tokenRefreshTimer = setTimeout(async () => {
+        if (localStorage.getItem('cybernote_logged_out') === '1') return;
+        const refreshed = await requestSilentTokenRefresh();
+        if (!refreshed) {
+            handleExpiredGoogleSession({ silent: true });
+        }
     }, remainingMs);
 }
 
@@ -1048,8 +1134,12 @@ function setupSessionExpiryListeners() {
         if (!navigator.onLine) return;
         if (localStorage.getItem('cybernote_logged_out') === '1') return;
         const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
-        if (isUserSignedIn() && (!state.googleAccessToken || Date.now() >= expiry)) {
-            handleExpiredGoogleSession({ silent: true });
+        // If within 3 minutes of expiry or already expired, silently refresh immediately on wake/focus
+        if (isUserSignedIn() && (!state.googleAccessToken || (expiry - Date.now()) < 180000)) {
+            const refreshed = await requestSilentTokenRefresh();
+            if (!refreshed && (!state.googleAccessToken || Date.now() >= expiry)) {
+                handleExpiredGoogleSession({ silent: true });
+            }
         }
     };
 
@@ -1125,8 +1215,20 @@ function initGoogleAuth() {
                     }
                     downloadAllNotesFromDrive(true).catch(() => {});
                 } else if (!isLoggedOut && (state.googleUser || savedEmail)) {
-                    // Token expired while browser was closed: user remains signed in!
-                    setSyncStatus('live', 'Drive Connected (Click to sync)');
+                    // Token expired while browser was closed: attempt silent background refresh immediately!
+                    setSyncStatus('syncing', 'Connecting Drive...');
+                    requestSilentTokenRefresh().then(refreshed => {
+                        if (refreshed && state.googleAccessToken) {
+                            if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+                                uploadPendingNotesToDrive().catch(() => {});
+                            }
+                            downloadAllNotesFromDrive(true).catch(() => {});
+                        } else {
+                            setSyncStatus('live', 'Drive Connected (Click to sync)');
+                        }
+                    }).catch(() => {
+                        setSyncStatus('live', 'Drive Connected (Click to sync)');
+                    });
                 }
             } catch (err) {
                 console.warn('GIS Token client init:', err);
@@ -1239,7 +1341,7 @@ async function handleGoogleTokenResponse(tokenResponse, { isSilentRefresh = fals
 
     if (tokenResponse.error) {
         console.error('Google Auth Error:', tokenResponse);
-        if (!isSilentRefresh && tokenResponse.error !== 'user_closed_popup') {
+        if (!isSilentRefresh && !isSilentRefreshing && tokenResponse.error !== 'user_closed_popup') {
             showToast(`Sign-In error: ${tokenResponse.error}`, true);
         }
         return;
