@@ -997,19 +997,19 @@ async function ensureGoogleTokenValid(options = {}) {
         return true;
     }
 
-    // 2. If this is an interactive user action (clicking Sync, Save, Download), renew token seamlessly
-    if (options && options.interactive) {
-        const refreshed = await requestGoogleLoginInteractive();
-        return Boolean(refreshed && state.googleAccessToken);
-    }
-
-    // 3. Fallback: if token hasn't reached its exact expiry timestamp yet
+    // 2. Fallback: if token hasn't reached its exact expiry timestamp yet
     if (token && expiry > Date.now()) {
         if (!state.googleAccessToken) state.googleAccessToken = token;
         return true;
     }
 
-    // 4. Token expired and call is non-interactive: do NOT trigger popup in background
+    // 3. ONLY trigger login popup if the user explicitly clicked "Sign In" or "Connect Drive"
+    if (options && options.explicitLoginPrompt) {
+        const refreshed = await requestGoogleLoginInteractive();
+        return Boolean(refreshed && state.googleAccessToken);
+    }
+
+    // 4. Token expired during normal app usage: NEVER pop up login windows in user's face!
     return false;
 }
 
@@ -1112,9 +1112,6 @@ function initGoogleAuth() {
         if (window.google?.accounts?.oauth2) {
             const clientId = getEffectiveGoogleClientId();
             try {
-                if (window.google?.accounts?.id?.disableAutoSelect) {
-                    window.google.accounts.id.disableAutoSelect();
-                }
                 state.tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: clientId,
                     scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
@@ -1201,10 +1198,6 @@ function updateDriveModalStatus(isSignedIn) {
 }
 
 function requestGoogleLogin() {
-    if (window.google?.accounts?.id?.disableAutoSelect) {
-        try { window.google.accounts.id.disableAutoSelect(); } catch (e) {}
-    }
-
     if (window.google?.accounts?.oauth2) {
         const clientId = getEffectiveGoogleClientId();
         try {
@@ -1225,7 +1218,7 @@ function requestGoogleLogin() {
                            localStorage.getItem('cybernote_user_email');
         if (savedEmail) {
             tokenConfig.hint = savedEmail;
-            tokenConfig.login_hint = savedEmail;
+            tokenConfig.prompt = '';
         } else {
             tokenConfig.prompt = 'select_account';
         }
@@ -3379,10 +3372,12 @@ async function syncActiveNoteDirectly(options = {}) {
     const nodeId = state.activeNodeId;
 
     try {
-        const valid = await ensureGoogleTokenValid({ interactive: !silent });
+        const valid = await ensureGoogleTokenValid();
         if (!valid) {
+            flushAndPersistActiveNode();
+            setSyncStatus('live', 'Saved locally (Drive Reconnect)');
             if (!silent) {
-                showToast('Sign in with Google to sync this note with Google Drive', 'info');
+                showToast('✓ Note saved locally. Google Drive session expired (click Sign In to reconnect Drive).', 'info');
             }
             return;
         }
