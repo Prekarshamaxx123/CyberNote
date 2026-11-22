@@ -7887,10 +7887,33 @@ body.theme-sepia #paint-modal .modal-content {
 
     /* Hide redundant desktop header tools on mobile (Undo/Redo/Save are in bottom bar) */
     .header-left-tools,
-    #sync-status,
     #btn-about,
+    a.btn-about,
     #btn-header-signout {
         display: none !important;
+    }
+
+    /* Live Google Drive Sync status badge in Mobile Header (Visual feedback for cloud saves) */
+    #sync-status {
+        display: inline-flex !important;
+        padding: 4px 8px !important;
+        height: 32px !important;
+        align-items: center !important;
+        gap: 6px !important;
+        border-radius: 999px !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        max-width: 140px !important;
+        flex-shrink: 0 !important;
+    }
+
+    #sync-status .sync-text {
+        display: inline-block !important;
+        font-size: 0.72rem !important;
+        max-width: 88px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
     }
 
     .header-right {
@@ -8029,9 +8052,9 @@ body.theme-sepia #paint-modal .modal-content {
 
     /* 4. Proportional Native Note Meta Bar, Title & Single-Line Tags */
     .note-meta-bar {
-        padding: 4px 12px !important;
-        min-height: 36px !important;
-        gap: 8px !important;
+        padding: 4px 10px !important;
+        min-height: 40px !important;
+        gap: 6px !important;
         flex-wrap: nowrap !important;
         border-bottom: 1px solid var(--border-color);
     }
@@ -8046,34 +8069,59 @@ body.theme-sepia #paint-modal .modal-content {
     }
 
     .note-meta-actions {
-        gap: 5px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
         flex-shrink: 0 !important;
     }
 
-    .note-lock-btn {
-        padding: 3px 8px !important;
-        font-size: 0.71rem !important;
-        border-radius: 999px !important;
-        gap: 4px !important;
+    .note-meta-actions .note-lock-btn {
+        padding: 5px 7px !important;
+        min-width: 32px !important;
+        height: 32px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 8px !important;
+        font-size: 0.72rem !important;
+    }
+
+    .note-meta-actions .note-lock-btn span,
+    .note-meta-actions #readonly-btn-label,
+    .note-meta-actions #password-lock-btn-label,
+    .note-meta-actions .sync-active-note-text {
+        display: none !important;
     }
 
     .title-container {
-        padding: 10px 12px 4px 12px !important;
-        gap: 8px !important;
-        min-height: 44px !important;
+        padding: 4px 0 !important;
+        gap: 6px !important;
+        min-height: 36px !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .title-left-group {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        gap: 6px !important;
     }
 
     .icon-selector {
-        width: 32px !important;
-        height: 32px !important;
+        width: 30px !important;
+        height: 30px !important;
         border-radius: 8px !important;
-        font-size: 1.1rem !important;
+        font-size: 1rem !important;
+        flex-shrink: 0 !important;
     }
 
     .note-title-input {
-        font-size: 1.32rem !important;
+        font-size: 1.15rem !important;
         font-weight: 700 !important;
         line-height: 1.3 !important;
+        width: 100% !important;
+        min-width: 0 !important;
     }
 
     .tags-container {
@@ -9269,3 +9317,24 @@ body.theme-dark .settings-modal-content {
     border-radius: 12px !important;
     box-shadow: 0 24px 60px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
+
+/* Dedicated Active Note Sync Trigger Buttons & Animations */
+.btn-sync-active-note-trigger.syncing svg,
+.sync-active-note-svg.spinning {
+    animation: spin 0.85s linear infinite;
+}
+
+#btn-sync-active-note-meta {
+    background: rgba(137, 180, 250, 0.12);
+    border-color: rgba(137, 180, 250, 0.28);
+    color: var(--accent);
+}
+
+#btn-sync-active-note-meta:hover {
+    background: rgba(137, 180, 250, 0.22);
+}
+
+#m-btn-sync-note {
+    color: var(--accent) !important;
+}
+

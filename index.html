@@ -375,6 +375,12 @@
                         </div>
                     </div>
                     <div class="note-meta-actions">
+                        <button id="btn-sync-active-note-meta" class="btn btn-sm btn-secondary note-lock-btn btn-sync-active-note-trigger" title="Sync this Note with Google Drive">
+                            <svg class="sync-active-note-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                            </svg>
+                            <span class="sync-active-note-text">Sync</span>
+                        </button>
                         <button id="btn-toggle-readonly" class="btn btn-sm btn-secondary note-lock-btn" title="Toggle Read-Only Mode">
                             <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                             <span id="readonly-btn-label">Read Only</span>
@@ -488,11 +494,11 @@
                             </button>
                         </div>
                         <div class="ribbon-tab-quick-tools">
-                            <button type="button" class="ribbon-quick-action-btn" id="btn-sync-active-note" title="Sync this Note with Google Drive">
-                                <svg id="sync-active-note-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;">
+                            <button type="button" class="ribbon-quick-action-btn btn-sync-active-note-trigger" id="btn-sync-active-note" title="Sync this Note with Google Drive">
+                                <svg class="sync-active-note-svg" id="sync-active-note-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;">
                                     <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                                 </svg>
-                                <span id="sync-active-note-text" style="pointer-events: none;">Sync</span>
+                                <span class="sync-active-note-text" id="sync-active-note-text" style="pointer-events: none;">Sync</span>
                             </button>
                             <button class="ribbon-quick-action-btn" id="btn-quick-zen" onclick="toggleZenMode()" title="Focus Mode (Distraction-Free Writing)">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
@@ -1557,6 +1563,13 @@
                     <!-- Main Sleek Bottom Bar (Matches Photo Layout: Scrollable CyberNote Tools + Pinned Keyboard Toggle) -->
                     <div id="mobile-bottom-toolbar" class="mobile-bottom-toolbar" role="toolbar" aria-label="Mobile Note Tools">
                         <div class="mobile-bottom-scroll" id="mobile-bottom-scroll">
+                            <!-- 0. Sync Active Note with Google Drive -->
+                            <button type="button" class="m-bar-btn btn-sync-active-note-trigger" id="m-btn-sync-note" title="Sync this Note with Google Drive">
+                                <svg class="sync-active-note-svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                </svg>
+                            </button>
+
                             <!-- 1. + (Insert & Studio Drawer) -->
                             <button type="button" class="m-bar-btn" id="m-btn-insert" title="Insert & Studio Tools (+)">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
