@@ -3207,7 +3207,7 @@ async function triggerTwoWaySync(silent = false) {
     }
 }
 
-// Debounced auto-save to Drive (fires 600ms after editing pauses on active note)
+// Smart debounced auto-save to Drive (fires 60s / 1 min after typing pause, or immediately on blur)
 function scheduleDriveAutoBackup() {
     if (!state.activeNodeId) return;
     const node = state.nodes.get(state.activeNodeId);
@@ -3232,10 +3232,11 @@ function scheduleDriveAutoBackup() {
         return;
     }
 
-    setSyncStatus('syncing', 'Saving to Drive...');
+    setSyncStatus('pending', 'Pending Drive Sync');
     clearTimeout(state.driveSaveTimer);
     state.driveSaveTimer = setTimeout(async () => {
         if (!state.activeNodeId) return;
+        setSyncStatus('syncing', 'Saving to Drive...');
         const valid = await ensureGoogleTokenValid();
         if (!valid) {
             setSyncStatus('offline', 'Saved locally (Sign In to sync Drive)');
@@ -3248,7 +3249,7 @@ function scheduleDriveAutoBackup() {
             console.warn('Auto backup to Drive failed:', e);
             setSyncStatus('pending', 'Pending Drive Sync');
         }
-    }, 600);
+    }, 60000); // 60s (1 minute) interval: battery-friendly, clean Drive history, zero rate limits
 }
 
 // Immediately flush and sync active note when user finishes editing / taps outside or switches apps
