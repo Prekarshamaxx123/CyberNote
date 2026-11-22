@@ -1139,6 +1139,7 @@ function initGoogleAuth() {
         }
     }
     tryInitGIS();
+    startSmartAutoSyncPoller();
 }
 
 
@@ -3252,7 +3253,7 @@ function scheduleDriveAutoBackup() {
 
 // Immediately flush and sync active note when user finishes editing / taps outside or switches apps
 function handleEditorFieldBlur() {
-    if (isNoteDirectSyncing) return;
+    if (isSyncButtonPressed || isDirectSyncRunning) return;
     if (!state.activeNodeId || state.isReadOnly) return;
     const node = state.nodes.get(state.activeNodeId);
     if (!node || !node._userActuallyTyped) return;
@@ -3348,36 +3349,44 @@ async function triggerDriveDownload() {
     }
 }
 
-let isNoteDirectSyncing = false;
+let isSyncButtonPressed = false;
+let isDirectSyncRunning = false;
 
 // ---- Dedicated Active Note Direct Sync (Single-Note Two-Way Cloud Sync) ----
-async function syncActiveNoteDirectly() {
-    if (isNoteDirectSyncing) return;
-    isNoteDirectSyncing = true;
+async function syncActiveNoteDirectly(options = {}) {
+    const silent = !!(options && options.silent);
+    if (isDirectSyncRunning) return;
+    isDirectSyncRunning = true;
+    isSyncButtonPressed = true;
 
     const btn = document.getElementById('btn-sync-active-note');
     const svg = document.getElementById('sync-active-note-svg');
     const txt = document.getElementById('sync-active-note-text');
-    if (btn) btn.classList.add('syncing');
-    if (svg) svg.classList.add('spinning');
-    if (txt) txt.textContent = 'Syncing...';
+    if (!silent) {
+        if (btn) btn.classList.add('syncing');
+        if (svg) svg.classList.add('spinning');
+        if (txt) txt.textContent = 'Syncing...';
+    }
+
+    const nodeId = state.activeNodeId;
 
     try {
-        const valid = await ensureGoogleTokenValid({ interactive: true });
+        const valid = await ensureGoogleTokenValid({ interactive: !silent });
         if (!valid) {
-            showToast('Sign in with Google to sync this note with Google Drive', 'info');
+            if (!silent) {
+                showToast('Sign in with Google to sync this note with Google Drive', 'info');
+            }
             return;
         }
 
-        const nodeId = state.activeNodeId;
         if (!nodeId) {
-            showToast('Select a note first to sync.', 'info');
+            if (!silent) showToast('Select a note first to sync.', 'info');
             return;
         }
 
         const localNode = state.nodes.get(nodeId);
         if (!localNode) {
-            showToast('Active note not found.', 'warning');
+            if (!silent) showToast('Active note not found.', 'warning');
             return;
         }
 
@@ -3466,9 +3475,20 @@ async function syncActiveNoteDirectly() {
             }
 
             if (shouldDownload) {
+                // If silent and user is currently typing inside the editor, do NOT overwrite active typing
+                const isUserCurrentlyTyping = (
+                    document.activeElement === noteEditor ||
+                    document.activeElement === noteTitleInput ||
+                    (noteTagsInput && document.activeElement === noteTagsInput)
+                );
+                if (silent && isUserCurrentlyTyping) {
+                    return;
+                }
+
                 Object.assign(localNode, cloudNode);
                 localNode._contentLoaded = true;
                 localNode._userEditedThisSession = false;
+                localNode._userActuallyTyped = false;
                 localNode._offlineEdited = false;
                 localNode._lastCloudSyncTime = Date.now();
                 localNode._lastSyncedSig = `${localNode.title || ''}|${localNode.tags || ''}|${localNode.content || ''}`;
@@ -3491,7 +3511,11 @@ async function syncActiveNoteDirectly() {
                 idbPutNote(localNode);
                 try { localStorage.setItem(`cybernote_node_${nodeId}`, JSON.stringify(localNode)); } catch (e) {}
                 renderTree();
-                showToast(`✓ Downloaded latest updates for "${localNode.title || 'Note'}" from Google Drive!`, 'success');
+                if (!silent) {
+                    showToast(`✓ Downloaded latest updates for "${localNode.title || 'Note'}" from Google Drive!`, 'success');
+                } else {
+                    showToast(`✓ Auto-updated "${localNode.title || 'Note'}" from Google Drive`, 'info');
+                }
             } else if (hasLocalEdits && isContentDifferent) {
                 localNode.title = curTitle;
                 localNode.content = curContent;
@@ -3500,16 +3524,17 @@ async function syncActiveNoteDirectly() {
                 localNode._contentLoaded = true;
                 await uploadNodeToDrive(folderId, localNode);
                 localNode._userEditedThisSession = false;
+                localNode._userActuallyTyped = false;
                 localNode._offlineEdited = false;
                 localNode._lastCloudSyncTime = Date.now();
                 localNode._lastSyncedSig = `${curTitle}|${curTags}|${curContent}`;
                 if (state.pendingUploadNodeIds) state.pendingUploadNodeIds.delete(nodeId);
                 scheduleManifestUploadToDrive();
-                showToast(`✓ Saved "${localNode.title || 'Note'}" to Google Drive!`, 'success');
+                if (!silent) showToast(`✓ Saved "${localNode.title || 'Note'}" to Google Drive!`, 'success');
             } else {
                 localNode._lastCloudSyncTime = Date.now();
                 localNode._lastSyncedSig = `${curTitle}|${curTags}|${curContent}`;
-                showToast(`✓ Note is already up to date with Google Drive!`, 'info');
+                if (!silent) showToast(`✓ Note is already up to date with Google Drive!`, 'info');
             }
 
             const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3542,6 +3567,7 @@ async function syncActiveNoteDirectly() {
             await uploadNodeToDrive(folderId, localNode);
             localNode._wasSyncedToDrive = true;
             localNode._userEditedThisSession = false;
+            localNode._userActuallyTyped = false;
             localNode._lastCloudSyncTime = Date.now();
             localNode._lastSyncedSig = `${curTitle}|${curTags}|${curContent}`;
             if (state.pendingUploadNodeIds) state.pendingUploadNodeIds.delete(nodeId);
@@ -3550,22 +3576,60 @@ async function syncActiveNoteDirectly() {
 
             const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             setSyncStatus('live', `Drive Synced (${nowStr})`);
-            showToast(`✓ Uploaded "${localNode.title || 'Note'}" to Google Drive!`, 'success');
+            if (!silent) showToast(`✓ Uploaded "${localNode.title || 'Note'}" to Google Drive!`, 'success');
         } else {
-            showToast(`Note not found on Google Drive. If you typed on another PC, check that PC is connected to Drive and clicked Save.`, 'info');
+            if (!silent) showToast(`Note not found on Google Drive. If you typed on another PC, check that PC is connected to Drive and clicked Save.`, 'info');
         }
     } catch (err) {
         if (err && err.isSessionExpired) return;
         console.error(`Sync active note ${nodeId} error:`, err);
-        showToast(`Sync error: ${err.message}`, 'error');
+        if (!silent) showToast(`Sync error: ${err.message}`, 'error');
     } finally {
-        isNoteDirectSyncing = false;
+        isDirectSyncRunning = false;
         setTimeout(() => {
-            if (btn) btn.classList.remove('syncing');
-            if (svg) svg.classList.remove('spinning');
-            if (txt) txt.textContent = 'Sync';
-        }, 500);
+            isSyncButtonPressed = false;
+            if (!silent) {
+                if (btn) btn.classList.remove('syncing');
+                if (svg) svg.classList.remove('spinning');
+                if (txt) txt.textContent = 'Sync';
+            }
+        }, 400);
     }
+}
+
+// ---- Smart Auto-Sync Background Poller (Periodic 20s Check) ----
+let smartAutoSyncTimer = null;
+
+function startSmartAutoSyncPoller() {
+    if (smartAutoSyncTimer) return;
+    smartAutoSyncTimer = setInterval(async () => {
+        try {
+            // 1. Only poll if browser tab is visible to the user
+            if (document.visibilityState !== 'visible') return;
+
+            // 2. Only poll if user is signed in to Google
+            if (!isUserSignedIn()) return;
+
+            // 3. Do not run if manual sync or save is currently in progress
+            if (isDirectSyncRunning || state.isSyncing) return;
+
+            // 4. Do not poll if user is actively typing in the editor right now
+            const isUserFocusedOnEditor = (
+                document.activeElement === noteEditor ||
+                document.activeElement === noteTitleInput ||
+                (noteTagsInput && document.activeElement === noteTagsInput)
+            );
+            if (isUserFocusedOnEditor) return;
+
+            // 5. Must have an active note selected
+            if (!state.activeNodeId) return;
+
+            // 6. Silently check and pull remote updates for the active note
+            await syncActiveNoteDirectly({ silent: true });
+        } catch (e) {
+            console.warn('Smart auto-sync background check encountered:', e);
+        }
+    }, 20000); // 20-second interval: 3 requests/min vs 600 requests/min quota (100% safe)
 }
 
 // Handle when note was deleted on Google Drive by another device
@@ -11354,7 +11418,7 @@ function setupEventListeners() {
     const btnSyncActiveNote = document.getElementById('btn-sync-active-note');
     if (btnSyncActiveNote) {
         btnSyncActiveNote.addEventListener('mousedown', () => {
-            isNoteDirectSyncing = true;
+            isSyncButtonPressed = true;
         });
         btnSyncActiveNote.addEventListener('click', (e) => {
             e.preventDefault();
