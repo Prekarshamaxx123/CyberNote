@@ -3359,13 +3359,20 @@ async function syncActiveNoteDirectly(options = {}) {
     isDirectSyncRunning = true;
     isSyncButtonPressed = true;
 
-    const btn = document.getElementById('btn-sync-active-note');
-    const svg = document.getElementById('sync-active-note-svg');
-    const txt = document.getElementById('sync-active-note-text');
+    const syncButtons = [
+        document.getElementById('btn-sync-active-note'),
+        document.getElementById('btn-sync-active-note-meta'),
+        document.getElementById('m-btn-sync-note')
+    ].filter(Boolean);
+
     if (!silent) {
-        if (btn) btn.classList.add('syncing');
-        if (svg) svg.classList.add('spinning');
-        if (txt) txt.textContent = 'Syncing...';
+        syncButtons.forEach(b => {
+            b.classList.add('syncing');
+            const svg = b.querySelector('svg');
+            if (svg) svg.classList.add('spinning');
+            const txt = b.querySelector('.sync-active-note-text, #sync-active-note-text');
+            if (txt) txt.textContent = 'Syncing...';
+        });
     }
 
     const nodeId = state.activeNodeId;
@@ -3513,8 +3520,6 @@ async function syncActiveNoteDirectly(options = {}) {
                 renderTree();
                 if (!silent) {
                     showToast(`✓ Downloaded latest updates for "${localNode.title || 'Note'}" from Google Drive!`, 'success');
-                } else {
-                    showToast(`✓ Auto-updated "${localNode.title || 'Note'}" from Google Drive`, 'info');
                 }
             } else if (hasLocalEdits && isContentDifferent) {
                 localNode.title = curTitle;
@@ -3589,9 +3594,13 @@ async function syncActiveNoteDirectly(options = {}) {
         setTimeout(() => {
             isSyncButtonPressed = false;
             if (!silent) {
-                if (btn) btn.classList.remove('syncing');
-                if (svg) svg.classList.remove('spinning');
-                if (txt) txt.textContent = 'Sync';
+                syncButtons.forEach(b => {
+                    b.classList.remove('syncing');
+                    const svg = b.querySelector('svg');
+                    if (svg) svg.classList.remove('spinning');
+                    const txt = b.querySelector('.sync-active-note-text, #sync-active-note-text');
+                    if (txt) txt.textContent = 'Sync';
+                });
             }
         }, 400);
     }
@@ -11414,18 +11423,21 @@ function setupEventListeners() {
     const btnSettingsSync = document.getElementById('btn-settings-sync-now');
     if (btnSettingsSync) btnSettingsSync.onclick = () => triggerTwoWaySync(false);
 
-    // Note-Level Fast Direct Sync Button (Next to Focus in editor ribbon)
-    const btnSyncActiveNote = document.getElementById('btn-sync-active-note');
-    if (btnSyncActiveNote) {
-        btnSyncActiveNote.addEventListener('mousedown', () => {
+    // Note-Level Fast Direct Sync Buttons (Editor ribbon, Note-meta bar, and Mobile bottom bar)
+    const syncTriggers = document.querySelectorAll('.btn-sync-active-note-trigger, #btn-sync-active-note, #btn-sync-active-note-meta, #m-btn-sync-note');
+    syncTriggers.forEach(btn => {
+        btn.addEventListener('mousedown', () => {
             isSyncButtonPressed = true;
         });
-        btnSyncActiveNote.addEventListener('click', (e) => {
+        btn.addEventListener('touchstart', () => {
+            isSyncButtonPressed = true;
+        }, { passive: true });
+        btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             syncActiveNoteDirectly();
         });
-    }
+    });
     const btnQuickZen = document.getElementById('btn-quick-zen');
     if (btnQuickZen) {
         btnQuickZen.addEventListener('click', (e) => {
