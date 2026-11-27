@@ -48,6 +48,20 @@ $postFields = [
 
 if (!empty($input['client_secret'])) {
     $postFields['client_secret'] = $input['client_secret'];
+} else {
+    $configFile = __DIR__ . '/token_config.php';
+    if (file_exists($configFile)) {
+        $cfg = include $configFile;
+        if (is_array($cfg) && !empty($cfg['client_secret'])) {
+            $postFields['client_secret'] = $cfg['client_secret'];
+        }
+    }
+    if (empty($postFields['client_secret'])) {
+        $envSecret = getenv('GOOGLE_CLIENT_SECRET');
+        if (!empty($envSecret)) {
+            $postFields['client_secret'] = $envSecret;
+        }
+    }
 }
 
 if ($grantType === 'authorization_code') {
@@ -65,8 +79,15 @@ curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urle
 curl_setopt($ch, CURLOPT_TIMEOUT, 15);
 
 $response = curl_exec($ch);
+$curlErr = curl_error($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
+
+if ($response === false) {
+    http_response_code(502);
+    echo json_encode(['error' => 'token_relay_failed', 'error_description' => $curlErr ?: 'Failed to contact Google OAuth endpoint.']);
+    exit;
+}
 
 http_response_code($httpCode ?: 200);
 echo $response;

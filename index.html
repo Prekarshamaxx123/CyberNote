@@ -58,7 +58,7 @@
                 if (document.getElementById('cybernote-failover-banner')) return;
                 var banner = document.createElement('div');
                 banner.id = 'cybernote-failover-banner';
-                banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:999999; background:linear-gradient(90deg, #181926, #24273a); border-bottom:1px solid rgba(245, 158, 11, 0.4); color:#cad3f5; font-size:12px; padding:6px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.4); font-family:system-ui,-apple-system,sans-serif;';
+                banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:999990; background:linear-gradient(90deg, #181926, #24273a); border-bottom:1px solid rgba(245, 158, 11, 0.4); color:#cad3f5; font-size:12px; padding:6px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.4); font-family:system-ui,-apple-system,sans-serif;';
                 banner.innerHTML = '<div style="display:flex; align-items:center; gap:8px;">' +
                     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5a97f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
                     '<span><strong>Backup Mirror Active:</strong> Main site (<code>cybernote.cybertubelk.xyz</code>) is unreachable. Connected via official GitHub Pages Backup Mirror.</span>' +
@@ -76,16 +76,16 @@
                 window.location.href = targetUrl;
             };
 
-            // Probe with Image (bypasses CORS restrictions)
+            // Probe with Image (only redirects if the image actually loads with 2xx)
             var probeImg = new Image();
             probeImg.onload = handleMainSiteOnline;
             probeImg.onerror = function() {
-                try {
-                    fetch('https://cybernote.cybertubelk.xyz/index.html?probe=' + Date.now(), {
-                        mode: 'no-cors',
-                        cache: 'no-store'
-                    }).then(handleMainSiteOnline).catch(function() {});
-                } catch(e) {}
+                if (!resolved) {
+                    resolved = true;
+                    clearTimeout(timeoutId);
+                    console.warn('[CyberNote Failover] Main web probe failed. Staying on GitHub Pages backup mirror.');
+                    sessionStorage.setItem('cybernote_stay_backup', '1');
+                }
             };
             probeImg.src = 'https://cybernote.cybertubelk.xyz/icons/icon-192.png?probe=' + Date.now();
         } catch (e) {
@@ -172,7 +172,7 @@
             </button>
 
             <!-- Google Drive Cloud / Live Sync Status Badge -->
-            <div class="sync-badge" id="sync-status" title="Google Drive Cloud Sync Status (Click to open Settings)">
+            <div class="sync-badge" id="sync-status" title="Google Drive Cloud Sync Status (Click to sync)">
                 <span class="sync-status-icon" id="sync-status-icon">
                     <span class="sync-dot live"></span>
                 </span>
@@ -349,7 +349,7 @@
                 </div>
             </div>
 
-            <div id="note-view" class="note-view">
+            <div id="note-view" class="note-view" style="display: none;">
                 <!-- Unified Compact Header Bar (Breadcrumbs + Title + Tags + Actions) -->
                 <div class="note-meta-bar">
                     <div class="breadcrumbs" id="breadcrumbs" style="display: none;">
@@ -2717,6 +2717,14 @@
                             <p style="margin:0; font-size:0.8rem; color:var(--text-secondary); line-height:1.4;">
                                 To protect your 15 GB Google Drive quota, CyberNote compresses uploaded screenshots and canvas drawings into optimized lightweight formats and minifies note metadata so your entire notebook consumes under 0.001% of your storage.
                             </p>
+                        </div>
+
+                        <div style="margin-top:12px; background:var(--bg-app); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                            <div>
+                                <h5 style="margin:0 0 4px 0; font-size:0.88rem;">Local Browser Cache &amp; Data</h5>
+                                <p style="margin:0; font-size:0.78rem; color:var(--text-muted);">Wipe all locally cached notes, IndexedDB records, and session tokens from this browser.</p>
+                            </div>
+                            <button type="button" id="btn-clear-all-local-data" class="btn btn-danger btn-sm" onclick="confirmClearAllLocalData()">Clear All Local Data</button>
                         </div>
                     </div>
 

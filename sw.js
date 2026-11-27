@@ -1,6 +1,6 @@
 // CyberNote 🛡️ - Service Worker for 100% Offline-First PWA Execution
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '') || '';
-const CACHE_NAME = 'cybernote-v39-silent-renewal';
+const CACHE_NAME = 'cybernote-v41-offline-cache';
 
 const ASSETS_TO_CACHE = [
     `${BASE_PATH}/`,
@@ -9,7 +9,9 @@ const ASSETS_TO_CACHE = [
     `${BASE_PATH}/privacy.html`,
     `${BASE_PATH}/terms.html`,
     `${BASE_PATH}/style.css`,
+    `${BASE_PATH}/style.css?v=20261120_mandatory_auth_v36`,
     `${BASE_PATH}/app.js`,
+    `${BASE_PATH}/app.js?v=20261120_mandatory_auth_v36`,
     `${BASE_PATH}/manifest.json`,
     `${BASE_PATH}/icons/icon-192.png`,
     `${BASE_PATH}/icons/icon-512.png`
@@ -57,33 +59,35 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Navigation Requests (HTML document loading)
+    // Navigation Requests (HTML document loading) with 2.5s timeout for fast offline fallback
     if (event.request.mode === 'navigate') {
-        event.respondWith(
-            fetch(event.request)
-                .then((networkResponse) => {
-                    if (networkResponse && networkResponse.status === 200) {
-                        const copy = networkResponse.clone();
-                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-                    }
-                    return networkResponse;
-                })
-                .catch(async () => {
-                    // Offline navigation fallback: serve cached app shell
-                    const matchDirect = await caches.match(event.request);
-                    if (matchDirect) return matchDirect;
+        event.respondWith((async () => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 2500);
+            try {
+                const networkResponse = await fetch(event.request, { signal: controller.signal });
+                clearTimeout(timer);
+                if (networkResponse && networkResponse.status === 200) {
+                    const copy = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+                }
+                return networkResponse;
+            } catch (_) {
+                clearTimeout(timer);
+                const matchDirect = await caches.match(event.request, { ignoreSearch: true });
+                if (matchDirect) return matchDirect;
 
-                    const matchAppShell = await caches.match(`${BASE_PATH}/index.html`) ||
-                                          await caches.match(`${BASE_PATH}/`) ||
-                                          await caches.match('index.html');
-                    if (matchAppShell) return matchAppShell;
+                const matchAppShell = await caches.match(`${BASE_PATH}/index.html`, { ignoreSearch: true }) ||
+                                      await caches.match(`${BASE_PATH}/`, { ignoreSearch: true }) ||
+                                      await caches.match('index.html', { ignoreSearch: true });
+                if (matchAppShell) return matchAppShell;
 
-                    return new Response(
-                        '<!DOCTYPE html><html><head><meta charset="utf-8"><title>CyberNote Offline</title></head><body style="background:#1e1e2e;color:#cdd6f4;font-family:sans-serif;text-align:center;padding:50px;"><h2>CyberNote Offline</h2><p>Please connect to the internet once to cache the full notebook.</p></body></html>',
-                        { headers: { 'Content-Type': 'text/html' } }
-                    );
-                })
-        );
+                return new Response(
+                    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>CyberNote Offline</title></head><body style="background:#1e1e2e;color:#cdd6f4;font-family:sans-serif;text-align:center;padding:50px;"><h2>CyberNote Offline</h2><p>Please connect to the internet once to cache the full notebook.</p></body></html>',
+                    { headers: { 'Content-Type': 'text/html' } }
+                );
+            }
+        })());
         return;
     }
 
@@ -98,7 +102,8 @@ self.addEventListener('fetch', (event) => {
                 return networkResponse;
             })
             .catch(async () => {
-                const cachedAsset = await caches.match(event.request);
+                const cachedAsset = await caches.match(event.request) ||
+                                    await caches.match(event.request, { ignoreSearch: true });
                 if (cachedAsset) return cachedAsset;
                 return new Response('Asset unavailable offline', { status: 503 });
             })
