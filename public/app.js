@@ -898,6 +898,25 @@ function restorePreservedOfflineNotes() {
     }
 }
 
+function safeJsonParse(raw, fallback = null) {
+    if (!raw || typeof raw !== 'string') return fallback;
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        return fallback;
+    }
+}
+
+function safeLocalStorageSet(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (e) {
+        console.warn('[CyberNote] localStorage write failed for', key, e);
+        return false;
+    }
+}
+
 function handleExpiredGoogleSession({ silent = false } = {}) {
     if (!navigator.onLine) {
         setSyncStatus('offline', 'Offline (Saved locally)');
@@ -917,16 +936,122 @@ function handleExpiredGoogleSession({ silent = false } = {}) {
         state.driveSaveTimer = null;
     }
 
-    // Only clear the expired in-memory token — NEVER wipe user identity, local notes, or log the user out!
+    // Clear the expired access token from BOTH memory and localStorage to prevent infinite 401 loops
     state.googleAccessToken = null;
     state.driveFolderVerified = false;
+    localStorage.removeItem('cybernote_google_token');
+    localStorage.removeItem('cybernote_google_token_expiry');
 
     updateGoogleUserUI();
     if (typeof closeDriveModal === 'function') closeDriveModal();
     if (typeof closeSyncConflictModal === 'function') closeSyncConflictModal();
     if (typeof hideSyncOverlay === 'function') hideSyncOverlay();
 
-    setSyncStatus('live', 'Drive Connected (Click to sync)');
+    setSyncStatus('offline', 'Session expired (Click Sync to reconnect)');
+    if (!silent) {
+        showToast('Google session expired. Click Sync or Sign In to reconnect.', 'warning');
+    }
+}
+
+let tokenRelaySupported = null;
+async function checkTokenRelayAvailable() {
+    if (tokenRelaySupported !== null) return tokenRelaySupported;
+    if (window.location.protocol === 'file:') {
+        tokenRelaySupported = false;
+        return false;
+    }
+    try {
+        const res = await fetch('api/token.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const text = await res.text();
+        // PHP relay returns JSON 400; static servers return 404/405/raw <?php
+        tokenRelaySupported = (res.status === 400 && text.trim().startsWith('{') && !text.includes('<?php'));
+    } catch (e) {
+        tokenRelaySupported = false;
+    }
+    return tokenRelaySupported;
+}
+
+async function exchangeAuthCodeForTokens(code) {
+    try {
+        const clientId = getEffectiveGoogleClientId();
+        const res = await fetch('api/token.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: clientId,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: 'postmessage'
+            })
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data && data.access_token) {
+            if (data.refresh_token) {
+                safeLocalStorageSet('cybernote_google_refresh_token', data.refresh_token);
+            }
+            await handleGoogleTokenResponse(data, { isSilentRefresh: false });
+            return true;
+        }
+        console.warn('[CyberNote] Code exchange failed, falling back to GIS token flow:', data);
+        return false;
+    } catch (e) {
+        console.warn('[CyberNote] Code exchange error:', e);
+        return false;
+    }
+}
+
+async function refreshTokenViaRelay() {
+    const refreshToken = localStorage.getItem('cybernote_google_refresh_token');
+    if (!refreshToken || !navigator.onLine) return false;
+    if (localStorage.getItem('cybernote_logged_out') === '1') return false;
+
+    try {
+        const clientId = getEffectiveGoogleClientId();
+        const res = await fetch('api/token.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: clientId,
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken
+            })
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data && data.access_token) {
+            if (data.refresh_token) {
+                safeLocalStorageSet('cybernote_google_refresh_token', data.refresh_token);
+            }
+            await handleGoogleTokenResponse(data, { isSilentRefresh: true });
+            return true;
+        }
+        if (data && data.error === 'invalid_grant') {
+            localStorage.removeItem('cybernote_google_refresh_token');
+        }
+        return false;
+    } catch (e) {
+        console.warn('[CyberNote] Refresh token relay error:', e);
+        return false;
+    }
+}
+
+function handleGoogleAuthError(err) {
+    const errType = err?.type || err?.error || 'auth_error';
+    const wasSilent = isSilentRefreshing;
+    isSilentRefreshing = false;
+
+    if (tokenRequestResolvers.length > 0) {
+        const resolvers = tokenRequestResolvers;
+        tokenRequestResolvers = [];
+        resolvers.forEach(r => r(false));
+    }
+
+    if (!wasSilent && errType !== 'popup_closed' && errType !== 'user_closed_popup') {
+        showToast(`Google Sign-In notice: ${errType}`, 'warning');
+    }
 }
 
 async function waitForGIS(timeoutMs = 4000) {
@@ -940,7 +1065,8 @@ async function waitForGIS(timeoutMs = 4000) {
                 state.tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: clientId,
                     scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-                    callback: handleGoogleTokenResponse
+                    callback: handleGoogleTokenResponse,
+                    error_callback: handleGoogleAuthError
                 });
                 return true;
             } catch (e) {
@@ -960,86 +1086,54 @@ let tokenRefreshPromise = null;
 async function requestGoogleLoginInteractive() {
     if (tokenRefreshPromise) return tokenRefreshPromise;
     tokenRefreshPromise = new Promise((resolve) => {
+        const resolver = (success) => {
+            clearTimeout(timer);
+            tokenRefreshPromise = null;
+            resolve(success);
+        };
         const timer = setTimeout(() => {
+            tokenRequestResolvers = tokenRequestResolvers.filter(r => r !== resolver);
             tokenRefreshPromise = null;
             resolve(false);
         }, 60000);
 
-        tokenRequestResolvers.push((success) => {
-            clearTimeout(timer);
-            tokenRefreshPromise = null;
-            resolve(success);
-        });
-
-        requestGoogleLogin({ interactive: true });
+        tokenRequestResolvers.push(resolver);
+        requestGoogleLogin(true);
     });
     return tokenRefreshPromise;
 }
 
-// Silently refreshes Google Drive access token in the background using Google Identity Services (GIS).
-// Runs without intrusive popups by supplying prompt: '' with the user's existing email hint.
+// Silently refreshes Google Drive access token in the background.
+// Prefers true OAuth refresh_token via api/token.php when available, then falls back to GIS prompt: ''.
 async function requestSilentTokenRefresh() {
     if (!isUserSignedIn()) return false;
     if (localStorage.getItem('cybernote_logged_out') === '1') return false;
 
-    // Reuse existing in-flight silent refresh promise if one is already running
     if (silentRefreshPromise) return silentRefreshPromise;
 
-    const savedEmail = state.googleUser?.email || 
-                       JSON.parse(localStorage.getItem('cybernote_user') || '{}')?.email || 
-                       localStorage.getItem('cybernote_user_email');
-
-    const hasGIS = await waitForGIS(4000);
-    if (!hasGIS || !state.tokenClient) return false;
-
-    silentRefreshPromise = new Promise((resolve) => {
-        let settled = false;
-        const timer = setTimeout(() => {
-            isSilentRefreshing = false;
-            if (!settled) {
-                settled = true;
-                silentRefreshPromise = null;
-                resolve(false);
-            }
-        }, 12000);
-
-        tokenRequestResolvers.push((success) => {
-            isSilentRefreshing = false;
-            if (!settled) {
-                settled = true;
-                clearTimeout(timer);
-                silentRefreshPromise = null;
-                resolve(success);
-            }
-        });
-
-        try {
-            isSilentRefreshing = true;
-            const tokenConfig = {
-                prompt: ''
-            };
-            if (savedEmail) {
-                tokenConfig.hint = savedEmail;
-            }
-            state.tokenClient.requestAccessToken(tokenConfig);
-        } catch (e) {
-            isSilentRefreshing = false;
-            console.warn('[CyberNote] Silent token refresh notice:', e);
-            if (!settled) {
-                settled = true;
-                clearTimeout(timer);
-                silentRefreshPromise = null;
-                resolve(false);
+    silentRefreshPromise = (async () => {
+        // Background refresh must NEVER call GIS requestAccessToken() because GIS opens a popup.
+        // Only use the silent OAuth refresh_token relay when available.
+        if (localStorage.getItem('cybernote_google_refresh_token')) {
+            const relayOk = await refreshTokenViaRelay();
+            if (relayOk && state.googleAccessToken) {
+                return true;
             }
         }
-    });
+        return false;
+    })();
 
-    return silentRefreshPromise;
+    try {
+        return await silentRefreshPromise;
+    } finally {
+        silentRefreshPromise = null;
+    }
 }
 
 // Ensures Google access token is valid (checks memory and localStorage, silently refreshes if needed)
 async function ensureGoogleTokenValid(options = {}) {
-    if (!isUserSignedIn()) return false;
+    const allowInteractive = Boolean(options && (options.explicitLoginPrompt || options.interactive));
+    if (!isUserSignedIn() && !allowInteractive) return false;
 
     const expiry = parseInt(localStorage.getItem('cybernote_google_token_expiry') || '0', 10);
     const token = state.googleAccessToken || localStorage.getItem('cybernote_google_token');
@@ -1051,7 +1145,7 @@ async function ensureGoogleTokenValid(options = {}) {
     }
 
     // 2. Token is near expiry or expired: Attempt silent background refresh first without popups!
-    if (navigator.onLine && localStorage.getItem('cybernote_logged_out') !== '1') {
+    if (navigator.onLine && localStorage.getItem('cybernote_logged_out') !== '1' && isUserSignedIn()) {
         const refreshed = await requestSilentTokenRefresh();
         if (refreshed && state.googleAccessToken) {
             return true;
@@ -1064,8 +1158,8 @@ async function ensureGoogleTokenValid(options = {}) {
         return true;
     }
 
-    // 4. ONLY trigger login popup if the user explicitly clicked "Sign In" or "Connect Drive"
-    if (options && options.explicitLoginPrompt) {
+    // 4. ONLY trigger login popup if interactive login is explicitly permitted
+    if (allowInteractive) {
         const refreshed = await requestGoogleLoginInteractive();
         return Boolean(refreshed && state.googleAccessToken);
     }
@@ -1101,7 +1195,6 @@ function scheduleSessionExpiryWatch() {
     }
 
     // Proactively refresh 5 minutes before the 1-hour expiry (remainingMs - 300,000ms)
-    // This keeps the session alive forever so the user is never disconnected!
     const proactiveRefreshDelay = Math.max(10000, remainingMs - 300000);
 
     tokenPreExpirySyncTimer = setTimeout(async () => {
@@ -1169,6 +1262,7 @@ function setupSessionExpiryListeners() {
 
 function initGoogleAuth() {
     setupSessionExpiryListeners();
+    checkTokenRelayAvailable().catch(() => false);
 
     // 1. Sync Client ID in settings
     const effId = getEffectiveGoogleClientId();
@@ -1185,7 +1279,7 @@ function initGoogleAuth() {
     const isLoggedOut = localStorage.getItem('cybernote_logged_out') === '1';
 
     if (!isLoggedOut && savedUser) {
-        try { state.googleUser = JSON.parse(savedUser); } catch(e) {}
+        state.googleUser = safeJsonParse(savedUser, null);
     }
     if (!isLoggedOut && savedToken && Date.now() < (expiry - 60000)) {
         state.googleAccessToken = savedToken;
@@ -1205,7 +1299,8 @@ function initGoogleAuth() {
                 state.tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: clientId,
                     scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-                    callback: handleGoogleTokenResponse
+                    callback: handleGoogleTokenResponse,
+                    error_callback: handleGoogleAuthError
                 });
 
                 // If user is logged in and token is currently active, run cloud sync
@@ -1224,10 +1319,10 @@ function initGoogleAuth() {
                             }
                             downloadAllNotesFromDrive(true).catch(() => {});
                         } else {
-                            setSyncStatus('live', 'Drive Connected (Click to sync)');
+                            setSyncStatus('offline', 'Session expired (Click Sync to reconnect)');
                         }
                     }).catch(() => {
-                        setSyncStatus('live', 'Drive Connected (Click to sync)');
+                        setSyncStatus('offline', 'Session expired (Click Sync to reconnect)');
                     });
                 }
             } catch (err) {
@@ -1288,7 +1383,7 @@ function updateDriveModalStatus(isSignedIn) {
 
     if (state.googleUser && !isExplicitlyLoggedOut) {
         if (nameEl) {
-            nameEl.innerHTML = `<span style="color:var(--success);">● Connected:</span> ${state.googleUser.name} (${state.googleUser.email})`;
+            nameEl.innerHTML = `<span style="color:var(--success);">● Connected:</span> ${escapeHtml(state.googleUser.name || '')} (${escapeHtml(state.googleUser.email || '')})`;
         }
         if (detailEl) {
             detailEl.textContent = 'Automatic Google Drive backup active. Changes are synced seamlessly.';
@@ -1299,82 +1394,152 @@ function updateDriveModalStatus(isSignedIn) {
     }
 }
 
-function requestGoogleLogin() {
+function requestGoogleLogin(forceSelectAccount = false) {
     if (window.google?.accounts?.oauth2) {
         const clientId = getEffectiveGoogleClientId();
-        try {
-            state.tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: clientId,
-                scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-                callback: handleGoogleTokenResponse
-            });
-        } catch (err) {
-            console.warn('GIS Token client re-init:', err);
+        const scopeStr = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+
+        // Prefer Authorization Code Flow (gives persistent refresh_token) when api/token.php is available
+        if (tokenRelaySupported === true && typeof google.accounts.oauth2.initCodeClient === 'function') {
+            try {
+                const codeClient = google.accounts.oauth2.initCodeClient({
+                    client_id: clientId,
+                    scope: scopeStr,
+                    ux_mode: 'popup',
+                    callback: async (codeResp) => {
+                        if (!codeResp || codeResp.error || !codeResp.code) {
+                            // Fall back to token client if user or server couldn't use code flow
+                            if (codeResp?.error && codeResp.error !== 'popup_closed') {
+                                requestGoogleTokenPopup(forceSelectAccount);
+                            } else {
+                                handleGoogleAuthError(codeResp);
+                            }
+                            return;
+                        }
+                        const ok = await exchangeAuthCodeForTokens(codeResp.code);
+                        if (!ok) {
+                            requestGoogleTokenPopup(forceSelectAccount);
+                        }
+                    },
+                    error_callback: handleGoogleAuthError
+                });
+                codeClient.requestCode();
+                return;
+            } catch (err) {
+                console.warn('GIS Code client fallback to Token client:', err);
+            }
         }
+
+        requestGoogleTokenPopup(forceSelectAccount);
+    } else {
+        showToast('Google authentication service is loading... please click again in a moment.', 'info');
+        initGoogleAuth();
+    }
+}
+
+function requestGoogleTokenPopup(forceSelectAccount = false) {
+    if (!window.google?.accounts?.oauth2) return;
+    const clientId = getEffectiveGoogleClientId();
+    try {
+        state.tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+            callback: handleGoogleTokenResponse,
+            error_callback: handleGoogleAuthError
+        });
+    } catch (err) {
+        console.warn('GIS Token client re-init:', err);
     }
 
     if (state.tokenClient) {
         const tokenConfig = {};
-        const savedEmail = state.googleUser?.email || 
-                           JSON.parse(localStorage.getItem('cybernote_user') || '{}')?.email || 
+        const savedEmail = state.googleUser?.email ||
+                           safeJsonParse(localStorage.getItem('cybernote_user'), {})?.email ||
                            localStorage.getItem('cybernote_user_email');
-        if (savedEmail) {
+        if (savedEmail && !forceSelectAccount) {
             tokenConfig.hint = savedEmail;
             tokenConfig.prompt = '';
         } else {
             tokenConfig.prompt = 'select_account';
         }
         state.tokenClient.requestAccessToken(tokenConfig);
-    } else {
-        alert('Google authentication service is loading... please click again in a moment.');
-        initGoogleAuth();
     }
 }
 
 async function handleGoogleTokenResponse(tokenResponse, { isSilentRefresh = false } = {}) {
-    const hasToken = Boolean(tokenResponse && tokenResponse.access_token);
+    const wasSilent = Boolean(isSilentRefresh || isSilentRefreshing);
+    isSilentRefreshing = false;
+
+    if (!tokenResponse) {
+        if (tokenRequestResolvers.length > 0) {
+            const resolvers = tokenRequestResolvers;
+            tokenRequestResolvers = [];
+            resolvers.forEach(r => r(false));
+        }
+        return;
+    }
+
+    if (tokenResponse.error) {
+        console.error('Google Auth Error:', tokenResponse);
+        if (tokenRequestResolvers.length > 0) {
+            const resolvers = tokenRequestResolvers;
+            tokenRequestResolvers = [];
+            resolvers.forEach(r => r(false));
+        }
+        if (!wasSilent && tokenResponse.error !== 'user_closed_popup' && tokenResponse.error !== 'popup_closed') {
+            showToast(`Sign-In error: ${tokenResponse.error}`, true);
+        }
+        return;
+    }
+
+    const hasToken = Boolean(tokenResponse.access_token);
     if (tokenRequestResolvers.length > 0) {
         const resolvers = tokenRequestResolvers;
         tokenRequestResolvers = [];
         resolvers.forEach(r => r(hasToken));
     }
 
-    if (tokenResponse.error) {
-        console.error('Google Auth Error:', tokenResponse);
-        if (!isSilentRefresh && !isSilentRefreshing && tokenResponse.error !== 'user_closed_popup') {
-            showToast(`Sign-In error: ${tokenResponse.error}`, true);
-        }
-        return;
-    }
+    if (!hasToken) return;
+
+    const prevEmail = state.googleUser?.email || localStorage.getItem('cybernote_user_email') || '';
 
     state.googleAccessToken = tokenResponse.access_token;
     state.driveFolderVerified = false;
-    localStorage.setItem('cybernote_google_token', tokenResponse.access_token);
+    safeLocalStorageSet('cybernote_google_token', tokenResponse.access_token);
     const expiresIn = tokenResponse.expires_in || 3600;
-    localStorage.setItem('cybernote_google_token_expiry', (Date.now() + (expiresIn * 1000)).toString());
+    safeLocalStorageSet('cybernote_google_token_expiry', (Date.now() + (expiresIn * 1000)).toString());
     localStorage.removeItem('cybernote_logged_out');
+
+    // Fetch profile first when switching/logging in to verify account identity isolation
+    const profile = await fetchGoogleUserProfile();
+    const newEmail = profile?.email || state.googleUser?.email || '';
+    if (prevEmail && newEmail && prevEmail.toLowerCase() !== newEmail.toLowerCase()) {
+        console.warn('[CyberNote] Account switched from', prevEmail, 'to', newEmail, '- isolating local notes.');
+        clearAllLocalNotesData();
+        state.googleAccessToken = tokenResponse.access_token;
+        state.googleUser = profile;
+        safeLocalStorageSet('cybernote_google_token', tokenResponse.access_token);
+        safeLocalStorageSet('cybernote_google_token_expiry', (Date.now() + (expiresIn * 1000)).toString());
+        safeLocalStorageSet('cybernote_user', JSON.stringify(profile));
+        safeLocalStorageSet('cybernote_user_email', newEmail);
+    }
 
     // Restore any offline notes preserved when session expired
     restorePreservedOfflineNotes();
 
     scheduleSessionExpiryWatch();
 
-    const isExistingUser = Boolean(state.googleUser || localStorage.getItem('cybernote_user'));
+    const isExistingUser = Boolean(prevEmail && (!newEmail || prevEmail.toLowerCase() === newEmail.toLowerCase()));
 
-    if (isSilentRefresh || isExistingUser) {
-        if (!state.googleUser) {
-            await fetchGoogleUserProfile();
-        } else {
-            updateGoogleUserUI();
-        }
+    if (wasSilent || isExistingUser) {
+        updateGoogleUserUI();
         if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
             uploadPendingNotesToDrive().catch(() => {});
         }
         return;
     }
 
-    // Only on very first initial sign in
-    await fetchGoogleUserProfile();
+    // First initial sign-in (or newly switched account)
     await autoRestoreFromDriveOnSignIn();
 }
 
@@ -1391,16 +1556,18 @@ async function fetchGoogleUserProfile() {
                 picture: data.picture,
                 id: data.sub
             };
-            localStorage.setItem('cybernote_user', JSON.stringify(state.googleUser));
+            safeLocalStorageSet('cybernote_user', JSON.stringify(state.googleUser));
             if (data.email) {
-                localStorage.setItem('cybernote_user_email', data.email);
+                safeLocalStorageSet('cybernote_user_email', data.email);
             }
             updateGoogleUserUI();
             if (typeof updateSettingsUI === 'function') updateSettingsUI();
+            return state.googleUser;
         }
     } catch (err) {
         console.error('Failed to fetch user profile:', err);
     }
+    return null;
 }
 
 function clearAllLocalNotesData() {
@@ -1517,6 +1684,9 @@ async function signoutGoogle() {
                 flushEditorToState();
                 await uploadSingleNodeToDrive(state.activeNodeId, true).catch(() => {});
             }
+            if (state.pendingUploadNodeIds && state.pendingUploadNodeIds.size > 0) {
+                await uploadPendingNotesToDrive().catch(() => {});
+            }
         } catch (e) {}
 
         if (window.google?.accounts?.oauth2?.revoke) {
@@ -1541,6 +1711,7 @@ async function signoutGoogle() {
     state.driveFolderVerified = false;
     localStorage.removeItem('cybernote_google_token');
     localStorage.removeItem('cybernote_google_token_expiry');
+    localStorage.removeItem('cybernote_google_refresh_token');
     localStorage.removeItem('cybernote_user');
     localStorage.removeItem('cybernote_user_email');
     localStorage.setItem('cybernote_logged_out', '1');
@@ -1553,6 +1724,20 @@ async function signoutGoogle() {
     setSyncStatus('live', 'Signed out from Google Drive');
     showToast('Signed out. Local notes cleared.', 'info');
 }
+
+function confirmClearAllLocalData() {
+    if (!confirm('Clear all locally cached notes, IndexedDB records, and session tokens from this browser? Cloud notes on Google Drive will NOT be deleted.')) {
+        return;
+    }
+    localStorage.removeItem('cybernote_google_token');
+    localStorage.removeItem('cybernote_google_token_expiry');
+    localStorage.removeItem('cybernote_google_refresh_token');
+    localStorage.removeItem('cybernote_offline_sync_pending');
+    clearAllLocalNotesData();
+    if (typeof closeSettingsModal === 'function') closeSettingsModal();
+    showToast('All local browser data cleared.', 'info');
+}
+window.confirmClearAllLocalData = confirmClearAllLocalData;
 
 // --- Cloud Sync Animation Overlay Controller ---
 function showSyncOverlay(title = 'Syncing with Google Drive...', desc = 'Connecting and synchronizing notes...') {
@@ -1602,8 +1787,10 @@ function deduplicateNodes() {
     const toDelete = [];
     for (const [id, node] of state.nodes.entries()) {
         if (!node) continue;
+        if (node.is_folder || node.icon === 'folder') continue;
         const normTitle = (node.title || '').trim().toLowerCase();
         const normContent = (node.content || '').trim();
+        if (!normTitle || !normContent) continue;
         const key = `${node.parent_id || '__root__'}|${normTitle}|${normContent}`;
         if (seen.has(key)) {
             const existingId = seen.get(key);
@@ -1906,7 +2093,15 @@ function repairEscapedHtml(content) {
     if (!content || typeof content !== 'string') return content;
     if (!hasEscapedHtmlTags(content)) return content;
 
-    let cur = content;
+    const codePlaceholders = [];
+    let cur = content.replace(/<(pre|code)\b[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+        const idx = codePlaceholders.length;
+        codePlaceholders.push(match);
+        return `__CYBERNOTE_CODE_BLOCK_${idx}__`;
+    });
+
+    if (!hasEscapedHtmlTags(cur)) return content;
+
     for (let iter = 0; iter < 10; iter++) {
         const prev = cur;
         cur = cur
@@ -1922,6 +2117,8 @@ function repairEscapedHtml(content) {
         if (cur === prev) break;
         if (!hasEscapedHtmlTags(cur)) break;
     }
+
+    cur = cur.replace(/__CYBERNOTE_CODE_BLOCK_(\d+)__/g, (_, i) => codePlaceholders[Number(i)] || '');
     return cur;
 }
 
@@ -1998,13 +2195,18 @@ async function saveConsolidatedBackupToDriveFolder(folderId) {
         const deletedIds = state.deletedNodeIds || new Set();
         const allNodes = Array.from(state.nodes.values()).filter(n => !deletedIds.has(n.id) && n._contentLoaded !== false);
         if (allNodes.length === 0) return null;
-        const payload = JSON.stringify({
+        let payload = JSON.stringify({
             app: 'CyberNote',
             version: 2,
             exported_at: Date.now(),
             count: allNodes.length,
             nodes: allNodes
         });
+
+        const e2eePass = state.e2eePassword || localStorage.getItem('cybernote_e2ee_pass');
+        if (state.e2eeEnabled && e2eePass && window.crypto?.subtle) {
+            payload = await encryptData(payload, e2eePass);
+        }
 
         const fileName = 'CyberNote_Backup.json';
         if (!driveBackupFileId) {
@@ -2174,24 +2376,35 @@ async function checkAndRestoreLegacyDriveBackup(folderId) {
 
 // List all cn_*.json files in the CyberNote folder (properly URL-encoded query)
 async function listDriveCyberNoteFiles(folderId) {
-    const q = `'${folderId}' in parents and trashed = false`;
-    let res = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&pageSize=1000`);
-    if (!res.ok) {
-        // If 404 or 403, folder might have been deleted or become inaccessible; re-ensure folder once
-        if (res.status === 404 || res.status === 403) {
-            localStorage.removeItem('cybernote_drive_folder_id');
-            state.driveFolderId = null;
-            state.driveFolderVerified = false;
-            const newFolderId = await ensureDriveCyberNoteFolder(true);
-            const retryQ = `'${newFolderId}' in parents and trashed = false`;
-            res = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(retryQ)}&fields=files(id,name,modifiedTime)&pageSize=1000`);
-        }
+    let activeFolderId = folderId;
+    let pageToken = null;
+    const allFiles = [];
+
+    do {
+        const q = `'${activeFolderId}' in parents and trashed = false`;
+        const pageParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
+        let res = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name,modifiedTime)&pageSize=1000${pageParam}`);
         if (!res.ok) {
-            throw new Error(`Failed to list Drive files (${res.status})`);
+            // Only re-ensure folder if 404 (not found); do NOT delete folderId on 403 rate limit
+            if (res.status === 404 && !pageToken) {
+                localStorage.removeItem('cybernote_drive_folder_id');
+                state.driveFolderId = null;
+                state.driveFolderVerified = false;
+                activeFolderId = await ensureDriveCyberNoteFolder(true);
+                const retryQ = `'${activeFolderId}' in parents and trashed = false`;
+                res = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(retryQ)}&fields=nextPageToken,files(id,name,modifiedTime)&pageSize=1000`);
+            }
+            if (!res.ok) {
+                throw new Error(`Failed to list Drive files (${res.status})`);
+            }
         }
-    }
-    const data = await res.json();
-    const allFiles = data.files || [];
+        const data = await res.json();
+        if (Array.isArray(data.files)) {
+            allFiles.push(...data.files);
+        }
+        pageToken = data.nextPageToken || null;
+    } while (pageToken);
+
     const manifestFile = allFiles.find(f => f.name === 'cn_manifest.json');
     if (manifestFile) {
         driveManifestFileId = manifestFile.id;
@@ -2201,7 +2414,6 @@ async function listDriveCyberNoteFiles(folderId) {
         driveBackupFileId = backupFile.id;
     }
     const files = allFiles.filter(f => f.name.startsWith('cn_') && f.name.endsWith('.json') && f.name !== 'cn_manifest.json');
-    // Populate driveFileIdCache
     for (const f of files) {
         const nId = f.name.replace(/^cn_/, '').replace(/\.json$/, '');
         driveFileIdCache.set(nId, f.id);
@@ -2226,7 +2438,11 @@ async function uploadNodeToDrive(folderId, node) {
         node.content = repairEscapedHtml(node.content);
     }
     const fileName = `cn_${node.id}.json`;
-    const payload = JSON.stringify(node);
+    let payload = JSON.stringify(node);
+    const e2eePass = state.e2eePassword || localStorage.getItem('cybernote_e2ee_pass');
+    if (state.e2eeEnabled && e2eePass && window.crypto?.subtle) {
+        payload = await encryptData(payload, e2eePass);
+    }
 
     let activeFolderId = folderId || state.driveFolderId || await ensureDriveCyberNoteFolder();
     let fileId = driveFileIdCache.get(node.id);
@@ -2327,9 +2543,14 @@ async function uploadNodeToDrive(folderId, node) {
     return fileId;
 }
 
-// Delete a note file from Drive
+// Delete (trash) a note file from Drive so cross-device deletion detection works reliably
 async function deleteNodeFromDrive(fileId) {
-    await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, { method: 'DELETE' }).catch(() => {});
+    if (!fileId) return;
+    await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trashed: true })
+    }).catch(() => {});
 }
 
 // Debounced manifest upload so Drive always has the current notebook hierarchy
@@ -3002,7 +3223,21 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true,
             try {
                 const dlRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
                 if (dlRes && dlRes.ok) {
-                    const cloudNode = await dlRes.json();
+                    let cloudNode = await dlRes.json();
+                    if (cloudNode && cloudNode.e2ee === true) {
+                        const e2eePass = state.e2eePassword || localStorage.getItem('cybernote_e2ee_pass');
+                        if (e2eePass && window.crypto?.subtle) {
+                            try {
+                                const decryptedStr = await decryptData(cloudNode, e2eePass);
+                                cloudNode = JSON.parse(decryptedStr);
+                            } catch (decErr) {
+                                console.warn(`Failed to decrypt E2EE node ${nodeId}:`, decErr);
+                                cloudNode = null;
+                            }
+                        } else {
+                            cloudNode = null;
+                        }
+                    }
                     if (cloudNode && cloudNode.id) {
                         if (cloudNode.content && hasEscapedHtmlTags(cloudNode.content)) {
                             cloudNode.content = repairEscapedHtml(cloudNode.content);
@@ -3021,10 +3256,10 @@ async function downloadAllNotesFromDrive(silent = false, { manageOverlay = true,
                             const localTime = localNode.updated_at || localNode.created_at || 0;
                             const isLocalPending = state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(cloudNode.id);
                             
-                            // If user explicitly requested download (forceDownload or !silent), or local is not pending newer edits
-                            if (forceDownload || !silent || !isLocalPending || cloudTime >= localTime) {
+                            // Only overwrite pending local edits if forceDownload is true or cloud is strictly newer
+                            if (forceDownload || !isLocalPending || cloudTime > localTime) {
                                 Object.assign(localNode, cloudNode);
-                                if (isLocalPending && (forceDownload || !silent || cloudTime >= localTime)) {
+                                if (isLocalPending && (forceDownload || cloudTime > localTime)) {
                                     state.pendingUploadNodeIds.delete(cloudNode.id);
                                 }
                                 updatedCount++;
@@ -3353,13 +3588,20 @@ function handleEditorFieldBlur() {
     if (!state.activeNodeId || state.isReadOnly) return;
     const node = state.nodes.get(state.activeNodeId);
     if (!node || !node._userActuallyTyped) return;
+    if (node.is_folder || node.icon === 'folder') return;
+    if (node.password_hash && !state.unlockedNotes.has(node.id)) return;
+    if (node._contentLoaded === false) return;
+
     const curTitle = noteTitleInput ? noteTitleInput.value : (node.title || '');
     let curContent = noteEditor ? noteEditor.innerHTML : (node.content || '');
     if (curContent && hasEscapedHtmlTags(curContent)) {
         curContent = repairEscapedHtml(curContent);
     }
     const curTags = noteTagsInput ? noteTagsInput.value : (node.tags || '');
-    const hasChanged = (node.content !== curContent || node.title !== curTitle || (node.tags || '') !== curTags);
+    const currentSig = `${curTitle}|${curTags}|${curContent}`;
+    const isPending = Boolean(state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(node.id));
+    const hasChanged = (node._lastSyncedSig !== currentSig || isPending || node.content !== curContent || node.title !== curTitle || (node.tags || '') !== curTags);
+
     if (hasChanged) {
         flushAndPersistActiveNode();
         if (isUserSignedIn()) {
@@ -3503,7 +3745,9 @@ async function syncActiveNoteDirectly(options = {}) {
         }
         const curTags = noteTagsInput ? noteTagsInput.value : (localNode.tags || '');
         const curText = (noteEditor ? (noteEditor.innerText || '') : '').trim();
-        const isLocalEmpty = (curText === '' && curTitle.trim() === '' && curTags.trim() === '');
+        const hasRichMedia = /<(img|svg|canvas|table|pre|iframe|video|audio)\b/i.test(curContent) ||
+                             /class=["'][^"']*(shape-wrap|code-box|callout-box|checklist-item|editor-img-wrap)/i.test(curContent);
+        const isLocalEmpty = (curText === '' && !hasRichMedia && curTitle.trim() === '' && curTags.trim() === '');
 
         // Has the user actually typed or edited locally on this device?
         const hasLocalEdits = Boolean(
@@ -3834,9 +4078,11 @@ function setupSSE() {
                 state.nodes.set(updated.id, existing);
 
                 if (state.activeNodeId === updated.id && !state.isSyncing) {
+                    const isLocked = !!(updated.password_hash && !state.unlockedNotes.has(updated.id));
                     noteTitleInput.value = updated.title || '';
                     noteTagsInput.value = updated.tags || '';
-                    if (document.activeElement !== noteEditor) {
+                    if (typeof renderTagChips === 'function') renderTagChips(updated.tags || '');
+                    if (!isLocked && document.activeElement !== noteEditor) {
                         setEditorContent(updated.content || '');
                     }
                     updateBreadcrumbs(updated.id);
@@ -4453,10 +4699,11 @@ function performGlobalSearch(query) {
     const matches = [];
 
     for (const node of state.nodes.values()) {
+        const isLocked = !!(node.password_hash && !state.unlockedNotes.has(node.id));
         const titleMatch = normalizeQuery(node.title).includes(q);
         const tagsMatch = node.tags && normalizeQuery(node.tags).includes(q);
-        const plainContent = stripHtml(node.content);
-        const contentMatch = normalizeQuery(plainContent).includes(q);
+        const plainContent = isLocked ? '' : stripHtml(node.content);
+        const contentMatch = !isLocked && normalizeQuery(plainContent).includes(q);
 
         if (titleMatch || tagsMatch || contentMatch) {
             let score = 0;
@@ -4845,7 +5092,7 @@ function openTreeContextMenu(e, nodeId) {
         selectNode(nodeId);
     }
 
-    const targetId = nodeId || state.activeNodeId;
+    const targetId = nodeId || null;
     activeContextMenuNodeId = targetId;
 
     const ctxNewRoot = document.getElementById('ctx-new-root');
@@ -5513,6 +5760,7 @@ function selectNode(id) {
         if (typeof closeMobileToolbarDrawer === 'function') closeMobileToolbarDrawer();
         if (tagsEl) tagsEl.style.display = 'none';
         if (scrollArea) scrollArea.style.display = 'none';
+        if (noteEditor) noteEditor.innerHTML = '';
         if (folderViewEl) folderViewEl.style.display = 'none';
         if (btnToggleRo) btnToggleRo.style.display = 'none';
         if (btnTogglePwd) {
@@ -5546,6 +5794,7 @@ function selectNode(id) {
             if (typeof closeMobileToolbarDrawer === 'function') closeMobileToolbarDrawer();
             if (tagsEl) tagsEl.style.display = 'none';
             if (scrollArea) scrollArea.style.display = 'none';
+            if (noteEditor) noteEditor.innerHTML = '';
             if (folderViewEl) folderViewEl.style.display = 'flex';
             if (btnToggleRo) btnToggleRo.style.display = 'none';
             noteTitleInput.placeholder = 'Folder Name...';
@@ -5572,6 +5821,7 @@ function selectNode(id) {
                 downloadSingleNoteFromDrive(id, { silent: true });
             } else {
                 setEditorContent(node.content || '');
+                applyReadOnlyState(!!node.is_readonly);
             }
         }
     }
@@ -5809,30 +6059,37 @@ function flushActiveNodeBeforeUnload() {
     if (!state.activeNodeId || state.isReadOnly) return;
     const activeId = state.activeNodeId;
     const cur = state.nodes.get(activeId);
-    if (!cur) return;
+    if (!cur || cur.type === 'folder') return;
+    if (cur.is_locked && !state.unlockedNodes.has(activeId)) return;
 
     let curContent = noteEditor ? noteEditor.innerHTML : cur.content;
     if (curContent && hasEscapedHtmlTags(curContent)) {
         curContent = repairEscapedHtml(curContent);
     }
-    const curTitle = noteTitleInput ? noteTitleInput.value : cur.title;
-    const curTags = noteTagsInput ? noteTagsInput.value : cur.tags;
+    const curTitle = noteTitleInput ? noteTitleInput.value : (cur.title || '');
+    const curTags = noteTagsInput ? noteTagsInput.value : (cur.tags || '');
+    const currentSig = `${curTitle}|${curTags}|${curContent}`;
+    const isPending = Boolean(state.pendingUploadNodeIds && state.pendingUploadNodeIds.has(activeId));
 
-    const hasChanged = (cur.content !== curContent || cur.title !== curTitle || (cur.tags || '') !== (curTags || ''));
-    if (!hasChanged) return;
+    const inMemoryChanged = (cur.content !== curContent || cur.title !== curTitle || (cur.tags || '') !== (curTags || ''));
+    const syncNeeded = inMemoryChanged || isPending || (cur._lastSyncedSig !== currentSig);
+    if (!syncNeeded) return;
 
     const now = Date.now();
-    cur.content = curContent;
-    cur.title = curTitle;
-    cur.tags = curTags;
-    cur.updated_at = now;
+    if (inMemoryChanged) {
+        cur.content = curContent;
+        cur.title = curTitle;
+        cur.tags = curTags;
+        cur.updated_at = now;
+    }
 
-    // 1. Instant synchronous write to localStorage
+    // 1. Instant synchronous write to localStorage & IndexedDB
     try {
-        localStorage.setItem(`cybernote_node_${activeId}`, JSON.stringify(cur));
-        localStorage.setItem('cybernote_active', activeId);
+        idbPutNote(cur);
+        safeLocalStorageSet(`cybernote_node_${activeId}`, JSON.stringify(cur));
+        safeLocalStorageSet('cybernote_active', activeId);
         const list = Array.from(state.nodes.values());
-        localStorage.setItem('cybernote_local_raw_nodes', JSON.stringify(list));
+        safeLocalStorageSet('cybernote_local_raw_nodes', JSON.stringify(list));
     } catch (e) {}
 
     // 2. Clear pending timers
@@ -5997,6 +6254,10 @@ async function createSubNode(parentId, type = 'note') {
 async function duplicateCurrentNode() {
     if (!state.activeNodeId || !state.nodes.has(state.activeNodeId)) return;
     const orig = state.nodes.get(state.activeNodeId);
+    if (orig.password_hash && !state.unlockedNotes.has(orig.id)) {
+        showToast('Note is password locked. Unlock it first before duplicating.', 'warning');
+        return;
+    }
     const now = Date.now();
     const dupId = 'node-' + Math.random().toString(36).substring(2, 10) + '-' + now;
 
@@ -6114,10 +6375,14 @@ async function deleteNode(id) {
 function moveActiveNode(direction) {
     if (!state.activeNodeId || !state.nodes.has(state.activeNodeId)) return;
     const current = state.nodes.get(state.activeNodeId);
+    const curPinned = !!current.is_pinned;
 
     const siblings = Array.from(state.nodes.values())
-        .filter(n => n.parent_id === current.parent_id)
-        .sort((a, b) => a.position - b.position);
+        .filter(n => (n.parent_id || null) === (current.parent_id || null) && !!n.is_pinned === curPinned)
+        .sort((a, b) => (a.position || 0) - (b.position || 0));
+
+    // Normalize positions so subnodes all starting at 0 can be reordered cleanly
+    siblings.forEach((n, i) => { n.position = i; });
 
     const idx = siblings.findIndex(n => n.id === current.id);
     if (idx === -1) return;
@@ -6132,6 +6397,7 @@ function moveActiveNode(direction) {
 
     sendDeltaPatch(current.id, { position: current.position });
     sendDeltaPatch(target.id, { position: target.position });
+    saveLocalNodesBackup();
     renderTree();
     scheduleManifestUploadToDrive();
 }
@@ -6202,7 +6468,7 @@ function applyReadOnlyState(isReadOnly) {
         try { hideTableResizeOverlay(); } catch (e) {}
         const selectionBubble = document.getElementById('selection-bubble');
         if (selectionBubble) selectionBubble.style.display = 'none';
-        const slashMenu = document.getElementById('slash-command-menu');
+        const slashMenu = document.getElementById('slash-menu');
         if (slashMenu) slashMenu.style.display = 'none';
     }
 
@@ -6250,6 +6516,12 @@ function applyReadOnlyState(isReadOnly) {
         noteTagsInput.readOnly = isReadOnly;
         noteTagsInput.style.display = isReadOnly ? 'none' : '';
     }
+    const visibleTagsInput = document.getElementById('note-tags-input');
+    if (visibleTagsInput) {
+        visibleTagsInput.readOnly = isReadOnly;
+        visibleTagsInput.disabled = isReadOnly;
+        visibleTagsInput.style.display = isReadOnly ? 'none' : '';
+    }
     const tagsWrapper = document.getElementById('tags-container');
     if (tagsWrapper) {
         tagsWrapper.classList.toggle('readonly-tags', isReadOnly);
@@ -6269,7 +6541,7 @@ function applyReadOnlyState(isReadOnly) {
     if (btn) {
         const eyeSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
         const editSvg = `<svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
-        btn.innerHTML = `${isReadOnly ? editSvg : eyeSvg}<span>${isReadOnly ? 'Make Editable' : 'Read Only'}</span>`;
+        btn.innerHTML = `${isReadOnly ? editSvg : eyeSvg}<span id="readonly-btn-label">${isReadOnly ? 'Make Editable' : 'Read Only'}</span>`;
         btn.className = `btn btn-sm note-lock-btn ${isReadOnly ? 'btn-danger' : 'btn-secondary'}`;
         btn.title = isReadOnly ? 'Read-Only Mode active. Click to make editable.' : 'Set note to Read-Only mode.';
     }
@@ -7277,12 +7549,16 @@ function exportNoteAs(format) {
     }
     const node = state.nodes.get(state.activeNodeId);
     if (!node) return;
-    if (node.type === 'folder') {
+    if (node.is_folder || node.icon === 'folder' || node.type === 'folder') {
         showToast('Folders cannot be exported as single notes');
         return;
     }
+    if (node.password_hash && !state.unlockedNotes.has(node.id)) {
+        showToast('Note is password locked. Unlock it first before exporting.', 'warning');
+        return;
+    }
     const title = node.title || 'Untitled Note';
-    const content = noteEditor.innerHTML || '';
+    const content = noteEditor.innerHTML || node.content || '';
     let data = '';
     let mime = 'text/plain';
 
@@ -7410,6 +7686,8 @@ function execFormat(command, value = null) {
 
 function handleFontFamilyChange(font) {
     if (state.isReadOnly) return;
+    noteEditor.focus();
+    restoreSelection();
     if (font === 'inherit') {
         document.execCommand('fontName', false, '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
     } else {
@@ -7466,7 +7744,7 @@ function insertTodoItem() {
     if (state.isReadOnly) return;
     const html = `
         <div class="todo-item" contenteditable="false">
-            <input type="checkbox" onchange="this.nextElementSibling.classList.toggle('todo-done')">
+            <input type="checkbox" onchange="if(this.checked){this.setAttribute('checked','checked')}else{this.removeAttribute('checked')} this.nextElementSibling.classList.toggle('todo-done', this.checked); if(typeof handleEditorInput==='function') handleEditorInput();">
             <span contenteditable="true" class="todo-text">Checklist task</span>
         </div><p><br></p>
     `;
@@ -7488,10 +7766,15 @@ function insertDivider() {
 
 function insertHyperlink() {
     if (state.isReadOnly) return;
-    const url = prompt('Enter Web Link URL (e.g. https://github.com):');
-    if (url) {
-        execFormat('createLink', url);
+    const rawUrl = prompt('Enter Web Link URL (e.g. https://github.com):');
+    if (!rawUrl) return;
+    const trimmed = rawUrl.trim();
+    if (/^(javascript|data|vbscript):/i.test(trimmed)) {
+        showToast('Invalid or unsafe link URL.', 'warning');
+        return;
     }
+    const safeUrl = /^(https?:\/\/|mailto:|#|\/)/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    execFormat('createLink', safeUrl);
 }
 
 
@@ -7528,13 +7811,12 @@ function confirmInsertCodeBox() {
 }
 
 function copySnippet(btn) {
-    const pre = btn.closest('.code-box').querySelector('pre code');
+    const pre = btn.closest('.code-box')?.querySelector('pre code, pre');
     if (!pre) return;
     navigator.clipboard.writeText(pre.innerText).then(() => {
-        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Copied!';
-        setTimeout(() => {
-            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code';
-        }, 2000);
+        showToast('Copied code to clipboard!', 'success');
+    }).catch(() => {
+        showToast('Failed to copy code.', 'warning');
     });
 }
 
@@ -7569,8 +7851,10 @@ function compressImageSource(dataUrl, maxDimension = 1280, quality = 0.82) {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
 
-            // Compress to JPEG 0.82 to reduce 5MB files down to ~70KB
-            const compressed = canvas.toDataURL('image/jpeg', quality);
+            // Preserve transparency for PNG/WebP/SVG by encoding as WebP; use JPEG for opaque photos
+            const hasAlphaFormat = /^data:image\/(png|webp|svg\+xml)/i.test(dataUrl);
+            const mime = hasAlphaFormat ? 'image/webp' : 'image/jpeg';
+            const compressed = canvas.toDataURL(mime, quality);
             resolve(compressed);
         };
         img.onerror = () => resolve(dataUrl);
@@ -7601,6 +7885,7 @@ function handleClipboardPaste(e) {
     for (const item of items) {
         if (item.type.indexOf('image') === 0) {
             e.preventDefault();
+            saveSelection();
             const blob = item.getAsFile();
             const reader = new FileReader();
             reader.onload = async (event) => {
@@ -7784,10 +8069,14 @@ function updateImageResizeOverlay() {
         height = wrap.offsetHeight;
     } else {
         const imgRect = img.getBoundingClientRect();
-        left = imgRect.left - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
-        top = imgRect.top - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
-        width = imgRect.width;
-        height = imgRect.height;
+        const rawW = img.offsetWidth || imgRect.width;
+        const rawH = img.offsetHeight || imgRect.height;
+        const centerX = imgRect.left + imgRect.width / 2;
+        const centerY = imgRect.top + imgRect.height / 2;
+        width = curRotate !== 0 ? rawW : imgRect.width;
+        height = curRotate !== 0 ? rawH : imgRect.height;
+        left = (centerX - width / 2) - scrollRect.left - scrollArea.clientLeft + scrollArea.scrollLeft;
+        top = (centerY - height / 2) - scrollRect.top - scrollArea.clientTop + scrollArea.scrollTop;
     }
 
     if (width === 0 || height === 0) {
@@ -8123,33 +8412,12 @@ function setupImageMoveInteractions() {
         document.body.style.userSelect = 'none';
         moveHandle.classList.add('dragging');
 
-        // Ensure activeWrap is positioned directly relative to noteEditor
         const rect = activeWrap.getBoundingClientRect();
         const edRect = noteEditor.getBoundingClientRect();
-        const startL = rect.left - edRect.left;
-        const startT = rect.top - edRect.top;
-
-        if (activeWrap.parentNode !== noteEditor) {
-            noteEditor.appendChild(activeWrap);
-        }
-
         mouseOffsetX = clientX - rect.left;
         mouseOffsetY = clientY - rect.top;
-
-        curTargetLeft = Math.max(0, startL);
-        curTargetTop = Math.max(0, startT);
-
-        activeWrap.setAttribute('data-align', 'free');
-        activeWrap.style.position = 'absolute';
-        activeWrap.style.margin = '0';
-        activeWrap.style.display = 'inline-block';
-        activeWrap.style.left = `${Math.round(curTargetLeft)}px`;
-        activeWrap.style.top = `${Math.round(curTargetTop)}px`;
-        activeWrap.style.zIndex = '1000';
-        activeWrap.classList.add('moving-active');
-
-        updateAlignmentButtonsUI('free');
-        updateImageResizeOverlay();
+        curTargetLeft = Math.max(0, rect.left - edRect.left);
+        curTargetTop = Math.max(0, rect.top - edRect.top);
     };
 
     const handlePointerMove = (clientX, clientY) => {
@@ -8157,7 +8425,20 @@ function setupImageMoveInteractions() {
 
         const dist = Math.hypot(clientX - startClientX, clientY - startClientY);
         if (dist < 4 && !hasMoved) return;
-        hasMoved = true;
+        if (!hasMoved) {
+            hasMoved = true;
+            if (activeWrap.parentNode !== noteEditor) {
+                noteEditor.appendChild(activeWrap);
+            }
+            activeWrap.setAttribute('data-align', 'free');
+            activeWrap.style.position = 'absolute';
+            activeWrap.style.margin = '0';
+            activeWrap.style.display = 'inline-block';
+            activeWrap.style.float = 'none';
+            activeWrap.style.zIndex = '1000';
+            activeWrap.classList.add('moving-active');
+            updateAlignmentButtonsUI('free');
+        }
 
         const editorRect = noteEditor.getBoundingClientRect();
         let targetLeft = clientX - mouseOffsetX - editorRect.left;
@@ -8202,11 +8483,12 @@ function setupImageMoveInteractions() {
         // Unconditionally hide coordinate badge
         if (dropLine) dropLine.style.display = 'none';
         if (!isMoving) return;
+        const didMove = hasMoved;
         isMoving = false;
         hasMoved = false;
         document.body.style.userSelect = '';
         moveHandle.classList.remove('dragging');
-        if (activeWrap) {
+        if (activeWrap && didMove) {
             activeWrap.classList.remove('moving-active');
             activeWrap.style.zIndex = '15';
             activeWrap.style.left = `${Math.round(curTargetLeft)}px`;
@@ -8792,48 +9074,35 @@ function setupTableInteractions() {
         }
     });
 
-    // Start column drag resizing on mousedown
-    noteEditor.addEventListener('mousedown', (e) => {
-        if (state.isReadOnly) return;
-        const cell = e.target.closest('td, th');
-        if (!cell) return;
+    const startColResize = (cell, clientX) => {
+        isResizingTableCol = true;
+        resizeHoverCell = cell;
+        resizeTableElem = cell.closest('table');
+        resizeColIdx = cell.cellIndex;
+        resizeStartX = clientX;
+        resizeStartWidth = cell.offsetWidth;
 
-        const rect = cell.getBoundingClientRect();
-        const distFromRight = rect.right - e.clientX;
-        if (distFromRight >= -2 && distFromRight <= 8) {
-            e.preventDefault();
-            e.stopPropagation();
-
-            isResizingTableCol = true;
-            resizeHoverCell = cell;
-            resizeTableElem = cell.closest('table');
-            resizeColIdx = cell.cellIndex;
-            resizeStartX = e.clientX;
-            resizeStartWidth = cell.offsetWidth;
-
-            if (resizeTableElem) {
-                resizeTableElem.style.tableLayout = 'fixed';
-                const firstRow = resizeTableElem.rows[0];
-                if (firstRow) {
-                    for (let i = 0; i < firstRow.children.length; i++) {
-                        const colCell = firstRow.children[i];
-                        if (!colCell.style.width) {
-                            colCell.style.width = `${colCell.offsetWidth}px`;
-                        }
+        if (resizeTableElem) {
+            resizeTableElem.style.tableLayout = 'fixed';
+            const firstRow = resizeTableElem.rows[0];
+            if (firstRow) {
+                for (let i = 0; i < firstRow.children.length; i++) {
+                    const colCell = firstRow.children[i];
+                    if (!colCell.style.width) {
+                        colCell.style.width = `${colCell.offsetWidth}px`;
                     }
                 }
             }
-
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
         }
-    });
 
-    // Handle column resize dragging on window
-    window.addEventListener('mousemove', (e) => {
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    };
+
+    const moveColResize = (clientX) => {
         if (!isResizingTableCol || !resizeTableElem || resizeColIdx < 0) return;
 
-        const delta = e.clientX - resizeStartX;
+        const delta = clientX - resizeStartX;
         const newWidth = Math.max(35, resizeStartWidth + delta);
 
         for (const row of resizeTableElem.rows) {
@@ -8852,7 +9121,49 @@ function setupTableInteractions() {
         }
 
         updateTableResizeOverlay();
+    };
+
+    // Start column drag resizing on mousedown
+    noteEditor.addEventListener('mousedown', (e) => {
+        if (state.isReadOnly) return;
+        const cell = e.target.closest('td, th');
+        if (!cell) return;
+
+        const rect = cell.getBoundingClientRect();
+        const distFromRight = rect.right - e.clientX;
+        if (distFromRight >= -2 && distFromRight <= 8) {
+            e.preventDefault();
+            e.stopPropagation();
+            startColResize(cell, e.clientX);
+        }
     });
+
+    // Start column drag resizing on touchstart
+    noteEditor.addEventListener('touchstart', (e) => {
+        if (state.isReadOnly || !e.touches || e.touches.length !== 1) return;
+        const cell = e.target.closest('td, th');
+        if (!cell) return;
+
+        const touch = e.touches[0];
+        const rect = cell.getBoundingClientRect();
+        const distFromRight = rect.right - touch.clientX;
+        if (distFromRight >= -6 && distFromRight <= 16) {
+            e.preventDefault();
+            e.stopPropagation();
+            startColResize(cell, touch.clientX);
+        }
+    }, { passive: false });
+
+    // Handle column resize dragging on window
+    window.addEventListener('mousemove', (e) => {
+        moveColResize(e.clientX);
+    });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!isResizingTableCol || !e.touches || e.touches.length === 0) return;
+        e.preventDefault();
+        moveColResize(e.touches[0].clientX);
+    }, { passive: false });
 
     // Finish column resize dragging on window
     const finishColResize = () => {
@@ -8873,6 +9184,8 @@ function setupTableInteractions() {
 
     window.addEventListener('mouseup', finishColResize);
     window.addEventListener('mouseleave', finishColResize);
+    window.addEventListener('touchend', finishColResize);
+    window.addEventListener('touchcancel', finishColResize);
 }
 
 function setTableWidthFull() {
@@ -8950,15 +9263,25 @@ function adjustActiveColWidth(delta) {
 function addTableRow(above = false) {
     if (!state.activeTableCell || !state.activeTableElement) return;
     const tr = state.activeTableCell.closest('tr');
+    if (!tr) return;
+    const table = state.activeTableElement;
     const colsCount = tr.children.length;
+    const inThead = tr.parentNode && tr.parentNode.tagName === 'THEAD';
     const newTr = document.createElement('tr');
     for (let i = 0; i < colsCount; i++) {
-        const td = document.createElement('td');
-        td.contentEditable = true;
-        td.textContent = 'Item';
-        newTr.appendChild(td);
+        const cell = document.createElement(inThead && above ? 'th' : 'td');
+        cell.contentEditable = true;
+        cell.textContent = inThead && above ? 'Header' : 'Item';
+        newTr.appendChild(cell);
     }
-    if (above) {
+    if (inThead && !above) {
+        let tbody = table.querySelector('tbody');
+        if (!tbody) {
+            tbody = document.createElement('tbody');
+            table.appendChild(tbody);
+        }
+        tbody.insertBefore(newTr, tbody.firstChild);
+    } else if (above) {
         tr.parentNode.insertBefore(newTr, tr);
     } else {
         tr.parentNode.insertBefore(newTr, tr.nextSibling);
@@ -8987,9 +9310,18 @@ function addTableColumn(left = false) {
 
 function deleteTableRow() {
     if (!state.activeTableCell || !state.activeTableElement) return;
+    const table = state.activeTableElement;
     const tr = state.activeTableCell.closest('tr');
-    tr.remove();
-    updateTableResizeOverlay();
+    if (tr) tr.remove();
+    state.activeTableCell = null;
+    if (tableToolbar) tableToolbar.style.display = 'none';
+    if (table.rows.length === 0) {
+        table.remove();
+        state.activeTableElement = null;
+        hideTableResizeOverlay();
+    } else {
+        updateTableResizeOverlay();
+    }
     handleEditorInput();
 }
 
@@ -8997,16 +9329,28 @@ function deleteTableColumn() {
     if (!state.activeTableCell || !state.activeTableElement) return;
     const cellIdx = state.activeTableCell.cellIndex;
     const table = state.activeTableElement;
-    for (const row of table.rows) {
+    for (const row of Array.from(table.rows)) {
         if (row.children[cellIdx]) row.children[cellIdx].remove();
     }
-    updateTableResizeOverlay();
+    state.activeTableCell = null;
+    if (tableToolbar) tableToolbar.style.display = 'none';
+    const remainingCols = table.rows[0] ? table.rows[0].children.length : 0;
+    if (table.rows.length === 0 || remainingCols === 0) {
+        table.remove();
+        state.activeTableElement = null;
+        hideTableResizeOverlay();
+    } else {
+        updateTableResizeOverlay();
+    }
     handleEditorInput();
 }
 
 function deleteEntireTable() {
     if (!state.activeTableElement) return;
     state.activeTableElement.remove();
+    state.activeTableElement = null;
+    state.activeTableCell = null;
+    if (tableToolbar) tableToolbar.style.display = 'none';
     hideTableResizeOverlay();
     handleEditorInput();
 }
@@ -9020,11 +9364,15 @@ function hideFloatingToolbars() {
 }
 
 // --- Canvas Auto-Crop & Transparency Helpers ---
-function isCanvasEmpty(canvas) {
+function isCanvasEmpty(canvas, isTransparent = state.paintTransparentBg) {
     const ctx = canvas.getContext('2d');
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    for (let i = 3; i < data.length; i += 4) {
-        if (data[i] > 10) return false;
+    for (let i = 0; i < data.length; i += 4) {
+        const a = data[i + 3];
+        if (a > 10) {
+            if (isTransparent) return false;
+            if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) return false;
+        }
     }
     return true;
 }
@@ -9232,21 +9580,10 @@ function setupPaintStudio() {
         };
     }
 
-    function startPaint(pt) {
-        state.isPainting = true;
-        state.paintPoints = [pt];
-        ctx.beginPath();
-        ctx.moveTo(pt.x, pt.y);
-    }
-
-    function drawPaint(pt) {
-        if (!state.isPainting) return;
-        state.paintPoints.push(pt);
-
+    function configurePaintStroke() {
         ctx.lineWidth = state.paintTool === 'eraser' ? state.paintWidth * 2.5 : state.paintWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-
         if (state.paintTool === 'eraser') {
             if (state.paintTransparentBg) {
                 ctx.globalCompositeOperation = 'destination-out';
@@ -9255,28 +9592,44 @@ function setupPaintStudio() {
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.strokeStyle = '#ffffff';
             }
-            ctx.lineTo(pt.x, pt.y);
-            ctx.stroke();
-        } else if (state.paintTool === 'signature') {
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.strokeStyle = state.paintColor;
-            if (state.paintPoints.length >= 3) {
-                const p0 = state.paintPoints[state.paintPoints.length - 2];
-                const p1 = state.paintPoints[state.paintPoints.length - 1];
-                const midX = (p0.x + p1.x) / 2;
-                const midY = (p0.y + p1.y) / 2;
-                ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
-                ctx.stroke();
-            } else {
-                ctx.lineTo(pt.x, pt.y);
-                ctx.stroke();
-            }
         } else {
-            // Freehand brush
             ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = state.paintColor;
+        }
+    }
+
+    function startPaint(pt) {
+        state.isPainting = true;
+        state.paintPoints = [pt];
+        state.lastPaintMid = pt;
+        configurePaintStroke();
+        ctx.beginPath();
+        ctx.moveTo(pt.x, pt.y);
+        ctx.lineTo(pt.x + 0.01, pt.y + 0.01);
+        ctx.stroke();
+    }
+
+    function drawPaint(pt) {
+        if (!state.isPainting) return;
+        const pts = state.paintPoints;
+        const prev = pts[pts.length - 1];
+        pts.push(pt);
+        configurePaintStroke();
+
+        if (state.paintTool === 'signature' && pts.length >= 3) {
+            const mid = { x: (prev.x + pt.x) / 2, y: (prev.y + pt.y) / 2 };
+            const lastMid = state.lastPaintMid || prev;
+            ctx.beginPath();
+            ctx.moveTo(lastMid.x, lastMid.y);
+            ctx.quadraticCurveTo(prev.x, prev.y, mid.x, mid.y);
+            ctx.stroke();
+            state.lastPaintMid = mid;
+        } else {
+            ctx.beginPath();
+            ctx.moveTo(prev.x, prev.y);
             ctx.lineTo(pt.x, pt.y);
             ctx.stroke();
+            state.lastPaintMid = pt;
         }
     }
 
@@ -9284,6 +9637,7 @@ function setupPaintStudio() {
         if (state.isPainting) {
             state.isPainting = false;
             state.paintPoints = [];
+            state.lastPaintMid = null;
             ctx.globalCompositeOperation = 'source-over';
         }
     }
@@ -9307,12 +9661,14 @@ function setupPaintStudio() {
     }, { passive: false });
 
     canvas.addEventListener('touchend', stopPaint);
+    canvas.addEventListener('touchcancel', stopPaint);
 
     if (btnInsert) {
         btnInsert.onclick = () => {
             const cropped = getCroppedCanvas(canvas, state.paintTransparentBg);
             const dataUrl = getOptimizedCanvasDataUrl(cropped, state.paintTransparentBg);
             const chosenAlign = state.paintAlignment || 'center';
+            clearCanvas();
             closePaintModal();
             restoreSelection();
             if (state.paintTool === 'signature') {
@@ -9631,11 +9987,12 @@ function setupShapeStudio() {
     if (btnConfirm) {
         btnConfirm.onclick = () => {
             const s = state.shapeState;
-            const { fullSvg, calcW } = generateShapeSvg(s.shape, s.color, s.mode, s.strokeWidth, s.size);
+            const normMode = (s.mode === 'outline') ? 'none' : (s.mode || 'none');
+            const { fullSvg, calcW } = generateShapeSvg(s.shape, s.color, normMode, s.strokeWidth, s.size);
             const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(fullSvg);
             closeShapeModal();
             restoreSelection();
-            insertShapeElement(dataUrl, `${s.shape} shape`, calcW);
+            insertShapeElement(dataUrl, `${s.shape} shape`, calcW, { ...s, mode: normMode });
         };
     }
 
@@ -9660,11 +10017,17 @@ function closeShapeModal() {
     if (modal) modal.style.display = 'none';
 }
 
-function insertShapeElement(src, alt, width) {
+function insertShapeElement(src, alt, width, shapeMeta = null) {
     if (state.isReadOnly) return;
     noteEditor.focus();
     const w = width ? `${width}px` : '220px';
-    const html = `<p><br></p><div class="editor-img-wrap editor-shape-wrap" style="margin: 14px 0; display: inline-block; max-width: 100%; border: none; background: transparent;"><img class="note-vector-shape" src="${src}" alt="${alt || 'Shape'}" style="width: ${w}; max-width: 100%; height: auto; display: block; border: none; background: transparent; box-shadow: none;"></div><p><br></p>`;
+    const meta = shapeMeta || state.shapeState || {};
+    const shapeType = meta.shape || 'rect';
+    const shapeColor = meta.color || '#00ffff';
+    const shapeMode = (meta.mode === 'outline' || !meta.mode) ? 'none' : meta.mode;
+    const shapeWidth = meta.strokeWidth || 3;
+    const shapeStyle = meta.strokeStyle || 'solid';
+    const html = `<p><br></p><div class="editor-img-wrap editor-shape-wrap" data-shape-type="${escapeHtml(shapeType)}" data-shape-color="${escapeHtml(shapeColor)}" data-shape-mode="${escapeHtml(shapeMode)}" data-shape-width="${shapeWidth}" data-shape-style="${escapeHtml(shapeStyle)}" style="margin: 14px 0; display: inline-block; max-width: 100%; border: none; background: transparent;"><img class="note-vector-shape" src="${src}" alt="${escapeHtml(alt || 'Shape')}" style="width: ${w}; max-width: 100%; height: auto; display: block; border: none; background: transparent; box-shadow: none;"></div><p><br></p>`;
     document.execCommand('insertHTML', false, html);
     handleEditorInput();
 }
@@ -9784,15 +10147,11 @@ function setupNoteShapeDrawing() {
     let startY = 0;
     let ghost = null;
 
-    noteEditor.addEventListener('mousedown', (e) => {
-        if (!state.isDrawingShapeMode || state.isReadOnly) return;
-        e.preventDefault();
-        e.stopPropagation();
-
+    const startShapeDraw = (clientX, clientY) => {
         isDrawing = true;
         const edRect = noteEditor.getBoundingClientRect();
-        startX = e.clientX - edRect.left;
-        startY = e.clientY - edRect.top;
+        startX = clientX - edRect.left;
+        startY = clientY - edRect.top;
 
         ghost = document.createElement('div');
         ghost.id = 'shape-draw-ghost';
@@ -9802,13 +10161,13 @@ function setupNoteShapeDrawing() {
         ghost.style.height = '0px';
         ghost.innerHTML = `<span style="position:absolute;top:-24px;left:0;background:#0f172a;color:#00ffff;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid #00ffff;white-space:nowrap;" id="ghost-dim">0 × 0</span>`;
         noteEditor.appendChild(ghost);
-    });
+    };
 
-    window.addEventListener('mousemove', (e) => {
+    const moveShapeDraw = (clientX, clientY) => {
         if (!isDrawing || !ghost) return;
         const edRect = noteEditor.getBoundingClientRect();
-        const curX = e.clientX - edRect.left;
-        const curY = e.clientY - edRect.top;
+        const curX = clientX - edRect.left;
+        const curY = clientY - edRect.top;
 
         const left = Math.min(startX, curX);
         const top = Math.min(startY, curY);
@@ -9822,7 +10181,41 @@ function setupNoteShapeDrawing() {
 
         const dim = document.getElementById('ghost-dim');
         if (dim) dim.textContent = `${Math.round(width)} × ${Math.round(height)}`;
+    };
+
+    const cancelShapeDraw = () => {
+        isDrawing = false;
+        state.isDrawingShapeMode = false;
+        noteEditor.style.cursor = '';
+        if (ghost) {
+            ghost.remove();
+            ghost = null;
+        }
+    };
+
+    noteEditor.addEventListener('mousedown', (e) => {
+        if (!state.isDrawingShapeMode || state.isReadOnly) return;
+        e.preventDefault();
+        e.stopPropagation();
+        startShapeDraw(e.clientX, e.clientY);
     });
+
+    noteEditor.addEventListener('touchstart', (e) => {
+        if (!state.isDrawingShapeMode || state.isReadOnly || !e.touches || e.touches.length !== 1) return;
+        e.preventDefault();
+        e.stopPropagation();
+        startShapeDraw(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
+    window.addEventListener('mousemove', (e) => {
+        moveShapeDraw(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!isDrawing || !e.touches || e.touches.length === 0) return;
+        e.preventDefault();
+        moveShapeDraw(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
 
     const finishDrawing = () => {
         if (!isDrawing) return;
@@ -9851,15 +10244,12 @@ function setupNoteShapeDrawing() {
     };
 
     window.addEventListener('mouseup', finishDrawing);
+    window.addEventListener('touchend', finishDrawing);
+    window.addEventListener('touchcancel', cancelShapeDraw);
 
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && state.isDrawingShapeMode) {
-            state.isDrawingShapeMode = false;
-            noteEditor.style.cursor = '';
-            if (ghost) {
-                ghost.remove();
-                ghost = null;
-            }
+            cancelShapeDraw();
             showToast('Shape drawing mode cancelled');
         }
     });
@@ -9970,6 +10360,10 @@ function performFind() {
 }
 
 function performReplace() {
+    if (state.isReadOnly) {
+        showToast('Note is Read-Only.', 'warning');
+        return;
+    }
     const query = findInput.value;
     const replacement = replaceInput.value;
     if (!query) return;
@@ -9985,14 +10379,35 @@ function performReplace() {
 }
 
 function performReplaceAll() {
+    if (state.isReadOnly) {
+        showToast('Note is Read-Only.', 'warning');
+        return;
+    }
     const query = findInput.value;
     const replacement = replaceInput.value;
-    if (!query) return;
+    if (!query || !noteEditor) return;
 
     const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    noteEditor.innerHTML = noteEditor.innerHTML.replace(regex, replacement);
-    handleEditorInput();
-    findCount.textContent = 'All replaced';
+    const walker = document.createTreeWalker(noteEditor, NodeFilter.SHOW_TEXT, null);
+    const textNodes = [];
+    let current;
+    while ((current = walker.nextNode())) {
+        if (current.nodeValue && regex.test(current.nodeValue)) {
+            regex.lastIndex = 0;
+            textNodes.push(current);
+        }
+    }
+    let replacedCount = 0;
+    for (const tNode of textNodes) {
+        tNode.nodeValue = tNode.nodeValue.replace(regex, () => {
+            replacedCount++;
+            return replacement;
+        });
+    }
+    if (replacedCount > 0) {
+        handleEditorInput();
+    }
+    findCount.textContent = replacedCount > 0 ? `Replaced ${replacedCount}` : '0 matches';
 }
 
 // --- Tree Info Modal ---
@@ -10084,21 +10499,38 @@ function closeGitHubModal() {
 }
 
 async function connectAndSyncGitHub() {
-    const username = document.getElementById('gh-username').value.trim();
-    const repo = document.getElementById('gh-repo').value.trim();
-    const token = document.getElementById('gh-token').value.trim();
+    const settingsRepoRaw = document.getElementById('gh-repo-settings')?.value.trim() || '';
+    const settingsToken = document.getElementById('gh-token-settings')?.value.trim() || '';
+    const settingsBranch = document.getElementById('gh-branch-settings')?.value.trim() || state.githubBranch || 'main';
+
+    let username = document.getElementById('gh-username')?.value.trim() || '';
+    let repo = document.getElementById('gh-repo')?.value.trim() || '';
+    let token = settingsToken || document.getElementById('gh-token')?.value.trim() || state.githubToken || '';
+
+    if (settingsRepoRaw) {
+        if (settingsRepoRaw.includes('/')) {
+            const parts = settingsRepoRaw.split('/').map(s => s.trim()).filter(Boolean);
+            username = parts[0] || username;
+            repo = parts[1] || repo;
+        } else {
+            repo = settingsRepoRaw;
+        }
+    }
+
     const statusDiv = document.getElementById('gh-sync-status');
 
     if (!username || !repo || !token) {
-        statusDiv.innerHTML = '<span style="color:var(--danger);">Please enter username, repo name, and Personal Access Token.</span>';
+        if (statusDiv) statusDiv.innerHTML = '<span style="color:var(--danger);">Please enter username/repo (e.g. user/repo) and Personal Access Token.</span>';
+        showToast('Please enter GitHub repository (owner/repo) and Personal Access Token.', 'warning');
         return;
     }
 
-    localStorage.setItem('cybernote_gh_config', JSON.stringify({ username, repo, token }));
-    statusDiv.innerHTML = 'Connecting to GitHub API...';
+    safeLocalStorageSet('cybernote_gh_config', JSON.stringify({ username, repo, token, branch: settingsBranch }));
+    if (statusDiv) statusDiv.innerHTML = 'Connecting to GitHub API...';
+    showToast('Syncing notes to GitHub...', 'info');
 
     try {
-        const testRes = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
+        const testRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(username)}/${encodeURIComponent(repo)}`, {
             headers: {
                 'Authorization': `token ${token}`,
                 'Accept': 'application/vnd.github.v3+json'
@@ -10109,14 +10541,18 @@ async function connectAndSyncGitHub() {
             throw new Error(`GitHub returned status ${testRes.status}`);
         }
 
-        statusDiv.innerHTML = 'Backing up notes to repository...';
+        if (statusDiv) statusDiv.innerHTML = 'Backing up notes to repository...';
         const allNodes = Array.from(state.nodes.values());
-        const jsonContent = JSON.stringify(allNodes, null, 2);
+        let jsonContent = JSON.stringify(allNodes, null, 2);
+        const e2eePass = state.e2eePassword || localStorage.getItem('cybernote_e2ee_pass');
+        if (state.e2eeEnabled && e2eePass && window.crypto?.subtle) {
+            jsonContent = await encryptData(jsonContent, e2eePass);
+        }
         const encodedContent = btoa(unescape(encodeURIComponent(jsonContent)));
 
         let sha = null;
         try {
-            const checkFile = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/data/notes.json`, {
+            const checkFile = await fetch(`https://api.github.com/repos/${encodeURIComponent(username)}/${encodeURIComponent(repo)}/contents/data/notes.json?ref=${encodeURIComponent(settingsBranch)}`, {
                 headers: {
                     'Authorization': `token ${token}`,
                     'Accept': 'application/vnd.github.v3+json'
@@ -10128,7 +10564,7 @@ async function connectAndSyncGitHub() {
             }
         } catch (e) {}
 
-        const putRes = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/data/notes.json`, {
+        const putRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(username)}/${encodeURIComponent(repo)}/contents/data/notes.json`, {
             method: 'PUT',
             headers: {
                 'Authorization': `token ${token}`,
@@ -10138,23 +10574,30 @@ async function connectAndSyncGitHub() {
             body: JSON.stringify({
                 message: `Update notes backup [${new Date().toISOString()}]`,
                 content: encodedContent,
+                branch: settingsBranch,
                 sha: sha || undefined
             })
         });
 
         if (putRes.ok) {
-            statusDiv.innerHTML = `
-                <div style="color:var(--success); font-weight:600;">✓ Connected & synced to GitHub!</div>
-                <div style="font-size:0.8rem; margin-top:4px;">Repo: <b>${username}/${repo}</b></div>
-                <div style="font-size:0.8rem;">Live: <code>https://${username}.github.io/${repo}/</code></div>
-            `;
+            const safeUser = escapeHtml(username);
+            const safeRepo = escapeHtml(repo);
+            if (statusDiv) {
+                statusDiv.innerHTML = `
+                    <div style="color:var(--success); font-weight:600;">Connected &amp; synced to GitHub!</div>
+                    <div style="font-size:0.8rem; margin-top:4px;">Repo: <b>${safeUser}/${safeRepo}</b></div>
+                    <div style="font-size:0.8rem;">Live: <code>https://${safeUser}.github.io/${safeRepo}/</code></div>
+                `;
+            }
             setSyncStatus('live', `Synced to GitHub (${username}/${repo})`);
+            showToast(`Synced to GitHub (${username}/${repo})`, 'success');
         } else {
-            const errData = await putRes.json();
+            const errData = await putRes.json().catch(() => ({}));
             throw new Error(errData.message || 'Failed to sync');
         }
     } catch (err) {
-        statusDiv.innerHTML = `<span style="color:var(--danger);">Error: ${err.message}</span>`;
+        if (statusDiv) statusDiv.innerHTML = `<span style="color:var(--danger);">Error: ${escapeHtml(err.message)}</span>`;
+        showToast(`GitHub Sync Error: ${err.message}`, true);
     }
 }
 
@@ -10365,6 +10808,10 @@ function performUndo() {
         editorHistory.isUndoingRedoing = true;
         editorHistory.index--;
         const previousHtml = editorHistory.stack[editorHistory.index];
+        hideFloatingToolbars();
+        state.activeImageElement = null;
+        state.activeTableElement = null;
+        state.activeTableCell = null;
         noteEditor.innerHTML = previousHtml;
 
         const node = state.nodes.get(state.activeNodeId);
@@ -10373,6 +10820,7 @@ function performUndo() {
             node.updated_at = Date.now();
         }
         scheduleSave('content', previousHtml);
+        scheduleDriveAutoBackup();
         updateWordStats();
         updateDocumentStats();
         updateUndoRedoUI();
@@ -10388,6 +10836,7 @@ function performUndo() {
         noteEditor.focus();
         const success = document.execCommand('undo');
         if (success) {
+            handleEditorInput();
             updateWordStats();
             updateDocumentStats();
             showToast('↺ Undo');
@@ -10404,6 +10853,10 @@ function performRedo() {
         editorHistory.isUndoingRedoing = true;
         editorHistory.index++;
         const nextHtml = editorHistory.stack[editorHistory.index];
+        hideFloatingToolbars();
+        state.activeImageElement = null;
+        state.activeTableElement = null;
+        state.activeTableCell = null;
         noteEditor.innerHTML = nextHtml;
 
         const node = state.nodes.get(state.activeNodeId);
@@ -10412,6 +10865,7 @@ function performRedo() {
             node.updated_at = Date.now();
         }
         scheduleSave('content', nextHtml);
+        scheduleDriveAutoBackup();
         updateWordStats();
         updateDocumentStats();
         updateUndoRedoUI();
@@ -10427,6 +10881,7 @@ function performRedo() {
         noteEditor.focus();
         const success = document.execCommand('redo');
         if (success) {
+            handleEditorInput();
             updateWordStats();
             updateDocumentStats();
             showToast('↻ Redo');
@@ -10504,16 +10959,16 @@ function convertMarkdownToHtml(md) {
     const isHtml = /<\s*\/?(?:div|span|p|b|i|u|s|h[1-6]|table|thead|tbody|tr|td|th|ul|ol|li|code|pre|blockquote|hr|br|img|mark|kbd|input|button|a|svg)\b/i.test(md);
     let html = isHtml ? md : escapeHtml(md);
 
+    const codeBlocks = [];
     html = html.replace(/```([a-zA-Z0-9_\-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
         const language = lang || 'code';
-        return `
-            <div class="code-box" contenteditable="false">
-                <div class="code-box-header"><span>${language.toUpperCase()}</span><button class="btn-copy-code" onclick="copySnippet(this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code</button></div>
-                <pre contenteditable="true"><code>${code.trim()}</code></pre>
-            </div><p><br></p>
-        `;
+        const blockHtml = `<div class="code-box" contenteditable="false"><div class="code-box-header"><span>${escapeHtml(language.toUpperCase())}</span><button class="btn-copy-code" onclick="copySnippet(this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Code</button></div><pre contenteditable="true"><code>${code.trim()}</code></pre></div><p><br></p>`;
+        const idx = codeBlocks.length;
+        codeBlocks.push(blockHtml);
+        return `@@CYBERNOTE_CODEBLOCK_${idx}@@`;
     });
 
+    const todoOnchange = `if(this.checked){this.setAttribute('checked','checked');}else{this.removeAttribute('checked');}this.nextElementSibling.classList.toggle('todo-done',this.checked);if(typeof handleEditorInput==='function')handleEditorInput();`;
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
     html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
     html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
@@ -10521,11 +10976,12 @@ function convertMarkdownToHtml(md) {
     html = html.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
     html = html.replace(/\*([^*]+)\*/g, '<i>$1</i>');
     html = html.replace(/~~([^~]+)~~/g, '<s>$1</s>');
-    html = html.replace(/^- \[x\] (.*$)/gim, '<div class="todo-item" contenteditable="false"><input type="checkbox" checked onchange="this.nextElementSibling.classList.toggle(\'todo-done\')"><span contenteditable="true" class="todo-text todo-done">$1</span></div>');
-    html = html.replace(/^- \[ \] (.*$)/gim, '<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="this.nextElementSibling.classList.toggle(\'todo-done\')"><span contenteditable="true" class="todo-text">$1</span></div>');
+    html = html.replace(/^- \[x\] (.*$)/gim, `<div class="todo-item" contenteditable="false"><input type="checkbox" checked="checked" onchange="${todoOnchange}"><span contenteditable="true" class="todo-text todo-done">$1</span></div>`);
+    html = html.replace(/^- \[ \] (.*$)/gim, `<div class="todo-item" contenteditable="false"><input type="checkbox" onchange="${todoOnchange}"><span contenteditable="true" class="todo-text">$1</span></div>`);
     html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
     html = html.replace(/\n\n/g, '<p></p>');
     html = html.replace(/\n/g, '<br>');
+    html = html.replace(/@@CYBERNOTE_CODEBLOCK_(\d+)@@/g, (_, idx) => codeBlocks[Number(idx)] || '');
     return html;
 }
 
@@ -10567,6 +11023,10 @@ function renderTagChips(tagsString = '') {
         nameSpan.onclick = () => {
             const searchInput = document.getElementById('global-search');
             if (searchInput) {
+                if (window.innerWidth <= 768) {
+                    const hdrCenter = document.getElementById('header-center-search');
+                    if (hdrCenter) hdrCenter.classList.add('mobile-search-open');
+                }
                 searchInput.value = tag;
                 performGlobalSearch(tag);
             }
@@ -10604,10 +11064,12 @@ function addTagToCurrentNode(rawTag) {
     if (!currentTags.includes(clean)) {
         currentTags.push(clean);
         const newTagStr = currentTags.join(', ');
-        node.tags = newTagStr;
+        if (noteTagsInput) noteTagsInput.value = newTagStr;
         scheduleSave('tags', newTagStr);
+        node.tags = newTagStr;
         saveLocalNodesBackup();
         renderTagChips(newTagStr);
+        if (isUserSignedIn()) scheduleDriveAutoBackup();
     }
 }
 
@@ -10622,15 +11084,18 @@ function removeTagFromCurrentNode(tagToRemove) {
         .filter(t => t.length > 0 && t !== tagToRemove);
 
     const newTagStr = currentTags.join(', ');
-    node.tags = newTagStr;
+    if (noteTagsInput) noteTagsInput.value = newTagStr;
     scheduleSave('tags', newTagStr);
+    node.tags = newTagStr;
     saveLocalNodesBackup();
     renderTagChips(newTagStr);
+    if (isUserSignedIn()) scheduleDriveAutoBackup();
 }
 
 function setupTagInteractions() {
     const input = document.getElementById('note-tags-input');
-    if (!input) return;
+    if (!input || input.dataset.tagBound === '1') return;
+    input.dataset.tagBound = '1';
 
     input.addEventListener('keydown', (e) => {
         if (state.isReadOnly) return;
@@ -11264,10 +11729,10 @@ function generateCodeBoxHtml(rows) {
     }
     const safeCode = escapeHtml(codeText.trimEnd());
     return `
-        <div class="code-box">
-            <div class="code-box-header">
+        <div class="code-box" contenteditable="false">
+            <div class="code-box-header" contenteditable="false">
                 <span>TERMINAL REFERENCE</span>
-                <button class="btn-copy-code" onclick="copyCodeBoxContent(this)">Copy</button>
+                <button class="btn-copy-code" onclick="copySnippet(this)">Copy</button>
             </div>
             <pre contenteditable="true">${safeCode}</pre>
         </div><p><br></p>`;
@@ -11530,19 +11995,19 @@ function setupEventListeners() {
         btn.addEventListener('touchstart', () => {
             isSyncButtonPressed = true;
         }, { passive: true });
+        btn.addEventListener('mouseleave', () => {
+            if (!isDirectSyncRunning) isSyncButtonPressed = false;
+        });
+        btn.addEventListener('touchcancel', () => {
+            if (!isDirectSyncRunning) isSyncButtonPressed = false;
+        }, { passive: true });
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             syncActiveNoteDirectly();
         });
     });
-    const btnQuickZen = document.getElementById('btn-quick-zen');
-    if (btnQuickZen) {
-        btnQuickZen.addEventListener('click', (e) => {
-            e.preventDefault();
-            toggleZenMode();
-        });
-    }
+    // Note: #btn-quick-zen already has onclick="toggleZenMode()" in index.html; do not double-bind!
 
     // Sync Conflict / Merge Modal Actions
     const btnSyncMerge = document.getElementById('btn-sync-merge');
@@ -12478,7 +12943,9 @@ function setupEventListeners() {
                 }
             }
         }
-        if (isCtrl && e.key.toLowerCase() === 'z') {
+        const activeTag = document.activeElement?.tagName;
+        const isFormField = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
+        if (!isFormField && isCtrl && e.key.toLowerCase() === 'z') {
             e.preventDefault();
             if (e.shiftKey) {
                 performRedo();
@@ -12486,7 +12953,7 @@ function setupEventListeners() {
                 performUndo();
             }
         }
-        if (isCtrl && e.key.toLowerCase() === 'y') {
+        if (!isFormField && isCtrl && e.key.toLowerCase() === 'y') {
             e.preventDefault();
             performRedo();
         }
@@ -13005,7 +13472,15 @@ function openSlashMenuAtCursor() {
     if (!selection || !selection.rangeCount) return;
 
     const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
+    let rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) {
+        const containerEl = range.startContainer.nodeType === Node.ELEMENT_NODE
+            ? range.startContainer
+            : range.startContainer.parentElement;
+        rect = (containerEl && containerEl.getBoundingClientRect)
+            ? containerEl.getBoundingClientRect()
+            : noteEditor.getBoundingClientRect();
+    }
 
     slashState.active = true;
     slashState.query = '';
@@ -13021,11 +13496,11 @@ function openSlashMenuAtCursor() {
         menuX = window.innerWidth - 320;
     }
     if (menuY + 360 > window.innerHeight) {
-        menuY = Math.max(10, Math.round(rect.top - 370));
+        menuY = Math.max(16, Math.round(rect.top - 370));
     }
 
     slashMenu.style.left = `${Math.max(16, menuX)}px`;
-    slashMenu.style.top = `${menuY}px`;
+    slashMenu.style.top = `${Math.max(16, menuY)}px`;
 
     renderSlashMenuItems();
 }
@@ -13060,6 +13535,7 @@ function executeSlashCommand(cmd) {
         }
     }
 
+    saveSelection();
     closeSlashMenu();
 
     if (cmd && typeof cmd.action === 'function') {
@@ -13075,6 +13551,7 @@ function setupSlashCommandMenu() {
         if (!slashState.active) {
             if (e.key === '/') {
                 setTimeout(() => {
+                    if (slashState.active) return;
                     const sel = window.getSelection();
                     if (!sel || !sel.rangeCount) return;
                     const node = sel.anchorNode;
@@ -13480,6 +13957,12 @@ function checkAndShowMobileInstallPrompt() {
 
     if (isStandalone) return;
 
+    // 2.5 Do NOT show while the mandatory welcome/auth modal is blocking the screen
+    const welcomeModal = document.getElementById('welcome-modal');
+    if (welcomeModal && (welcomeModal.classList.contains('mandatory-auth-active') || welcomeModal.style.display === 'flex')) {
+        return;
+    }
+
     // 3. Do NOT show if the user dismissed recently (within 3 days)
     const dismissedAt = parseInt(localStorage.getItem('cybernote_mobile_install_dismissed') || '0', 10);
     if (Date.now() - dismissedAt < 3 * 24 * 60 * 60 * 1000) return;
@@ -13546,6 +14029,3 @@ async function triggerPwaInstall() {
     }
 }
 window.triggerPwaInstall = triggerPwaInstall;
-
-// Trigger check shortly after page load on mobile devices (e.g. for iOS Safari or if beforeinstallprompt already fired)
-setTimeout(checkAndShowMobileInstallPrompt, 2000);

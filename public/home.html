@@ -6,6 +6,18 @@
     <title>CyberNote 🛡️ - Secure Hierarchical Knowledge & Cloud Notes</title>
     <meta name="description" content="CyberNote is a free, privacy-focused hierarchical notebook and knowledge base with offline PWA support and optional Google Drive cloud backup. No login required.">
     <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CyberNote">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./sw.js').catch(function() {});
+            });
+        }
+    </script>
 
     <!-- CyberNote Smart Failover & Main Web Redirection System -->
     <script>
@@ -46,12 +58,12 @@
             var probeImg = new Image();
             probeImg.onload = handleMainSiteOnline;
             probeImg.onerror = function() {
-                try {
-                    fetch('https://cybernote.cybertubelk.xyz/index.html?probe=' + Date.now(), {
-                        mode: 'no-cors',
-                        cache: 'no-store'
-                    }).then(handleMainSiteOnline).catch(function() {});
-                } catch(e) {}
+                if (!resolved) {
+                    resolved = true;
+                    clearTimeout(timeoutId);
+                    console.warn('[CyberNote Failover] Main web probe failed. Staying on GitHub Pages backup mirror.');
+                    sessionStorage.setItem('cybernote_stay_backup', '1');
+                }
             };
             probeImg.src = 'https://cybernote.cybertubelk.xyz/icons/icon-192.png?probe=' + Date.now();
         } catch (e) {
@@ -464,6 +476,33 @@
             color: var(--text-muted);
             font-size: 0.85rem;
             line-height: 1.6;
+        }
+        @media (max-width: 768px) {
+            .landing-nav {
+                padding: 12px 16px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            .nav-links {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            .hero-section {
+                padding: 40px 16px 28px;
+            }
+            .hero-title {
+                font-size: 2rem;
+            }
+            .hero-subtitle {
+                font-size: 1rem;
+            }
+            .hero-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .features-grid {
+                padding: 20px 16px 40px;
+            }
         }
     </style>
 </head>
